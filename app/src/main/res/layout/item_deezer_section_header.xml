@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A section heading inside the Deezer page's list: SectionHeader, as on every other page. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/SectionHeader">
+
+    <TextView
+        android:id="@+id/deezer_section_title"
+        style="@style/TitleLarge"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/deezer_section_action"
+        style="@style/SectionAction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+</LinearLayout>

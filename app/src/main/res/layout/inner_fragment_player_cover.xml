@@ -1,0 +1,50 @@
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:paddingHorizontal="24dp">
+
+    <!--
+        Three sleeves rather than one: the track playing, and the one on either
+        side of it parked a page away so a sideways drag has something to pull
+        into view.
+
+        clipChildren belongs on this page rather than on the strip - a view is
+        confined by its parent's flag, not by its own - and turning it off here
+        lets a neighbour travel right up to the edge of the screen, where the
+        pager around the page finally cuts it off, instead of appearing out of
+        the 24dp gutter.
+    -->
+    <FrameLayout
+        android:id="@+id/now_playing_cover_strip"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/now_playing_song_cover_previous"
+            style="@style/Widget.Platter.Cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/now_playing_song_cover_image_view"
+            style="@style/Widget.Platter.Cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/now_playing_song_cover_next"
+            style="@style/Widget.Platter.Cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

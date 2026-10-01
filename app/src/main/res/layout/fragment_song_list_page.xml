@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A list of tracks that is not a record of its own: a genre, a year, an
+    artist's top tracks, recently played and the like. The list header every
+    catalogue shares (ListHeader), then Play and Shuffle as the first row of
+    the list, as on a playlist.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
+
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed|snap"
+            app:titleEnabled="false">
+
+            <LinearLayout style="@style/ListHeader">
+
+                <TextView
+                    android:id="@+id/page_title_label"
+                    style="@style/ListHeaderTitle"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/page_caption_label"
+                    style="@style/ListHeaderCaption"
+                    tools:text="@string/label_placeholder" />
+
+                <!-- What the genre is, on a genre's page; gone everywhere else. -->
+                <TextView
+                    android:id="@+id/page_description_label"
+                    style="@style/ListHeaderCaption"
+                    android:paddingTop="@dimen/spacing_8"
+                    android:visibility="gone"
+                    tools:text="@string/genre_trip_hop_about"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_arrow_back"
+                app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+        android:id="@+id/song_list_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/global_padding_bottom"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

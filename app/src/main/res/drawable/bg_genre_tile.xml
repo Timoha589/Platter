@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A genre tile: DESIGN.md's card - the graphite surface at the card radius,
+     told apart from the canvas by colour alone, with no border or stripe. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/graphite" />
+    <corners android:radius="@dimen/radius_card" />
+</shape>

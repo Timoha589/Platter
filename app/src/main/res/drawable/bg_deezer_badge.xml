@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The download badge on a Deezer artist's portrait: a graphite disc with a
+     black ring, so it separates from any photo behind it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/graphite" />
+    <stroke
+        android:width="3dp"
+        android:color="@color/void_black" />
+</shape>

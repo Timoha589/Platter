@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Header wash of the artist, album and playlist pages. DESIGN.md gets its
+    depth from surface colour shifts rather than shadow, so the header is a
+    vertical ramp down the Spotify
+    surface ladder (smoke -> graphite -> carbon) that lands exactly on the page
+    background, leaving no seam under the portrait or cover.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="@color/smoke"
+        android:centerColor="@color/graphite"
+        android:endColor="@color/carbon"
+        android:type="linear" />
+</shape>

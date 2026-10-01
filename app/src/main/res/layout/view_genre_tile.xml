@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One genre, as the library's genre rail and the genre catalogue both show
+    it. DESIGN.md's card: graphite at the card radius, 12dp in from the sides, the name in
+    white 14sp semibold and what it holds in mist under it.
+
+    It used to carry a green stripe down its left edge. Green is the play
+    colour, and a stripe on every tile of a grid is the decorative border
+    DESIGN.md rules out; it also made the one element on the page that is
+    not a button look like one to press first.
+
+    Fixed height, so a name that wraps does not make one tile of a row taller
+    than its neighbour: two lines of name and the count fit in it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/genre_tile"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/genre_tile_height"
+    android:background="@drawable/bg_genre_tile"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/spacing_12"
+    android:paddingTop="@dimen/spacing_8"
+    android:paddingEnd="@dimen/spacing_12"
+    android:paddingBottom="@dimen/spacing_8">
+
+    <TextView
+        android:id="@+id/genre_label"
+        style="@style/LabelMedium"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="2"
+        tools:text="@string/label_placeholder" />
+
+    <TextView
+        android:id="@+id/genre_meta"
+        style="@style/LabelSmall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:paddingTop="2dp"
+        android:singleLine="true"
+        tools:text="@string/label_placeholder" />
+</LinearLayout>

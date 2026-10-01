@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The player's primary action: a filled white circle (DESIGN.md — the
+     primary action on a dark surface is always a white pill). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/scrim_50">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/pure_white" />
+        </shape>
+    </item>
+</ripple>

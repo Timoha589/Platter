@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A server rack, monoline: the glyph for a Subsonic server in the login list. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/titleTextColor"
+        android:strokeWidth="1.8"
+        android:pathData="M5,4h14a1.5,1.5 0 0,1 1.5,1.5v3.5a1.5,1.5 0 0,1 -1.5,1.5h-14a1.5,1.5 0 0,1 -1.5,-1.5v-3.5a1.5,1.5 0 0,1 1.5,-1.5z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/titleTextColor"
+        android:strokeWidth="1.8"
+        android:pathData="M5,13.5h14a1.5,1.5 0 0,1 1.5,1.5v3.5a1.5,1.5 0 0,1 -1.5,1.5h-14a1.5,1.5 0 0,1 -1.5,-1.5v-3.5a1.5,1.5 0 0,1 1.5,-1.5z" />
+    <path
+        android:fillColor="@color/titleTextColor"
+        android:pathData="M7.5,7.25m-1.1,0a1.1,1.1 0 1,1 2.2,0a1.1,1.1 0 1,1 -2.2,0M7.5,16.75m-1.1,0a1.1,1.1 0 1,1 2.2,0a1.1,1.1 0 1,1 -2.2,0" />
+</vector>

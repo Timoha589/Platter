@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/menu_search_button"
+        app:actionViewClass="android.widget.SearchView"
+        app:showAsAction="ifRoom" />
+
+    <!-- In the overflow, where a playlist keeps "Download all" -->
+    <item
+        android:id="@+id/action_cache_liked_tracks"
+        android:checkable="true"
+        android:title="@string/song_list_page_cache_liked"
+        app:showAsAction="never" />
+</menu>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 15+ only differs by opting out of the forced edge-to-edge layout;
+    all colour and component styling comes from the shared base theme.
+-->
+<resources>
+    <style name="AppTheme" parent="PlatterBaseTheme">
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+</resources>

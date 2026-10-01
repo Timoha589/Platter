@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A Deezer artist or album, reached from the Deezer part of search.
+
+    The header is the library artist page's (fragment_artist_page): the portrait
+    on the gradient, the name under it, the name moving into the toolbar once the
+    header has scrolled away. Only the shape of the picture changes - a circle
+    for an artist, the image radius for an album.
+
+    The body is one RecyclerView rather than sections in a NestedScrollView: an
+    artist can have hundreds of releases, and a list inside a scroll view lays
+    out every row it holds.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/void_black">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gradient_page_header"
+        app:elevation="0dp">
+
+        <!--
+            The header scrolls one-for-one with the page under the finger. A
+            0.4 parallax held the portrait and name nearly still while the
+            buttons and lists slid up over them, and snap carried the page on
+            to an edge after the finger had let go.
+        -->
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:titleEnabled="false">
+
+            <LinearLayout
+                style="@style/PageHeader">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/deezer_page_cover"
+                    style="@style/Widget.Platter.Cover.Circle"
+                    android:layout_width="@dimen/page_header_artwork"
+                    android:layout_height="@dimen/page_header_artwork"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:id="@+id/deezer_page_title"
+                    style="@style/HeadlineLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:gravity="center_horizontal"
+                    android:maxLines="2"
+                    android:paddingTop="@dimen/spacing_20"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/deezer_page_caption"
+                    style="@style/LabelSmall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:paddingTop="@dimen/spacing_4"
+                    tools:text="@string/label_placeholder" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/deezer_page_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin" />
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+            android:id="@+id/deezer_page_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/global_padding_bottom" />
+
+        <ProgressBar
+            android:id="@+id/deezer_page_loader"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="72dp" />
+
+        <TextView
+            android:id="@+id/deezer_page_error"
+            style="@style/TitleMedium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingStart="@dimen/spacing_32"
+            android:paddingTop="72dp"
+            android:paddingEnd="@dimen/spacing_32"
+            android:text="@string/deezer_page_failed"
+            android:visibility="gone" />
+    </FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

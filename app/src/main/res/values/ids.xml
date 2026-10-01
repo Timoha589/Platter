@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Remembers, on the view itself, which cover it is already showing, so a
+         rebind that changes nothing does not restart the load. -->
+    <item name="cover_art_tag" type="id" />
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.cappielloantonio.tempo.helper.recyclerview.NestedScrollableHost
+        android:id="@+id/player_queue_nested_scrollable_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!--
+            The list scrolls itself. It used to sit at wrap_content inside a
+            NestedScrollView, which measures it at full height: every row of
+            the queue was inflated and bound at once, covers and all, and
+            rebound whenever the queue changed. The "clear" button that sat
+            under it is the list's last row now (see PlayerQueueFragment).
+        -->
+        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+            android:id="@+id/player_queue_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="@dimen/global_padding_bottom" />
+    </com.cappielloantonio.tempo.helper.recyclerview.NestedScrollableHost>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/player_shuffle_queue_fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:contentDescription="@string/content_description_shuffle_button"
+        app:layout_behavior="com.google.android.material.behavior.HideBottomViewOnScrollBehavior"
+        app:srcCompat="@drawable/ic_shuffle" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
+

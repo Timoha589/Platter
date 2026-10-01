@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one column of the library's genre rail (item_library_genre,
+    two to a column): the tile's size and the cell's own gaps, so the rail
+    does not move when the genres land.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingEnd="@dimen/rail_card_gap">
+
+    <View
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/genre_tile_height"
+        android:layout_marginBottom="@dimen/spacing_8"
+        android:background="@drawable/skeleton_block" />
+
+    <View
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/genre_tile_height"
+        android:layout_marginBottom="@dimen/spacing_8"
+        android:background="@drawable/skeleton_block" />
+</LinearLayout>

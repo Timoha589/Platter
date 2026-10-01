@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one square rail card (item_library_album). Measured against
+    the real card at 206dp - its two lines of text are taller than their text
+    size - so the bottom padding makes up what the stripes do not, and swapping
+    the skeleton out for the rail does not move anything below it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingEnd="@dimen/rail_card_gap"
+    android:paddingBottom="5dp">
+
+    <View
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/cover_rail"
+        android:background="@drawable/skeleton_block" />
+
+    <View
+        android:layout_width="112dp"
+        android:layout_height="@dimen/skeleton_line_title"
+        android:layout_marginTop="@dimen/skeleton_line_title_top"
+        android:background="@drawable/skeleton_line" />
+
+    <View
+        android:layout_width="72dp"
+        android:layout_height="@dimen/skeleton_line_meta"
+        android:layout_marginTop="@dimen/skeleton_line_meta_top"
+        android:background="@drawable/skeleton_line" />
+</LinearLayout>

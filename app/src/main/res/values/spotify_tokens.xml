@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Spotify design tokens — see DESIGN.md ("Spotify — Style Reference").
+    This file is the single source of truth for the palette. Everything else
+    (colors.xml, styles.xml, typography.xml, drawables) aliases these values.
+-->
+<resources>
+
+    <!-- Accents -->
+    <color name="spotify_green">#1ED760</color>
+    <color name="signal_red">#B85850</color>
+    <!-- The heart on the liked tracks cover. Signal red is too muddy to read as a heart. -->
+    <color name="liked_red">#E5484D</color>
+
+    <!-- Surfaces, canvas -> elevated -->
+    <color name="void_black">#000000</color>
+    <color name="carbon">#121212</color>
+    <color name="graphite">#1F1F1F</color>
+    <color name="smoke">#292929</color>
+
+    <!-- Lines and muted UI -->
+    <color name="iron">#333333</color>
+    <color name="steel">#535353</color>
+    <color name="fog">#73777C</color>
+
+    <!-- Text -->
+    <color name="mist">#B3B3B3</color>
+    <color name="bone">#C5C5C5</color>
+    <color name="pure_white">#FFFFFF</color>
+
+    <!-- Promo gradient endpoints -->
+    <color name="magenta_glow">#AF2896</color>
+    <color name="promo_blue">#509BF5</color>
+
+    <!-- Translucent scrims used over artwork -->
+    <color name="scrim_50">#80000000</color>
+    <color name="scrim_70">#B3000000</color>
+    <color name="white_10">#1AFFFFFF</color>
+    <color name="white_20">#33FFFFFF</color>
+
+    <!-- Shape scale (DESIGN.md "Border Radius") -->
+    <dimen name="radius_small">2dp</dimen>
+    <dimen name="radius_card">6dp</dimen>
+    <dimen name="radius_image">6dp</dimen>
+    <dimen name="radius_pill">500dp</dimen>
+
+    <!-- Spacing scale, 4dp base unit, compact density -->
+    <dimen name="spacing_4">4dp</dimen>
+    <dimen name="spacing_8">8dp</dimen>
+    <dimen name="spacing_12">12dp</dimen>
+    <dimen name="spacing_16">16dp</dimen>
+    <dimen name="spacing_20">20dp</dimen>
+    <dimen name="spacing_24">24dp</dimen>
+    <dimen name="spacing_32">32dp</dimen>
+    <dimen name="spacing_40">40dp</dimen>
+    <dimen name="spacing_48">48dp</dimen>
+
+</resources>

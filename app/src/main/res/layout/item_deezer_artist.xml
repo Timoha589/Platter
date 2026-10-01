@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A Deezer artist in the search rail. The library's artist card (item_library_artist)
+    to the dimension, so the two rails read as one kind of thing - with a download
+    badge on the portrait, because a tap here does not open a page, it offers to
+    download the discography.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingEnd="@dimen/rail_card_gap">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/deezer_artist_cover"
+        style="@style/Widget.Platter.Cover.Circle"
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/cover_rail"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <FrameLayout
+        android:id="@+id/deezer_artist_badge"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_deezer_badge"
+        app:layout_constraintBottom_toBottomOf="@+id/deezer_artist_cover"
+        app:layout_constraintEnd_toEndOf="@+id/deezer_artist_cover">
+
+        <ImageView
+            android:id="@+id/deezer_artist_badge_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_download"
+            app:tint="@color/pure_white"
+            tools:ignore="ContentDescription" />
+
+        <ProgressBar
+            android:id="@+id/deezer_artist_badge_progress"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/pure_white"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/deezer_artist_name"
+        style="@style/LabelMedium"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="marquee"
+        android:gravity="center_horizontal"
+        android:maxWidth="@dimen/cover_rail"
+        android:paddingTop="@dimen/spacing_12"
+        android:singleLine="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/deezer_artist_cover" />
+
+    <TextView
+        android:id="@+id/deezer_artist_role"
+        style="@style/LabelSmall"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:maxWidth="@dimen/cover_rail"
+        android:paddingTop="@dimen/spacing_4"
+        android:singleLine="true"
+        android:text="@string/label_role_artist"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/deezer_artist_name" />
+</androidx.constraintlayout.widget.ConstraintLayout>

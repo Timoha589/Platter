@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Green is for play and shuffle only (DESIGN.md); My Wave's button is a play. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/scrim_50">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/spotify_green" />
+        </shape>
+    </item>
+</ripple>

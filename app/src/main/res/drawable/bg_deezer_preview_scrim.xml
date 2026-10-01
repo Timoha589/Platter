@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dims a cover under the preview mark, at the cover's own radius. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/scrim_70" />
+    <corners android:radius="@dimen/radius_image" />
+</shape>

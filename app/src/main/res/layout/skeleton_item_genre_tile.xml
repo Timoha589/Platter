@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one genre tile in the catalogue's grid (item_library_catalogue_genre):
+    the tile's own height, the full width of its column. The grid's decoration
+    sets the gaps, as it does for the tiles.
+-->
+<View xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/genre_tile_height"
+    android:background="@drawable/skeleton_block" />

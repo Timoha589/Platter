@@ -1,0 +1,129 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-parcelize'
+
+/*
+ * The one place the version is written. versionCode is derived from it, so a
+ * release can never forget to raise it - and Android refuses to install an
+ * update whose versionCode is not higher than the installed one. 1.2.3 -> 10203.
+ * The self-updater compares the GitHub release tag (v1.2.3) with this name.
+ */
+def platterVersionName = '1.0.0'
+def (vMajor, vMinor, vPatch) = platterVersionName.tokenize('.').collect { it as int }
+
+android {
+    compileSdk 35
+    buildToolsVersion = '35.0.0'
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdk 35
+
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName platterVersionName
+
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += [
+                        "room.schemaLocation": "$projectDir/schemas".toString(),
+                        "room.incremental"   : "true"
+                ]
+            }
+        }
+    }
+
+    flavorDimensions += "default"
+
+    productFlavors {
+        platter {
+            dimension = "default"
+            applicationId 'com.platter.music'
+        }
+    }
+
+    /*
+     * Optional release signing. Put the four properties below in
+     * ~/.gradle/gradle.properties (or pass them with -P) and release builds are
+     * signed automatically; without them, assembleRelease still produces an
+     * unsigned APK that you can sign later with apksigner.
+     */
+    signingConfigs {
+        release {
+            if (project.hasProperty('PLATTER_KEYSTORE')) {
+                storeFile file(PLATTER_KEYSTORE)
+                storePassword PLATTER_KEYSTORE_PASSWORD
+                keyAlias PLATTER_KEY_ALIAS
+                keyPassword PLATTER_KEY_PASSWORD
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            shrinkResources true
+            minifyEnabled true
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            if (project.hasProperty('PLATTER_KEYSTORE')) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+
+    namespace 'com.cappielloantonio.tempo'
+}
+
+dependencies {
+    implementation files('../libs/lib-decoder-ffmpeg-release.aar')
+
+    // AndroidX
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.0'
+    implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.8.6'
+    implementation 'androidx.navigation:navigation-ui-ktx:2.8.6'
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
+    implementation 'androidx.room:room-runtime:2.6.1'
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+
+    // Android Material
+    implementation 'com.google.android.material:material:1.10.0'
+
+    // Glide
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    implementation 'com.github.bumptech.glide:annotations:4.16.0'
+
+    // Media3
+    implementation 'androidx.media3:media3-session:1.5.1'
+    implementation 'androidx.media3:media3-common:1.5.1'
+    implementation 'androidx.media3:media3-exoplayer:1.5.1'
+    implementation 'androidx.media3:media3-ui:1.5.1'
+    implementation 'androidx.media3:media3-exoplayer-hls:1.5.1'
+    platterImplementation 'androidx.media3:media3-cast:1.5.1'
+
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+
+    // Retrofit
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:5.0.0-alpha.14'
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
+}

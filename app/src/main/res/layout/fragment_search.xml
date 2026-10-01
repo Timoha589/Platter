@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Search.
+
+    The screen has one state: a field at the top, and a single scrolling surface
+    under it holding either the suggestions or the results. It used to be a
+    Material SearchBar with a SearchView expanded out of it in onCreateView,
+    which meant the bar-to-panel transformation played over a blank screen every
+    time the screen opened - animating a bar the user had never seen into a
+    panel that covered everything anyway. Nothing transforms here, so nothing
+    animates: tapping search lands directly on the field, focused.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/void_black"
+    android:orientation="vertical">
+
+    <!-- Header: the field, on the black canvas with no divider - the pill is the
+         only edge in the row. Search is a tab of its own, so there is no back
+         arrow: the bar under the screen is the way out, as it is from home. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/void_black"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/content_gutter"
+        android:paddingTop="@dimen/spacing_8"
+        android:paddingEnd="@dimen/content_gutter"
+        android:paddingBottom="@dimen/spacing_8">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_search_field"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="@dimen/spacing_4">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_search"
+                app:tint="@color/searchColor"
+                tools:ignore="ContentDescription" />
+
+            <EditText
+                android:id="@+id/search_input"
+                style="@style/Widget.Platter.SearchField"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:hint="@string/search_hint"
+                android:importantForAutofill="no" />
+
+            <ImageButton
+                android:id="@+id/search_clear_button"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/search_clear_button"
+                android:padding="9dp"
+                android:src="@drawable/ic_close"
+                android:visibility="gone"
+                app:tint="@color/mist" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/search_scroll_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/global_padding_bottom"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!--  Recent searches, and the suggestions offered while typing  -->
+                <LinearLayout
+                    android:id="@+id/search_suggestion_sector"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/search_suggestion_header"
+                        style="@style/TitleLarge"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="@dimen/content_gutter"
+                        android:paddingTop="@dimen/section_header_top"
+                        android:paddingEnd="@dimen/content_gutter"
+                        android:paddingBottom="@dimen/spacing_4"
+                        android:text="@string/search_title_recent" />
+
+                    <LinearLayout
+                        android:id="@+id/search_suggestion_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
+                <!--  In flight, on a screen with nothing else on it: the shape of
+                      a first answer, where the answer will stand.  -->
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/search_results_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    android:visibility="gone"
+                    app:skeletonCount="1"
+                    app:skeletonItem="@layout/skeleton_search_results" />
+
+                <!--  Search result  -->
+                <LinearLayout
+                    android:id="@+id/search_result_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!--
+                        The one hit worth leading with. It repeats something from
+                        a section below, on purpose: the sections answer "what
+                        matched", and this answers "what you meant", which is a
+                        different question and usually the one being asked.
+                    -->
+                    <LinearLayout
+                        android:id="@+id/search_top_sector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingBottom="@dimen/section_bottom"
+                        android:visibility="gone">
+
+                        <TextView
+                            style="@style/TitleLarge"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingTop="@dimen/section_header_top"
+                            android:paddingEnd="@dimen/content_gutter"
+                            android:paddingBottom="@dimen/section_header_bottom"
+                            android:text="@string/search_title_top_result" />
+
+                        <LinearLayout
+                            android:id="@+id/search_top_result"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="@dimen/content_gutter"
+                            android:background="@drawable/bg_settings_group_single"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="@dimen/spacing_12">
+
+                            <com.google.android.material.imageview.ShapeableImageView
+                                android:id="@+id/search_top_cover"
+                                style="@style/Widget.Platter.Cover"
+                                android:layout_width="@dimen/cover_top_result"
+                                android:layout_height="@dimen/cover_top_result" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="@dimen/spacing_12"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/search_top_title"
+                                    style="@style/LabelLarge"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:text="@string/label_placeholder" />
+
+                                <TextView
+                                    android:id="@+id/search_top_subtitle"
+                                    style="@style/LabelSmall"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:maxLines="1"
+                                    android:paddingTop="@dimen/spacing_4"
+                                    android:text="@string/label_placeholder" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!--  Artist  -->
+                    <LinearLayout
+                        android:id="@+id/search_artist_sector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingBottom="@dimen/section_bottom"
+                        android:visibility="gone">
+
+                        <TextView
+                            style="@style/TitleLarge"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingTop="@dimen/section_header_top"
+                            android:paddingEnd="@dimen/content_gutter"
+                            android:paddingBottom="@dimen/section_header_bottom"
+                            android:text="@string/search_title_artist" />
+
+                        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                            android:id="@+id/search_result_artist_recycler_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:clipToPadding="false"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingEnd="@dimen/rail_end_padding"
+                            android:paddingBottom="@dimen/spacing_8" />
+                    </LinearLayout>
+
+                    <!--  Album  -->
+                    <LinearLayout
+                        android:id="@+id/search_album_sector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingBottom="@dimen/section_bottom"
+                        android:visibility="gone">
+
+                        <TextView
+                            style="@style/TitleLarge"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingTop="@dimen/section_header_top"
+                            android:paddingEnd="@dimen/content_gutter"
+                            android:paddingBottom="@dimen/section_header_bottom"
+                            android:text="@string/search_title_album" />
+
+                        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                            android:id="@+id/search_result_album_recycler_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:clipToPadding="false"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingEnd="@dimen/rail_end_padding"
+                            android:paddingBottom="@dimen/spacing_8" />
+                    </LinearLayout>
+
+                    <!--  Songs  -->
+                    <LinearLayout
+                        android:id="@+id/search_song_sector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingBottom="@dimen/section_bottom"
+                        android:visibility="gone">
+
+                        <TextView
+                            style="@style/TitleLarge"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="@dimen/content_gutter"
+                            android:paddingTop="@dimen/section_header_top"
+                            android:paddingEnd="@dimen/content_gutter"
+                            android:paddingBottom="@dimen/section_header_bottom"
+                            android:text="@string/search_title_song" />
+
+                        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                            android:id="@+id/search_result_tracks_recycler_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:clipToPadding="false"
+                            android:nestedScrollingEnabled="false"
+                            android:paddingBottom="@dimen/spacing_8" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!--  Songs the query is a line of. Under the library's own results,
+                      because it lands a moment after them and must not push what
+                      is being read down the screen; above "nothing found", which
+                      it replaces when the query was a lyric and nothing else.  -->
+                <LinearLayout
+                    android:id="@+id/search_lyrics_sector"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="@dimen/section_bottom"
+                    android:visibility="gone">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="@dimen/content_gutter"
+                        android:paddingTop="@dimen/section_header_top"
+                        android:paddingEnd="@dimen/content_gutter"
+                        android:paddingBottom="@dimen/section_header_bottom"
+                        android:text="@string/search_title_lyrics" />
+
+                    <!--  While the line is being looked up: two rows' worth of
+                          pulse, so the section is there - and says it is
+                          working - from the moment the search goes out.  -->
+                    <com.cappielloantonio.tempo.helper.view.SkeletonView
+                        android:id="@+id/search_lyrics_skeleton"
+                        style="@style/Widget.Platter.Skeleton.List"
+                        android:visibility="gone"
+                        app:skeletonCount="2"
+                        app:skeletonItem="@layout/skeleton_item_lyric_row" />
+
+                    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                        android:id="@+id/search_lyrics_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clipToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:paddingBottom="@dimen/spacing_8" />
+                </LinearLayout>
+
+                <!--  Nothing matched. It stands on its own now: with the overlay
+                      gone there is no panel left covering an empty result area.
+                      The Deezer section usually follows it, so it keeps as much
+                      room under it as over it: 48dp here and that heading's own
+                      24 make the 72 above, and the message sits centred between
+                      the field and the next section instead of crowding it.  -->
+                <LinearLayout
+                    android:id="@+id/search_empty_sector"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingStart="@dimen/spacing_32"
+                    android:paddingTop="72dp"
+                    android:paddingEnd="@dimen/spacing_32"
+                    android:paddingBottom="@dimen/spacing_48"
+                    android:visibility="gone">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/search_info_no_result_title" />
+
+                    <TextView
+                        style="@style/TitleMedium"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:paddingTop="@dimen/spacing_8"
+                        android:text="@string/search_info_no_result_subtitle" />
+                </LinearLayout>
+
+                <!--  What Deezer has for the query, through Deemix plus. It sits
+                      below both the results and "nothing found": the library is
+                      the answer, this is how to fill the gap in it - and it is
+                      most useful exactly when the library has nothing.  -->
+                <LinearLayout
+                    android:id="@+id/search_deezer_sector"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="@dimen/section_bottom"
+                    android:visibility="gone">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="@dimen/content_gutter"
+                        android:paddingTop="@dimen/section_header_top"
+                        android:paddingEnd="@dimen/content_gutter"
+                        android:text="@string/search_title_deezer" />
+
+                    <TextView
+                        android:id="@+id/search_deezer_quota"
+                        style="@style/LabelSmall"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="@dimen/content_gutter"
+                        android:paddingTop="@dimen/spacing_4"
+                        android:paddingEnd="@dimen/content_gutter"
+                        android:visibility="gone" />
+
+                    <!--  Artists: the same rail as the library's artists above  -->
+                    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                        android:id="@+id/search_deezer_artist_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/section_header_bottom"
+                        android:clipToPadding="false"
+                        android:paddingStart="@dimen/content_gutter"
+                        android:paddingEnd="@dimen/rail_end_padding"
+                        android:paddingBottom="@dimen/spacing_8"
+                        android:visibility="gone" />
+
+                    <!--  Tracks, then albums  -->
+                    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                        android:id="@+id/search_deezer_recycler_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_8"
+                        android:clipToPadding="false"
+                        android:nestedScrollingEnabled="false"
+                        android:paddingBottom="@dimen/spacing_8" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </FrameLayout>
+</LinearLayout>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder for one 52dp artist row (item_horizontal_artist) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/spacing_4"
+    android:paddingBottom="@dimen/spacing_4">
+
+    <View
+        android:layout_width="@dimen/cover_row"
+        android:layout_height="@dimen/cover_row"
+        android:layout_marginStart="@dimen/content_gutter"
+        android:background="@drawable/skeleton_block_circle" />
+
+    <View
+        android:layout_width="152dp"
+        android:layout_height="@dimen/skeleton_line_title"
+        android:layout_marginStart="@dimen/rail_card_gap"
+        android:background="@drawable/skeleton_line" />
+</LinearLayout>

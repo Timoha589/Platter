@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A genre in the catalogue's two-column grid; the gaps between cells are
+     the grid's item decoration. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <include
+        android:id="@+id/tile"
+        layout="@layout/view_genre_tile" />
+</FrameLayout>

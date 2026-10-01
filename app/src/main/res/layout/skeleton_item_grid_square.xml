@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one album in a two-column catalogue grid
+    (item_library_catalogue_album): a square cover the width of its column, the
+    title and artist lines under it, and the 16dp the card leaves below.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingBottom="21dp">
+
+    <View
+        android:id="@+id/skeleton_cover"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@drawable/skeleton_block"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <View
+        android:id="@+id/skeleton_title"
+        android:layout_width="112dp"
+        android:layout_height="@dimen/skeleton_line_title"
+        android:layout_marginTop="@dimen/skeleton_line_title_top"
+        android:background="@drawable/skeleton_line"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/skeleton_cover" />
+
+    <View
+        android:layout_width="72dp"
+        android:layout_height="@dimen/skeleton_line_meta"
+        android:layout_marginTop="@dimen/skeleton_line_meta_top"
+        android:background="@drawable/skeleton_line"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/skeleton_title" />
+</androidx.constraintlayout.widget.ConstraintLayout>

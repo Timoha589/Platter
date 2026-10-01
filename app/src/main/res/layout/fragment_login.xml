@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The server picker. A list page in the app's own terms (ListHeader): the
+    name large at the left, moving into the black toolbar once it scrolls
+    away. Under it the Timoha Premium offer - a promotional banner, the one
+    place DESIGN.md allows the gradient - then the servers already added, and
+    the way to add another as an outlined pill, the secondary action.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/void_black"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Platter.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/login_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/spacing_48">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                style="@style/ListHeader"
+                android:paddingTop="@dimen/spacing_8">
+
+                <!-- The disc sits 12dp in from the edges of its 64dp box. -->
+                <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginStart="-12dp"
+                    android:layout_marginBottom="@dimen/spacing_4"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_platter_mark" />
+
+                <TextView
+                    android:id="@+id/login_title_text_view"
+                    style="@style/ListHeaderTitle"
+                    android:text="@string/login_title_expanded" />
+
+                <TextView
+                    style="@style/TitleMedium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="@dimen/spacing_4"
+                    android:text="@string/login_subtitle" />
+            </LinearLayout>
+
+            <include
+                android:id="@+id/login_premium"
+                layout="@layout/item_login_premium"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/content_gutter"
+                android:layout_marginTop="@dimen/spacing_8"
+                android:layout_marginEnd="@dimen/content_gutter" />
+
+            <LinearLayout style="@style/SectionHeader">
+
+                <TextView
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/login_your_servers" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/server_list_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/no_server_added_text_view"
+                style="@style/TitleMedium"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/content_gutter"
+                android:paddingEnd="@dimen/content_gutter"
+                android:paddingBottom="@dimen/spacing_4"
+                android:text="@string/login_empty"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/add_server_button"
+                style="@style/Widget.Platter.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/content_gutter"
+                android:layout_marginTop="@dimen/spacing_12"
+                android:text="@string/login_add_server"
+                app:icon="@drawable/ic_add"
+                app:iconSize="20dp" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

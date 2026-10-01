@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Window background for the appcompat AlertDialog behind every preference
+    picker. The 16dp inset is the margin the dialog window itself has no other
+    way of getting; the radius is the 12dp the app's own dialogs already use.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="@dimen/spacing_16"
+    android:insetTop="@dimen/spacing_16"
+    android:insetRight="@dimen/spacing_16"
+    android:insetBottom="@dimen/spacing_16">
+
+    <shape android:shape="rectangle">
+        <solid android:color="@color/graphite" />
+        <corners android:radius="12dp" />
+    </shape>
+</inset>

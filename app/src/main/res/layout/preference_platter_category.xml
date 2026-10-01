@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Category heading. DESIGN.md's section header, scaled for a settings list:
+    Inter bold on the black canvas, with air above it so the cards below read
+    as one group.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/settings_text_gutter"
+    android:paddingTop="@dimen/settings_category_top"
+    android:paddingEnd="@dimen/settings_text_gutter"
+    android:paddingBottom="@dimen/settings_category_bottom">
+
+    <TextView
+        android:id="@android:id/title"
+        style="@style/SettingsCategoryTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</LinearLayout>

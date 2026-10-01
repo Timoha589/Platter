@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for a first set of search results: the "top result" header and
+    card, then the songs header and four track rows - the shape the answer
+    usually takes, at the heights the real sections use, so the results replace
+    it without the page shifting under the reader.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <View
+        android:layout_width="160dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="@dimen/content_gutter"
+        android:layout_marginTop="@dimen/section_header_top"
+        android:layout_marginBottom="@dimen/section_header_bottom"
+        android:background="@drawable/skeleton_line" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/skeleton_search_top_result"
+        android:layout_marginHorizontal="@dimen/content_gutter"
+        android:background="@drawable/skeleton_block" />
+
+    <View
+        android:layout_width="96dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="@dimen/content_gutter"
+        android:layout_marginTop="@dimen/skeleton_search_section_gap"
+        android:layout_marginBottom="@dimen/section_header_bottom"
+        android:background="@drawable/skeleton_line" />
+
+    <include layout="@layout/skeleton_item_row" />
+
+    <include layout="@layout/skeleton_item_row" />
+
+    <include layout="@layout/skeleton_item_row" />
+
+    <include layout="@layout/skeleton_item_row" />
+</LinearLayout>

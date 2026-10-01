@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/fragment_home_nested_scroll_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+    <!--  My Wave sits above the sections, outside the container reorder() refills  -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/home_wave"
+            layout="@layout/view_home_wave" />
+
+        <LinearLayout
+            android:id="@+id/home_linear_layout_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/global_padding_bottom">
+
+            <!--
+              One rhythm between sections: whatever a section ends on - a card,
+              a row, the page dots - sits 8dp above the section's bottom, and the
+              next heading starts section_header_top below that. Rows keep 4dp of
+              their own under the cover, so a list adds only 4; a rail adds 8.
+            -->
+
+            <!--  Discover music  -->
+            <LinearLayout
+                android:id="@+id/home_discover_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/discovery_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_discovery" />
+
+                    <TextView
+                        android:id="@+id/discovery_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_discovery_shuffle_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/discover_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Hero"
+                    app:skeletonCount="1"
+                    app:skeletonItem="@layout/skeleton_item_hero" />
+
+                <!--  slideview  -->
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/discover_song_view_pager"
+                    android:layout_width="match_parent"
+                    android:layout_height="212dp"
+                    android:clipToPadding="false"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="16dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!--  Similar tracks -->
+            <LinearLayout
+                android:id="@+id/home_similar_tracks_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/similar_tracks_pre_text_view"
+                    style="@style/SectionEyebrow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_subtitle_made_for_you"
+                    android:paddingBottom="@dimen/spacing_4" />
+
+                <TextView
+                    android:id="@+id/similar_tracks_text_view_refreshable"
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_made_for_you"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/similar_tracks_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_square" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/similar_tracks_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/rail_end_padding"
+                    android:paddingBottom="@dimen/spacing_8"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!--  Grid tracks -->
+            <LinearLayout
+                android:id="@+id/home_grid_tracks_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/grid_tracks_pre_text_view"
+                    style="@style/SectionEyebrow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_last_week"
+                    android:paddingBottom="@dimen/spacing_4" />
+
+                <TextView
+                    android:id="@+id/grid_tracks_text_view"
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_top_songs"
+                    android:paddingTop="0dp"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/top_songs_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <!-- Only for a period the user picked that has no plays -->
+                <TextView
+                    android:id="@+id/top_songs_empty_text_view"
+                    style="@style/BodyMedium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/spacing_8"
+                    android:text="@string/home_top_songs_empty"
+                    android:textColor="@color/subtitleTextColor"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/top_songs_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/top_songs_page_dots"
+                    style="@style/PageDots" />
+
+            </LinearLayout>
+
+
+            <!-- Favorites -->
+            <LinearLayout
+                android:id="@+id/starred_tracks_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/starred_tracks_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_starred_tracks" />
+
+                    <TextView
+                        android:id="@+id/starred_tracks_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_starred_tracks_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/starred_tracks_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/starred_tracks_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/starred_tracks_page_dots"
+                    style="@style/PageDots" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/starred_albums_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/starred_albums_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_starred_albums" />
+
+                    <TextView
+                        android:id="@+id/starred_albums_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_starred_albums_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/starred_albums_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/starred_albums_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/starred_albums_page_dots"
+                    style="@style/PageDots" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/starred_artists_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/starred_artists_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_starred_artists" />
+
+                    <TextView
+                        android:id="@+id/starred_artists_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_starred_artists_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/starred_artists_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row_circle" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/starred_artists_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/starred_artists_page_dots"
+                    style="@style/PageDots" />
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:id="@+id/home_new_releases_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  New releases  -->
+                <TextView
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_new_releases"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/new_releases_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/new_releases_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/new_releases_page_dots"
+                    style="@style/PageDots" />
+            </LinearLayout>
+
+            <!-- Fashback -->
+            <LinearLayout
+                android:id="@+id/home_flashback_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <TextView
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_flashback"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/years_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_plate" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/years_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/rail_end_padding"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+
+            <!--  Most played albums -->
+            <LinearLayout
+                android:id="@+id/home_most_played_albums_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/most_played_albums_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_most_played" />
+
+                    <TextView
+                        android:id="@+id/most_played_albums_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_most_played_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/most_played_albums_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_square" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/most_played_albums_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/rail_end_padding"
+                    android:paddingBottom="@dimen/spacing_8"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!--  Recently played albums -->
+            <LinearLayout
+                android:id="@+id/home_recently_played_albums_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/recently_played_albums_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_last_played" />
+
+
+                    <TextView
+                        android:id="@+id/recently_played_albums_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_last_played_see_all_button" />
+
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/recently_played_albums_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_square" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/recently_played_albums_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/rail_end_padding"
+                    android:paddingBottom="@dimen/spacing_8"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!--  Recently added albums -->
+            <LinearLayout
+                android:id="@+id/home_recently_added_albums_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <!--  Label and button  -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:paddingBottom="@dimen/section_header_bottom"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <TextView
+                        android:id="@+id/recently_added_albums_text_view_refreshable"
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/home_title_recently_added" />
+
+
+                    <TextView
+                        android:id="@+id/recently_added_albums_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/home_title_recently_added_see_all_button" />
+
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/recently_added_albums_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_square" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/recently_added_albums_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/rail_end_padding"
+                    android:paddingBottom="@dimen/spacing_8"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Playlists -->
+            <LinearLayout
+                android:id="@+id/pinned_playlists_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/pinned_playlists_text_view"
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_pinned_playlists"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/pinned_playlists_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/pinned_playlists_recycler_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Shares -->
+            <LinearLayout
+                android:id="@+id/shares_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/shares_text_view_refreshable"
+                    style="@style/TitleLarge"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingTop="@dimen/section_header_top"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:text="@string/home_title_shares"
+                    android:paddingBottom="@dimen/section_header_bottom" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/shares_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/shares_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/spacing_4"
+                    android:visibility="gone" />
+
+                <com.cappielloantonio.tempo.helper.view.PageDotsView
+                    android:id="@+id/shares_page_dots"
+                    style="@style/PageDots" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
+

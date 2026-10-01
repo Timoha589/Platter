@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SeekBarPreference keeps its slider inside the row rather than in the widget
+    frame, so it needs a layout of its own. Same card as every other row, with
+    the slider and its value under the summary.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/content_gutter"
+    android:layout_marginEnd="@dimen/content_gutter"
+    android:background="@drawable/bg_settings_group_single"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/spacing_16"
+    android:paddingTop="@dimen/settings_row_padding_vertical"
+    android:paddingEnd="@dimen/spacing_16"
+    android:paddingBottom="@dimen/settings_row_padding_vertical">
+
+    <TextView
+        android:id="@android:id/title"
+        style="@style/LabelMedium"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:id="@android:id/summary"
+        style="@style/LabelSmall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:lineSpacingExtra="2dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_8"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <SeekBar
+            android:id="@id/seekbar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@null"
+            android:paddingStart="0dp"
+            android:paddingEnd="@dimen/spacing_12"
+            android:progressBackgroundTint="@color/steel"
+            android:progressTint="@color/spotify_green"
+            android:thumbTint="@color/spotify_green" />
+
+        <TextView
+            android:id="@id/seekbar_value"
+            style="@style/LabelMedium"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:minWidth="@dimen/spacing_24" />
+    </LinearLayout>
+
+    <!-- Bound but unused: SeekBarPreference expects the frame to exist. -->
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
+</LinearLayout>

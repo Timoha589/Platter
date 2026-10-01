@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    DESIGN.md "Promotional Banner": the gradient, white headline and body on
+    the left, the white pill as the one action. The whole card takes the tap
+    too - it is the offer, and the button only names what tapping it does.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_premium_card"
+    android:foreground="?attr/selectableItemBackground"
+    android:orientation="vertical"
+    android:padding="@dimen/spacing_16">
+
+    <TextView
+        style="@style/InterFontFamily"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/inter_bold"
+        android:text="@string/premium_server_name"
+        android:textColor="@color/pure_white"
+        android:textSize="16sp" />
+
+    <TextView
+        style="@style/InterFontFamily"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alpha="0.8"
+        android:fontFamily="@font/inter_semi_bold"
+        android:paddingTop="2dp"
+        android:text="@string/premium_server_host"
+        android:textColor="@color/pure_white"
+        android:textSize="12sp" />
+
+    <TextView
+        style="@style/InterFontFamily"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/inter_regular"
+        android:lineSpacingMultiplier="1.1"
+        android:paddingTop="@dimen/spacing_8"
+        android:text="@string/premium_server_description"
+        android:textColor="@color/pure_white"
+        android:textSize="14sp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/premium_login_button"
+        style="@style/Widget.Platter.Button.Pill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_16"
+        android:text="@string/premium_server_log_in" />
+</LinearLayout>

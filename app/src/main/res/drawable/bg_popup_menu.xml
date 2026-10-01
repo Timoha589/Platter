@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Overflow / popup menu surface. Material 3 falls back to
+    android:colorBackgroundFloating for the framework popup, and that role is
+    derived from colorPrimary - which is Spotify green here, so the menu came
+    out tinted green. DESIGN.md keeps the interface monochrome, so the surface
+    is stated outright.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/graphite" />
+    <corners android:radius="12dp" />
+</shape>

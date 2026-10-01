@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Downloads tab. A single flat list of every downloaded track — the same row
+    the rest of the app uses for a song — under a page header carrying the
+    filter chips by why a track is here, the count and the two pill actions
+    (DESIGN.md: green pill for play, outlined pill for the secondary action).
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <fragment
+        android:id="@+id/toolbar_fragment"
+        android:name="com.cappielloantonio.tempo.ui.fragment.ToolbarFragment"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <ProgressBar
+        android:id="@+id/loading_progress_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminate="true" />
+
+    <!--
+        Empty state. The stock illustration this used to carry was a purple
+        unDraw graphic — the one thing DESIGN.md rules out outright ("Do not
+        use accent colors outside of #1ed760") — so the placeholder is the
+        download glyph on a graphite disc instead.
+    -->
+    <LinearLayout
+        android:id="@+id/empty_download_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/spacing_48"
+        android:paddingEnd="@dimen/spacing_48"
+        android:paddingBottom="@dimen/global_padding_bottom"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <FrameLayout
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:background="@drawable/bg_circle_graphite">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/download_info_empty_title"
+                android:src="@drawable/ic_download" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/title_empty_description_label"
+            style="@style/LabelLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/spacing_24"
+            android:text="@string/download_info_empty_title"
+            android:textAlignment="center" />
+
+        <TextView
+            android:id="@+id/subtitle_empty_description_label"
+            style="@style/LabelSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/spacing_8"
+            android:text="@string/download_info_empty_subtitle"
+            android:textAlignment="center" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/download_downloaded_sector"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/downloaded_text_view_refreshable"
+            style="@style/TitleLarge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/content_gutter"
+            android:paddingTop="@dimen/section_header_top"
+            android:paddingEnd="@dimen/content_gutter"
+            android:text="@string/download_title_section" />
+
+        <!--
+            Why each track is here: downloaded by hand, kept for a like, or
+            saved by smart download - which also decides what takes it off
+            again. Only shown when there is more than one of those to pick.
+        -->
+        <HorizontalScrollView
+            android:id="@+id/download_filter_scroll_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/content_gutter"
+            android:paddingTop="@dimen/spacing_8"
+            android:paddingEnd="@dimen/content_gutter"
+            android:scrollbars="none"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/download_filter_chip_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:checkedChip="@id/download_filter_all_chip"
+                app:chipSpacingHorizontal="@dimen/spacing_8"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/download_filter_all_chip"
+                    style="@style/Widget.Platter.Chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/download_filter_all" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/download_filter_manual_chip"
+                    style="@style/Widget.Platter.Chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/download_filter_manual" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/download_filter_liked_chip"
+                    style="@style/Widget.Platter.Chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/download_filter_liked"
+                    app:chipIcon="@drawable/ic_favorite"
+                    app:chipIconSize="14dp"
+                    app:chipIconVisible="true"
+                    app:chipIconTint="@color/chip_text"
+                    app:iconStartPadding="@dimen/spacing_4" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/download_filter_smart_chip"
+                    style="@style/Widget.Platter.Chip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/download_filter_smart"
+                    app:chipIcon="@drawable/ic_history"
+                    app:chipIconSize="14dp"
+                    app:chipIconVisible="true"
+                    app:chipIconTint="@color/chip_text"
+                    app:iconStartPadding="@dimen/spacing_4" />
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/downloaded_count_text_view"
+            style="@style/LabelSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/content_gutter"
+            android:paddingTop="@dimen/spacing_8"
+            android:paddingEnd="@dimen/content_gutter"
+            android:text="@string/label_placeholder" />
+
+        <!-- What keeps the tracks shown here on the device, and what takes them off. -->
+        <TextView
+            android:id="@+id/downloaded_source_text_view"
+            style="@style/LabelSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/content_gutter"
+            android:paddingTop="@dimen/spacing_4"
+            android:paddingEnd="@dimen/content_gutter"
+            android:visibility="gone"
+            tools:text="@string/download_source_liked"
+            tools:visibility="visible" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/content_gutter"
+            android:paddingTop="@dimen/spacing_16"
+            android:paddingEnd="@dimen/content_gutter"
+            android:paddingBottom="@dimen/section_header_bottom">
+
+            <Button
+                android:id="@+id/play_downloaded_button"
+                style="@style/Widget.Platter.Button.Play"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/spacing_8"
+                android:layout_weight="1"
+                android:text="@string/album_page_play_button"
+                app:icon="@drawable/ic_play"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/spacing_8"
+                app:iconSize="18dp" />
+
+            <Button
+                android:id="@+id/shuffle_downloaded_button"
+                style="@style/Widget.Platter.Button.Outlined"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/spacing_8"
+                android:layout_weight="1"
+                android:text="@string/album_page_shuffle_button"
+                app:icon="@drawable/ic_shuffle"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/spacing_8"
+                app:iconSize="18dp" />
+        </LinearLayout>
+
+        <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+            android:id="@+id/downloaded_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/global_padding_bottom"
+            tools:listitem="@layout/item_horizontal_track" />
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

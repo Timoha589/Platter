@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder for one Flashback year plate (item_home_year) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingEnd="@dimen/rail_card_gap"
+    android:paddingBottom="@dimen/spacing_8">
+
+    <View
+        android:layout_width="@dimen/skeleton_plate_width"
+        android:layout_height="@dimen/skeleton_plate_height"
+        android:background="@drawable/skeleton_block" />
+</LinearLayout>

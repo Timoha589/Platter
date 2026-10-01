@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The liked tracks, laid out as fragment_playlist_page is - the header every
+    page of its kind shares (PageHeader), then Play and Shuffle as the first
+    row of the track list - so they read as the playlist they are.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gradient_page_header"
+        app:elevation="0dp">
+
+        <!--
+            The header scrolls one-for-one with the page under the finger. A
+            0.4 parallax held the portrait and name nearly still while the
+            buttons and lists slid up over them, and snap carried the page on
+            to an edge after the finger had let go.
+        -->
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:titleEnabled="false">
+
+            <LinearLayout
+                style="@style/PageHeader">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/liked_tracks_cover_image_view"
+                    style="@style/Widget.Platter.Cover"
+                    android:layout_width="@dimen/page_header_artwork"
+                    android:layout_height="@dimen/page_header_artwork"
+                    android:src="@drawable/cover_liked_tracks"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:id="@+id/liked_tracks_name_label"
+                    style="@style/PageHeaderTitle"
+                    android:text="@string/song_list_page_starred" />
+
+                <TextView
+                    android:id="@+id/liked_tracks_caption_label"
+                    style="@style/PageHeaderCaption"
+                    android:text="@string/label_role_playlist" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_arrow_back"
+                app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+        android:id="@+id/liked_tracks_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/global_padding_bottom"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

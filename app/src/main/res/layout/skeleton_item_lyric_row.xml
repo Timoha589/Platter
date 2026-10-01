@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one item_lyric_match row: the 52dp cover, then the title,
+    the artist and the quoted line - three bars where a song row has two, so
+    the swap to the real row moves nothing.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="@dimen/spacing_4"
+    android:paddingBottom="@dimen/spacing_4">
+
+    <View
+        android:layout_width="@dimen/cover_row"
+        android:layout_height="@dimen/cover_row"
+        android:layout_marginStart="@dimen/content_gutter"
+        android:background="@drawable/skeleton_block" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/rail_card_gap"
+        android:orientation="vertical">
+
+        <View
+            android:layout_width="160dp"
+            android:layout_height="@dimen/skeleton_line_title"
+            android:background="@drawable/skeleton_line" />
+
+        <View
+            android:layout_width="96dp"
+            android:layout_height="@dimen/skeleton_line_meta"
+            android:layout_marginTop="@dimen/spacing_8"
+            android:background="@drawable/skeleton_line" />
+
+        <View
+            android:layout_width="220dp"
+            android:layout_height="@dimen/skeleton_line_meta"
+            android:layout_marginTop="@dimen/spacing_8"
+            android:background="@drawable/skeleton_line" />
+    </LinearLayout>
+</LinearLayout>

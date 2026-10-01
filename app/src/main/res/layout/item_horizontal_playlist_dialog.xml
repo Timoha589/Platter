@@ -1,0 +1,50 @@
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clipChildren="false"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="@dimen/spacing_4"
+    android:paddingBottom="@dimen/spacing_4">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        style="@style/Widget.Platter.Cover"
+        android:id="@+id/playlist_dialog_cover_image_view"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/playlist_dialog_title_text_view"
+        style="@style/LabelMedium"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="marquee"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:singleLine="true"
+        app:layout_constraintBottom_toTopOf="@+id/playlist_dialog_count_text_view"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/playlist_dialog_cover_image_view"
+        app:layout_constraintTop_toTopOf="@+id/playlist_dialog_cover_image_view"
+        app:layout_constraintVertical_chainStyle="packed" />
+
+    <TextView
+        android:id="@+id/playlist_dialog_count_text_view"
+        style="@style/LabelSmall"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="marquee"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:singleLine="true"
+        app:layout_constraintBottom_toBottomOf="@+id/playlist_dialog_cover_image_view"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/playlist_dialog_cover_image_view"
+        app:layout_constraintTop_toBottomOf="@+id/playlist_dialog_title_text_view" />
+</androidx.constraintlayout.widget.ConstraintLayout>

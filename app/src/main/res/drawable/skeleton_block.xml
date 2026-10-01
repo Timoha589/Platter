@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Loading placeholder for a cover. Smoke rather than graphite because the
+    pulse animates alpha downwards: at rest (alpha 1) it reads as #292929, at
+    the bottom of the pulse as roughly #1E1E1E, so the block breathes between
+    the card and hover surfaces instead of fading towards the black canvas.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <solid android:color="@color/smoke" />
+    <corners android:radius="@dimen/radius_image" />
+</shape>

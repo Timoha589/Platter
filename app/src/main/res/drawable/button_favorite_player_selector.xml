@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The player's favourite toggle is 48dp, the same touch target as the quick
+    action buttons at the bottom of the player, but the heart keeps its 26dp:
+    (48 - 26) / 2 = 11dp on every side.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/button_favorite_selector"
+    android:inset="11dp" />

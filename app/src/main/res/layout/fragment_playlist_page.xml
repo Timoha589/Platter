@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A playlist. The header is the one every page of its kind shares
+    (PageHeader, fragment_artist_page). Play and Shuffle are the first row of
+    the track list rather than part of the header: a playlist can run to
+    thousands of tracks, so the list is a RecyclerView of its own, and the
+    header has to end where the album and artist headers end.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gradient_page_header"
+        app:elevation="0dp">
+
+        <!--
+            The header scrolls one-for-one with the page under the finger. A
+            0.4 parallax held the portrait and name nearly still while the
+            buttons and lists slid up over them, and snap carried the page on
+            to an edge after the finger had let go.
+        -->
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:titleEnabled="false">
+
+            <LinearLayout
+                style="@style/PageHeader">
+
+                <!--
+                    The playlist's own artwork, laid over a block of four track
+                    covers that stands in for it when there is none.
+                -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="@dimen/page_header_artwork"
+                    android:layout_height="@dimen/page_header_artwork">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/playlist_cover_image_view_top_left"
+                        style="@style/Widget.Platter.Cover.Tile"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="invisible"
+                        app:layout_constraintBottom_toTopOf="@id/playlist_cover_image_view_bottom_left"
+                        app:layout_constraintEnd_toStartOf="@id/playlist_cover_image_view_top_right"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/playlist_cover_image_view_top_right"
+                        style="@style/Widget.Platter.Cover.Tile"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="invisible"
+                        app:layout_constraintBottom_toBottomOf="@id/playlist_cover_image_view_top_left"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/playlist_cover_image_view_top_left"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/playlist_cover_image_view_bottom_left"
+                        style="@style/Widget.Platter.Cover.Tile"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="invisible"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/playlist_cover_image_view_bottom_right"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/playlist_cover_image_view_top_left" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/playlist_cover_image_view_bottom_right"
+                        style="@style/Widget.Platter.Cover.Tile"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="invisible"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/playlist_cover_image_view_bottom_left"
+                        app:layout_constraintTop_toTopOf="@id/playlist_cover_image_view_bottom_left" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/playlist_cover_image_view"
+                        style="@style/Widget.Platter.Cover"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        tools:ignore="ContentDescription" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <TextView
+                    android:id="@+id/playlist_name_label"
+                    style="@style/PageHeaderTitle"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/playlist_caption_label"
+                    style="@style/PageHeaderCaption"
+                    android:text="@string/label_role_playlist" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/anim_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_arrow_back"
+                app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+        android:id="@+id/song_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/global_padding_bottom"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Layout metrics. The Spotify spacing scale (4dp base, compact density) and
+    the radius scale live in spotify_tokens.xml; this file keeps the
+    screen-level metrics that are specific to Platter's layouts.
+-->
+<resources>
+    <!-- Header of the artist, album and playlist pages (and the Deezer page).
+         One picture size for all of them: only its shape says what the page
+         is - a circle for an artist, the image radius for a record. -->
+    <dimen name="appbar_header_height">296dp</dimen>
+    <dimen name="page_header_artwork">184dp</dimen>
+    <dimen name="page_header_top">64dp</dimen>
+    <dimen name="activity_margin_content">16dp</dimen>
+
+    <!-- Bottom bar. Spotify's is a compact strip: a 22dp monoline icon over an
+         11sp label, ~58dp tall in total, with no active-indicator pill. -->
+    <dimen name="bottom_nav_height">58dp</dimen>
+    <dimen name="bottom_nav_icon_size">22dp</dimen>
+    <dimen name="bottom_nav_item_padding_top">7dp</dimen>
+    <dimen name="bottom_nav_item_padding_bottom">6dp</dimen>
+
+    <!-- Mini player (56dp) stacked on the black bottom bar (58dp) -->
+    <dimen name="bottom_sheet_behavior_peek_height">114dp</dimen>
+    <dimen name="bottom_sheet_peek_height">56dp</dimen>
+    <dimen name="now_playing_bottom_peek_height">64dp</dimen>
+    <dimen name="global_padding_bottom">142dp</dimen>
+
+    <!-- Lyrics are read from across the room, not scanned like metadata: the one
+         place the type scale is taken to its 24sp ceiling. Inactive lines are
+         drawn back from this rather than the sung one being pushed past it. -->
+    <dimen name="lyrics_text_size">24sp</dimen>
+
+    <!-- Content rails: 16dp gutter, 12dp between cards, 32dp between sections -->
+    <dimen name="content_gutter">16dp</dimen>
+    <dimen name="rail_card_gap">12dp</dimen>
+    <dimen name="rail_end_padding">4dp</dimen>
+    <dimen name="section_header_top">24dp</dimen>
+    <dimen name="section_header_bottom">12dp</dimen>
+    <dimen name="section_bottom">8dp</dimen>
+
+    <!-- Artwork sizes -->
+    <dimen name="cover_row">52dp</dimen>
+    <dimen name="cover_rail">160dp</dimen>
+    <!-- Top search hit: between a row and a rail card. Large enough to be read
+         as the answer, small enough that the sections under it stay in view. -->
+    <dimen name="cover_top_result">72dp</dimen>
+    <!-- A genre tile (view_genre_tile): two lines of name and a count under it. -->
+    <dimen name="genre_tile_height">72dp</dimen>
+
+    <!-- Settings. The list is a stack of graphite cards on the black canvas:
+         one card per category, inset by the content gutter, with the category
+         heading floating above it. -->
+    <dimen name="settings_row_min_height">56dp</dimen>
+    <dimen name="settings_row_padding_vertical">14dp</dimen>
+    <dimen name="settings_text_gutter">20dp</dimen>
+    <dimen name="settings_category_top">28dp</dimen>
+    <dimen name="settings_category_bottom">10dp</dimen>
+    <dimen name="settings_list_padding_bottom">32dp</dimen>
+
+    <!-- Loading placeholders. The line metrics are chosen so a skeleton card
+         measures the same as the card it stands in for: swapping one for the
+         other must not move the sections below it. -->
+    <dimen name="skeleton_line_title">14dp</dimen>
+    <dimen name="skeleton_line_meta">11dp</dimen>
+    <dimen name="skeleton_line_title_top">10dp</dimen>
+    <dimen name="skeleton_line_meta_top">6dp</dimen>
+    <dimen name="skeleton_hero_height">196dp</dimen>
+    <dimen name="skeleton_plate_width">172dp</dimen>
+    <dimen name="skeleton_plate_height">72dp</dimen>
+    <!-- The top result card: its cover plus 12dp of padding above and below. -->
+    <dimen name="skeleton_search_top_result">96dp</dimen>
+    <!-- The card's section's 8dp bottom and the next header's 24dp top. -->
+    <dimen name="skeleton_search_section_gap">32dp</dimen>
+
+    <!-- Side padding of the dialog action row. Each text button carries 8dp of
+         its own, so 16dp here lines the first and last labels up with the 24dp
+         the title and body text sit at - and leaves room for three Russian
+         labels side by side, where Material's 24dp forced them to stack. -->
+    <dimen name="dialog_actions_padding_horizontal">16dp</dimen>
+
+    <!-- Page dots under the paged rails on Home (PageDotsView). A dot is a
+         glyph, sized like one; the gap between dots is the 8dp token. -->
+    <dimen name="page_dot_size">6dp</dimen>
+    <dimen name="page_dot_gap">@dimen/spacing_8</dimen>
+
+    <!-- A server row's tile: the rack glyph, or the Platter disc for Timoha Premium -->
+    <dimen name="login_server_glyph_size">24dp</dimen>
+    <dimen name="login_server_mark_size">48dp</dimen>
+</resources>

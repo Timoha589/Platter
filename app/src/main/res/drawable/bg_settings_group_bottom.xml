@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Settings row surface. DESIGN.md's card layer (#1F1F1F) at the 6dp content
+    radius; the rows of one category are stacked into a single card, so only
+    the first and last of a group round off.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/white_10">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/graphite" />
+            <corners
+                android:bottomLeftRadius="@dimen/radius_card"
+                android:bottomRightRadius="@dimen/radius_card"
+                android:topLeftRadius="0dp"
+                android:topRightRadius="0dp" />
+        </shape>
+    </item>
+</ripple>

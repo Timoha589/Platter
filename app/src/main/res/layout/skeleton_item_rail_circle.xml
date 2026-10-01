@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Placeholder for one circular rail card (item_library_artist). Measured
+    against the real card at 214dp: the name and the 'Artist' caption are
+    taller than their text size, so the stripes are placed on the lines of text
+    and the bottom padding makes up the rest. Swapping the skeleton out for the
+    rail then moves nothing below it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingEnd="@dimen/rail_card_gap"
+    android:paddingBottom="3dp">
+
+    <View
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/cover_rail"
+        android:background="@drawable/skeleton_block_circle" />
+
+    <View
+        android:layout_width="96dp"
+        android:layout_height="@dimen/skeleton_line_title"
+        android:layout_marginTop="15dp"
+        android:background="@drawable/skeleton_line" />
+
+    <View
+        android:layout_width="48dp"
+        android:layout_height="@dimen/skeleton_line_meta"
+        android:layout_marginTop="11dp"
+        android:background="@drawable/skeleton_line" />
+</LinearLayout>

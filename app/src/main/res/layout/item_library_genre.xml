@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A genre in the library's rail: two rows, cards the width of every other
+     rail's (cover_rail), so the third column shows at the edge the way the
+     next card of a rail does. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingEnd="@dimen/rail_card_gap"
+    android:paddingBottom="@dimen/spacing_8">
+
+    <include
+        android:id="@+id/tile"
+        layout="@layout/view_genre_tile"
+        android:layout_width="@dimen/cover_rail"
+        android:layout_height="@dimen/genre_tile_height" />
+</FrameLayout>

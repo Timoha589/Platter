@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A song found by a line of its lyrics. The same 52dp cover on the gutter as
+    the song rows above it, with a third line: the lyric itself, quoted, so the
+    row says why it is here.
+
+    A song the library lacks behaves like a row of the Deezer section below:
+    a tap previews it, the cover dimming under a pause mark while it plays, and
+    the download is only ever the button at the end.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/content_gutter"
+    android:paddingTop="@dimen/spacing_4"
+    android:paddingEnd="@dimen/spacing_4"
+    android:paddingBottom="@dimen/spacing_4">
+
+    <FrameLayout
+        android:layout_width="52dp"
+        android:layout_height="52dp">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/lyric_cover"
+            style="@style/Widget.Platter.Cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/lyric_preview_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_deezer_preview_scrim"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/lyric_preview_icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_pause"
+                app:tint="@color/pure_white"
+                tools:ignore="ContentDescription" />
+
+            <ProgressBar
+                android:id="@+id/lyric_preview_progress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@color/pure_white"
+                android:visibility="gone" />
+        </FrameLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/spacing_12"
+        android:layout_marginEnd="@dimen/spacing_12"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/lyric_title"
+            style="@style/LabelMedium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="@string/label_placeholder" />
+
+        <TextView
+            android:id="@+id/lyric_subtitle"
+            style="@style/LabelSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="@string/label_placeholder" />
+
+        <TextView
+            android:id="@+id/lyric_snippet"
+            style="@style/LabelSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textStyle="italic"
+            tools:text="@string/label_placeholder" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/lyric_action"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/deezer_download"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/lyric_action_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_download"
+            app:tint="@color/pure_white"
+            tools:ignore="ContentDescription" />
+
+        <ProgressBar
+            android:id="@+id/lyric_action_progress"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/pure_white"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

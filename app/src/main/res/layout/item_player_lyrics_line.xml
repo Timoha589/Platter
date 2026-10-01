@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One timed line. Each line is its own view so the active one can be faded on
+    its own - a single TextView carrying the whole lyric can only be restyled by
+    rewriting its spans, which cannot be animated and relays out the block on
+    every frame.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/BodyLarge"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingVertical="8dp"
+    android:textColor="@color/lyricsTextColor"
+    android:textSize="@dimen/lyrics_text_size" />

@@ -1,0 +1,81 @@
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingHorizontal="24dp">
+
+    <ImageView
+        android:id="@+id/empty_description_image_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:maxWidth="240dp"
+        android:maxHeight="240dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ui_empty_description"
+        app:layout_constraintBottom_toTopOf="@id/title_empty_description_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
+
+    <TextView
+        android:id="@+id/title_empty_description_label"
+        style="@style/LabelMedium"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="12dp"
+        android:text="@string/description_empty_title"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/empty_description_image_view" />
+
+    <!--
+        The words fill the page rather than a square inside it.
+
+        The panel used to be locked to 1:1, which on a page taller than it is
+        wide made the square as narrow as the page was short - the lyric was
+        squeezed into a column with empty margins either side of it, wrapping
+        long lines that would otherwise have fitted. The artwork is square
+        because artwork is square; a lyric is not.
+
+        The fading edge stays: 56dp of dimming top and bottom is what makes the
+        column read as continuing past the panel rather than stopping at it.
+    -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/now_playing_song_lyrics_sroll_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fadingEdgeLength="56dp"
+        android:requiresFadingEdge="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Untimed lyrics and podcast descriptions: one block of text. -->
+            <TextView
+                android:id="@+id/now_playing_song_lyrics_text_view"
+                style="@style/BodyLarge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingMultiplier="1.25"
+                android:textSize="@dimen/lyrics_text_size" />
+
+            <!-- Timed lyrics: one view per line, filled in at runtime. -->
+            <LinearLayout
+                android:id="@+id/now_playing_song_lyrics_lines"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

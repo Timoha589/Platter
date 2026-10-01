@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="SkeletonView">
+        <!-- The placeholder item to repeat, e.g. @layout/skeleton_item_rail_square -->
+        <attr name="skeletonItem" format="reference" />
+        <!-- How many copies of it to inflate -->
+        <attr name="skeletonCount" format="integer" />
+    </declare-styleable>
+
+</resources>

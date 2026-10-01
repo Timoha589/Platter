@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    An album. The header is the one every page of its kind shares (PageHeader,
+    fragment_artist_page): the cover on the gradient, the name under it, then
+    who made it and what it is. The facts that used to hide behind an arrow
+    next to the name - length, genre, release dates, notes - are laid out
+    where they are read: the length in the caption, the dates and genre under
+    the tracks, the notes in a section of their own.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gradient_page_header"
+        app:elevation="0dp">
+
+        <!--
+            The header scrolls one-for-one with the page under the finger. A
+            0.4 parallax held the portrait and name nearly still while the
+            buttons and lists slid up over them, and snap carried the page on
+            to an edge after the finger had let go.
+        -->
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:titleEnabled="false">
+
+            <LinearLayout
+                style="@style/PageHeader">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/album_cover_image_view"
+                    style="@style/Widget.Platter.Cover"
+                    android:layout_width="@dimen/page_header_artwork"
+                    android:layout_height="@dimen/page_header_artwork"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:id="@+id/album_name_label"
+                    style="@style/PageHeaderTitle"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/album_artist_label"
+                    style="@style/PageHeaderLink"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/album_caption_label"
+                    style="@style/PageHeaderCaption"
+                    android:text="@string/label_role_album" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/anim_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_arrow_back"
+                app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/fragment_album_page_nested_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/global_padding_bottom">
+
+            <include
+                android:id="@+id/album_page_actions"
+                layout="@layout/view_page_actions" />
+
+            <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                android:id="@+id/song_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:paddingTop="@dimen/spacing_8" />
+
+            <!-- Release dates and genre, under the tracks they describe. -->
+            <TextView
+                android:id="@+id/album_release_label"
+                style="@style/LabelSmall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/content_gutter"
+                android:paddingTop="@dimen/spacing_16"
+                android:paddingEnd="@dimen/content_gutter"
+                android:visibility="gone"
+                tools:text="@string/label_placeholder"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/album_genre_label"
+                style="@style/LabelSmall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/content_gutter"
+                android:paddingTop="@dimen/spacing_4"
+                android:paddingEnd="@dimen/content_gutter"
+                android:visibility="gone"
+                tools:text="@string/label_placeholder"
+                tools:visibility="visible" />
+
+            <!-- Notes. Folded and linked to Last.fm the way the artist
+                 page's biography is. -->
+            <LinearLayout
+                android:id="@+id/album_about_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/album_page_about_section" />
+
+                    <TextView
+                        android:id="@+id/album_notes_lastfm_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/artist_page_bio_lastfm"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/album_notes_text_view"
+                    style="@style/BodyMedium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.35"
+                    android:maxLines="4"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:textColor="@color/subtitleTextColor" />
+
+                <TextView
+                    android:id="@+id/album_notes_expand_clickable"
+                    style="@style/SectionAction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/spacing_8"
+                    android:layout_marginTop="@dimen/spacing_4"
+                    android:background="@null"
+                    android:text="@string/artist_page_bio_expand"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    An explanatory paragraph rather than a control: the preferences declared
+    with selectable="false" and no title. Kept off the card so the card holds
+    only the things you can actually touch.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/summary"
+    style="@style/SettingsNote"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_text_gutter"
+    android:paddingEnd="@dimen/settings_text_gutter"
+    android:paddingBottom="@dimen/spacing_12" />

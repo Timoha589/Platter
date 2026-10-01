@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Material 3 colour roles remapped onto the Spotify palette (see spotify_tokens.xml).
+    The interface is dark-only: the "light" role set is deliberately identical to the
+    dark one so that no configuration can produce a light surface.
+    DESIGN.md: "Do not use light backgrounds or white surfaces in the core interface".
+-->
+<resources>
+
+    <!-- ============ Light role set (aliased to the dark palette on purpose) ============ -->
+    <color name="md_theme_light_primary">@color/spotify_green</color>
+    <color name="md_theme_light_onPrimary">@color/void_black</color>
+    <color name="md_theme_light_primaryContainer">@color/graphite</color>
+    <color name="md_theme_light_onPrimaryContainer">@color/pure_white</color>
+    <color name="md_theme_light_secondary">@color/mist</color>
+    <color name="md_theme_light_onSecondary">@color/void_black</color>
+    <color name="md_theme_light_secondaryContainer">@color/graphite</color>
+    <color name="md_theme_light_onSecondaryContainer">@color/pure_white</color>
+    <color name="md_theme_light_tertiary">@color/spotify_green</color>
+    <color name="md_theme_light_onTertiary">@color/void_black</color>
+    <color name="md_theme_light_tertiaryContainer">@color/smoke</color>
+    <color name="md_theme_light_onTertiaryContainer">@color/pure_white</color>
+    <color name="md_theme_light_error">@color/signal_red</color>
+    <color name="md_theme_light_errorContainer">@color/signal_red</color>
+    <color name="md_theme_light_onError">@color/pure_white</color>
+    <color name="md_theme_light_onErrorContainer">@color/pure_white</color>
+    <color name="md_theme_light_background">@color/void_black</color>
+    <color name="md_theme_light_onBackground">@color/pure_white</color>
+    <color name="md_theme_light_surface">@color/carbon</color>
+    <color name="md_theme_light_onSurface">@color/pure_white</color>
+    <color name="md_theme_light_surfaceVariant">@color/graphite</color>
+    <color name="md_theme_light_onSurfaceVariant">@color/mist</color>
+    <color name="md_theme_light_outline">@color/iron</color>
+    <color name="md_theme_light_inverseOnSurface">@color/void_black</color>
+    <color name="md_theme_light_inverseSurface">@color/pure_white</color>
+    <color name="md_theme_light_primaryInverse">@color/spotify_green</color>
+
+    <!-- ============ Dark role set ============ -->
+    <color name="md_theme_dark_primary">@color/spotify_green</color>
+    <color name="md_theme_dark_onPrimary">@color/void_black</color>
+    <color name="md_theme_dark_primaryContainer">@color/graphite</color>
+    <color name="md_theme_dark_onPrimaryContainer">@color/pure_white</color>
+    <color name="md_theme_dark_secondary">@color/mist</color>
+    <color name="md_theme_dark_onSecondary">@color/void_black</color>
+    <color name="md_theme_dark_secondaryContainer">@color/graphite</color>
+    <color name="md_theme_dark_onSecondaryContainer">@color/pure_white</color>
+    <color name="md_theme_dark_tertiary">@color/spotify_green</color>
+    <color name="md_theme_dark_onTertiary">@color/void_black</color>
+    <color name="md_theme_dark_tertiaryContainer">@color/smoke</color>
+    <color name="md_theme_dark_onTertiaryContainer">@color/pure_white</color>
+    <color name="md_theme_dark_error">@color/signal_red</color>
+    <color name="md_theme_dark_errorContainer">@color/signal_red</color>
+    <color name="md_theme_dark_onError">@color/pure_white</color>
+    <color name="md_theme_dark_onErrorContainer">@color/pure_white</color>
+    <color name="md_theme_dark_background">@color/void_black</color>
+    <color name="md_theme_dark_onBackground">@color/pure_white</color>
+    <color name="md_theme_dark_surface">@color/carbon</color>
+    <color name="md_theme_dark_onSurface">@color/pure_white</color>
+    <color name="md_theme_dark_surfaceVariant">@color/graphite</color>
+    <color name="md_theme_dark_onSurfaceVariant">@color/mist</color>
+    <color name="md_theme_dark_outline">@color/iron</color>
+    <color name="md_theme_dark_inverseOnSurface">@color/void_black</color>
+    <color name="md_theme_dark_inverseSurface">@color/pure_white</color>
+    <color name="md_theme_dark_primaryInverse">@color/spotify_green</color>
+
+    <!-- ============ App-specific semantic colours ============ -->
+    <color name="gradientTitleColor">@color/pure_white</color>
+    <color name="gradientSubtitleColor">@color/mist</color>
+    <color name="titleTextColor">@color/pure_white</color>
+    <color name="subtitleTextColor">@color/mist</color>
+    <color name="dividerColor">@color/smoke</color>
+    <color name="white">@color/pure_white</color>
+
+    <color name="lyricsTextColor">@color/pure_white</color>
+    <color name="shadowsLyricsTextColor">@color/steel</color>
+
+    <color name="searchPlaceholderColor">@color/bone</color>
+    <color name="searchColor">@color/pure_white</color>
+
+    <!-- Placeholder wash behind artwork that has not loaded yet -->
+    <color name="artworkPlaceholderColor">@color/graphite</color>
+
+</resources>

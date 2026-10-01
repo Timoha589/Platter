@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!--
+        The header wraps its content instead of being a fixed banner: a long
+        artist name simply takes a second line rather than being clipped.
+    -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/gradient_page_header"
+        app:elevation="0dp">
+
+        <!--
+            The header scrolls one-for-one with the page under the finger. A
+            0.4 parallax held the portrait and name nearly still while the
+            buttons and lists slid up over them, and snap carried the page on
+            to an edge after the finger had let go.
+        -->
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:id="@+id/collapsing_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:contentScrim="@color/void_black"
+            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:titleEnabled="false">
+
+            <!--
+                CollapsingToolbarLayout's own title drew the name twice here -
+                once at the expanded gravity and once at the collapsed one - so
+                the name is a plain TextView the layout controls, and the
+                toolbar title is filled in from code once the header is
+                collapsed far enough to hide it.
+
+                The portrait is a circle that has to be seen whole. It used to
+                be a match_parent backdrop with scaleType="centerCrop", so a
+                2:3 press shot stretched across a 296dp banner lost its top and
+                bottom. It now sits in a fixed square box, so nothing is cut.
+            -->
+            <LinearLayout
+                style="@style/PageHeader">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/artist_backdrop_image_view"
+                    style="@style/Widget.Platter.Cover.Circle"
+                    android:layout_width="@dimen/page_header_artwork"
+                    android:layout_height="@dimen/page_header_artwork"
+                    android:contentDescription="@string/artist_catalogue_title" />
+
+                <TextView
+                    android:id="@+id/artist_name_label"
+                    style="@style/PageHeaderTitle"
+                    tools:text="@string/label_placeholder" />
+
+                <TextView
+                    android:id="@+id/artist_role_label"
+                    style="@style/PageHeaderCaption"
+                    android:text="@string/label_role_artist" />
+            </LinearLayout>
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/anim_toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@android:color/transparent"
+                app:layout_collapseMode="pin"
+                app:navigationIcon="@drawable/ic_arrow_back"
+                app:titleTextAppearance="@style/TextAppearance.Platter.ToolbarTitle" />
+
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!--
+        Every list in here has nested scrolling turned off. A horizontal rail
+        that kept it answered a touch by starting a sideways nested scroll of
+        its own, and CoordinatorLayout, asking the header about that, cleared
+        the header's part in the vertical one the scroll view had just begun:
+        a drag that started on the albums moved the page under a header that
+        stayed put. The page is the one scrolling thing here; the rails only
+        need to scroll sideways, which does not depend on it.
+    -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/fragment_artist_page_nested_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipToPadding="false"
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/global_padding_bottom">
+
+            <!--
+                Action row. DESIGN.md reserves green for play actions, so
+                Shuffle is the green pill and Radio the outlined secondary -
+                a hierarchy the two identical white pills did not have.
+            -->
+            <LinearLayout
+                android:id="@+id/album_page_button_layout"
+                style="@style/PageActions">
+
+                <Button
+                    android:id="@+id/artist_page_shuffle_button"
+                    style="@style/Widget.Platter.Button.Play"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:text="@string/artist_page_shuffle_button"
+                    app:icon="@drawable/ic_shuffle"
+                    app:iconGravity="textStart"
+                    app:iconPadding="@dimen/spacing_8"
+                    app:iconSize="18dp" />
+
+                <Button
+                    android:id="@+id/artist_page_radio_button"
+                    style="@style/Widget.Platter.Button.Outlined"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/spacing_8"
+                    android:layout_weight="1"
+                    android:text="@string/artist_page_radio_button"
+                    app:icon="@drawable/ic_feed"
+                    app:iconGravity="textStart"
+                    app:iconPadding="@dimen/spacing_8"
+                    app:iconSize="18dp" />
+            </LinearLayout>
+
+            <!--  Most streamed songs  -->
+            <LinearLayout
+                android:id="@+id/artist_page_top_songs_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/artist_page_title_most_streamed_song_section" />
+
+                    <TextView
+                        android:id="@+id/most_streamed_song_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/artist_page_title_most_streamed_song_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/most_streamed_song_recycler_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/top_songs_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="5"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+            </LinearLayout>
+
+            <!--  Albums  -->
+            <LinearLayout
+                android:id="@+id/artist_page_albums_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/artist_page_title_album_section" />
+
+                    <TextView
+                        android:id="@+id/albums_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/artist_page_title_album_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/albums_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/albums_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_square" />
+            </LinearLayout>
+
+            <!--  Biography. After the music, as an album's notes are: it is
+                  read once, the songs and records above it every visit.  -->
+            <LinearLayout
+                android:id="@+id/artist_page_bio_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/artist_page_title_biography_section" />
+
+                    <TextView
+                        android:id="@+id/bio_more_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/artist_page_bio_lastfm" />
+                </LinearLayout>
+
+                <!-- A biography opens folded to a few lines: the full Last.fm
+                     text runs to screens and pushed the songs out of sight.
+                     The toggle under it appears only when there is more. -->
+                <TextView
+                    android:id="@+id/bio_text_view"
+                    style="@style/BodyMedium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.35"
+                    android:maxLines="4"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter"
+                    android:textColor="@color/subtitleTextColor" />
+
+                <!-- No ripple: the borderless one spread into a circle as wide
+                     as the label, and the text unfolding under it already
+                     answers the tap. -->
+                <TextView
+                    android:id="@+id/bio_expand_text_view_clickable"
+                    style="@style/SectionAction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:layout_marginStart="@dimen/spacing_8"
+                    android:layout_marginTop="@dimen/spacing_4"
+                    android:text="@string/artist_page_bio_expand"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <!--  Similar artists  -->
+            <LinearLayout
+                android:id="@+id/similar_artist_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/artist_page_title_album_more_like_this_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/similar_artists_recycler_view"
+                    android:nestedScrollingEnabled="false"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:paddingStart="@dimen/content_gutter"
+                    android:paddingEnd="@dimen/content_gutter" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/similar_artists_skeleton"
+                    style="@style/Widget.Platter.Skeleton.Rail"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_rail_circle" />
+
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

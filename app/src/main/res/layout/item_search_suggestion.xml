@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One suggestion row: a recent query (with a way to forget it) or a title the
+    server proposes for what is being typed. Plain text on the black canvas -
+    the leading glyph carries the distinction, so it is the only thing the two
+    variants have to swap.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:paddingStart="@dimen/content_gutter"
+    android:paddingTop="14dp"
+    android:paddingEnd="@dimen/content_gutter"
+    android:paddingBottom="14dp">
+
+    <ImageView
+        android:id="@+id/search_suggestion_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_history"
+        app:layout_constraintBottom_toBottomOf="@id/search_suggestion_title"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/search_suggestion_title"
+        app:tint="@color/mist"
+        tools:ignore="ContentDescription" />
+
+    <TextView
+        android:id="@+id/search_suggestion_title"
+        style="@style/BodyMedium"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/spacing_12"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/label_placeholder"
+        app:layout_constraintEnd_toStartOf="@id/search_suggestion_delete_icon"
+        app:layout_constraintStart_toEndOf="@id/search_suggestion_icon"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/search_suggestion_delete_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:background="?selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_close"
+        app:layout_constraintBottom_toBottomOf="@id/search_suggestion_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/search_suggestion_title"
+        app:tint="@color/mist"
+        tools:ignore="ContentDescription" />
+</androidx.constraintlayout.widget.ConstraintLayout>

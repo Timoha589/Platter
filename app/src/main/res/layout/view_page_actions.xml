@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Play and Shuffle, opening the track list of an album or a playlist. The
+    same row the artist page opens with (fragment_artist_page): green for the
+    play action, DESIGN.md's one accent, and the outlined pill beside it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/PageActions">
+
+    <Button
+        android:id="@+id/page_play_button"
+        style="@style/Widget.Platter.Button.Play"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/spacing_8"
+        android:layout_weight="1"
+        android:text="@string/album_page_play_button"
+        app:icon="@drawable/ic_play"
+        app:iconGravity="textStart"
+        app:iconPadding="@dimen/spacing_8"
+        app:iconSize="18dp" />
+
+    <Button
+        android:id="@+id/page_shuffle_button"
+        style="@style/Widget.Platter.Button.Outlined"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/spacing_8"
+        android:layout_weight="1"
+        android:text="@string/album_page_shuffle_button"
+        app:icon="@drawable/ic_shuffle"
+        app:iconGravity="textStart"
+        app:iconPadding="@dimen/spacing_8"
+        app:iconSize="18dp" />
+</LinearLayout>

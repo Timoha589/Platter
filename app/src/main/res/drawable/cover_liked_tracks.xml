@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cover of the liked tracks row in the library: a heart on a card surface.
+    The surface carries the size of the cover it fills; without it the heart's
+    24dp would be the drawable's whole size, and the cover's centerCrop would
+    blow the heart up to fill the square.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="52dp"
+                android:height="52dp" />
+            <solid android:color="@color/smoke" />
+        </shape>
+    </item>
+
+    <item
+        android:width="24dp"
+        android:height="24dp"
+        android:drawable="@drawable/ic_favorite_liked"
+        android:gravity="center" />
+</layer-list>

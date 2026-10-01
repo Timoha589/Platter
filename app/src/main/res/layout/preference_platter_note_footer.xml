@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A note that trails its card rather than introducing it. Same paragraph, but
+    it has to open a gap of its own: the card above ends flush, where a leading
+    note has the category heading's own padding above it.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/summary"
+    style="@style/SettingsNote"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="@dimen/settings_text_gutter"
+    android:paddingTop="@dimen/spacing_12"
+    android:paddingEnd="@dimen/settings_text_gutter"
+    android:paddingBottom="@dimen/spacing_12" />

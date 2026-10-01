@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One server: a square tile, the name in white over who signs in where in
+    mist - the same row shape as a playlist or an album in a list. Tapping
+    signs in; the dots edit (so does a long press).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/content_gutter"
+    android:paddingTop="@dimen/spacing_8"
+    android:paddingEnd="@dimen/spacing_4"
+    android:paddingBottom="@dimen/spacing_8">
+
+    <FrameLayout
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_server_tile">
+
+        <ImageView
+            android:id="@+id/server_icon_image_view"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_server"
+            android:tint="@color/mist" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/spacing_12"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/server_name_text_view"
+            style="@style/LabelMedium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:text="@string/label_placeholder" />
+
+        <TextView
+            android:id="@+id/server_address_text_view"
+            style="@style/LabelSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:paddingTop="2dp"
+            android:singleLine="true"
+            android:text="@string/label_placeholder" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="48dp"
+        android:layout_height="48dp">
+
+        <ImageButton
+            android:id="@+id/server_more_button"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/login_edit_server"
+            android:src="@drawable/ic_more_vert"
+            android:tint="@color/mist" />
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/server_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:indicatorColor="@color/pure_white"
+            app:indicatorSize="20dp"
+            app:trackThickness="2dp" />
+    </FrameLayout>
+</LinearLayout>

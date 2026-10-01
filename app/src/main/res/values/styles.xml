@@ -1,0 +1,713 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Platter theme — Spotify style system (see DESIGN.md).
+
+    The app is dark-only, so a single base theme serves day and night; the
+    values-v35 variant only adds the edge-to-edge opt-out.
+-->
+<resources>
+
+    <style name="AppTheme.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/void_black</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ui_splash_screen</item>
+        <item name="postSplashScreenTheme">@style/AppTheme</item>
+        <item name="windowSplashScreenAnimationDuration">100</item>
+    </style>
+
+    <!-- ============================ Base theme ============================ -->
+    <style name="PlatterBaseTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_dark_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_dark_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_dark_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_dark_onPrimaryContainer</item>
+        <item name="colorSecondary">@color/md_theme_dark_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_dark_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/md_theme_dark_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/md_theme_dark_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/md_theme_dark_tertiary</item>
+        <item name="colorOnTertiary">@color/md_theme_dark_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/md_theme_dark_tertiaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/md_theme_dark_onTertiaryContainer</item>
+        <item name="colorError">@color/md_theme_dark_error</item>
+        <item name="colorErrorContainer">@color/md_theme_dark_errorContainer</item>
+        <item name="colorOnError">@color/md_theme_dark_onError</item>
+        <item name="colorOnErrorContainer">@color/md_theme_dark_onErrorContainer</item>
+        <item name="android:colorBackground">@color/md_theme_dark_background</item>
+        <item name="colorOnBackground">@color/md_theme_dark_onBackground</item>
+        <item name="colorSurface">@color/md_theme_dark_surface</item>
+        <item name="colorOnSurface">@color/md_theme_dark_onSurface</item>
+        <item name="colorSurfaceVariant">@color/md_theme_dark_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/md_theme_dark_onSurfaceVariant</item>
+        <item name="colorOutline">@color/md_theme_dark_outline</item>
+        <item name="colorOnSurfaceInverse">@color/md_theme_dark_inverseOnSurface</item>
+        <item name="colorSurfaceInverse">@color/md_theme_dark_inverseSurface</item>
+        <item name="colorPrimaryInverse">@color/md_theme_dark_primaryInverse</item>
+
+        <!-- Material 3 surface containers, so components that use the newer
+             roles land on the Spotify surface ladder rather than a purple tint. -->
+        <item name="colorSurfaceDim">@color/void_black</item>
+        <item name="colorSurfaceBright">@color/smoke</item>
+        <item name="colorSurfaceContainerLowest">@color/void_black</item>
+        <item name="colorSurfaceContainerLow">@color/carbon</item>
+        <item name="colorSurfaceContainer">@color/carbon</item>
+        <item name="colorSurfaceContainerHigh">@color/graphite</item>
+        <item name="colorSurfaceContainerHighest">@color/smoke</item>
+
+        <!-- Material 3 tonal elevation tints surfaces with colorPrimary. With a
+             green primary that would wash every card green, so it is disabled:
+             DESIGN.md gets its depth from surface colour shifts, not overlays. -->
+        <item name="elevationOverlayEnabled">false</item>
+
+        <!-- System bars: black canvas top and bottom. Light-bar flags are left
+             at their platform default (false) — declaring
+             windowLightNavigationBar here would be an API 27 attribute in a
+             minSdk 24 theme for no behavioural gain. -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/void_black</item>
+        <item name="android:navigationBarColor">@color/void_black</item>
+        <item name="android:scrollbars">none</item>
+
+        <!-- Popup / overflow menus: see drawable/bg_popup_menu.xml -->
+        <item name="android:colorBackgroundFloating">@color/graphite</item>
+        <item name="popupMenuStyle">@style/Widget.Platter.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Widget.Platter.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.Platter.PopupMenu</item>
+
+        <item name="android:textColorPrimary">@color/pure_white</item>
+        <item name="android:textColorSecondary">@color/mist</item>
+        <item name="android:textColorHint">@color/bone</item>
+        <item name="android:fontFamily">@font/inter</item>
+
+        <!-- Default component styles, so the 90+ existing layouts inherit the
+             Spotify look without being touched one by one. -->
+        <item name="materialButtonStyle">@style/Widget.Platter.Button.Pill</item>
+        <item name="borderlessButtonStyle">@style/Widget.Platter.Button.Ghost</item>
+        <item name="bottomNavigationStyle">@style/Widget.Platter.BottomNavigation</item>
+        <item name="toolbarStyle">@style/Widget.Platter.Toolbar</item>
+        <item name="chipStyle">@style/Widget.Platter.Chip</item>
+        <item name="textInputStyle">@style/Widget.Platter.TextInputLayout</item>
+        <item name="floatingActionButtonStyle">@style/Widget.Platter.Fab</item>
+        <item name="materialCardViewStyle">@style/Widget.Platter.Card</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Platter.BottomSheetDialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Platter.AlertDialog</item>
+        <item name="tabStyle">@style/Widget.Platter.TabLayout</item>
+
+        <item name="preferenceTheme">@style/ThemeOverlay.Platter.Preference</item>
+        <item name="alertDialogTheme">@style/Theme.Platter.Dialog.Alert</item>
+
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.Platter.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.Platter.Card</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Platter.Card</item>
+    </style>
+
+    <style name="AppTheme" parent="PlatterBaseTheme" />
+
+    <!-- ============================ Shapes ============================ -->
+    <!-- DESIGN.md: 6px for content, 9999px for actions. Never mix families. -->
+    <style name="ShapeAppearance.Platter.Small" parent="ShapeAppearance.Material3.Corner.ExtraSmall">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/radius_small</item>
+    </style>
+
+    <style name="ShapeAppearance.Platter.Card" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/radius_card</item>
+    </style>
+
+    <style name="ShapeAppearance.Platter.Pill" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- ============================ Artwork ============================ -->
+    <!--
+        Artwork is shaped by the view, not only by the Glide transformation.
+        Glide's placeholder / fallback drawables are square, so an artist whose
+        server has no photo used to render as a square tile in a circular
+        section; a ShapeableImageView clips whatever the ImageView ends up
+        holding - photo, placeholder or error glyph - so the geometry never
+        depends on whether the image loaded.
+    -->
+    <style name="ShapeAppearanceOverlay.Platter.Cover" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/radius_image</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.Platter.CoverCircle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.Platter.CoverTile" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item>
+    </style>
+
+    <!-- Square cover: albums, songs, playlists, podcasts, radio -->
+    <style name="Widget.Platter.Cover" parent="Widget.MaterialComponents.ShapeableImageView">
+        <item name="android:scaleType">centerCrop</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.Platter.Cover</item>
+    </style>
+
+    <!-- Circular avatar: artists only (DESIGN.md "Geometry Rhythm") -->
+    <style name="Widget.Platter.Cover.Circle">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.Platter.CoverCircle</item>
+    </style>
+
+    <!--
+        One quarter of the mosaic a playlist without artwork of its own falls
+        back to. The four tiles are stitched into a single square, so the tile
+        itself is cut square and the radius is put on the block they form -
+        rounding each piece would leave a rounded corner in the middle of the
+        cover.
+    -->
+    <style name="Widget.Platter.Cover.Tile">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.Platter.CoverTile</item>
+    </style>
+
+    <!-- ============================ Buttons ============================ -->
+    <!-- The one filled button style: white pill, black label. DESIGN.md is
+         explicit that the primary action is never a coloured button. -->
+    <style name="Widget.Platter.Button.Pill" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/pure_white</item>
+        <item name="android:textColor">@color/void_black</item>
+        <item name="iconTint">@color/void_black</item>
+        <item name="rippleColor">@color/scrim_50</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Platter.Pill</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:paddingTop">@dimen/spacing_8</item>
+        <item name="android:paddingBottom">@dimen/spacing_8</item>
+        <item name="android:paddingStart">@dimen/spacing_24</item>
+        <item name="android:paddingEnd">@dimen/spacing_24</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <!-- Green pill — reserved for play/shuffle actions only -->
+    <style name="Widget.Platter.Button.Play" parent="Widget.Platter.Button.Pill">
+        <item name="backgroundTint">@color/spotify_green</item>
+        <item name="android:textColor">@color/void_black</item>
+        <item name="iconTint">@color/void_black</item>
+    </style>
+
+    <!-- Ghost text button — 'Log in' / 'Show all' style secondary action -->
+    <style name="Widget.Platter.Button.Ghost" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/mist</item>
+        <item name="iconTint">@color/mist</item>
+        <item name="rippleColor">@color/white_10</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Platter.Pill</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
+    </style>
+
+    <!-- Outlined pill — used for secondary chips such as 'Follow' -->
+    <style name="Widget.Platter.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">@color/pure_white</item>
+        <item name="iconTint">@color/pure_white</item>
+        <item name="strokeColor">@color/iron</item>
+        <item name="rippleColor">@color/white_10</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Platter.Pill</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
+    </style>
+
+    <!-- ============================ Navigation ============================ -->
+    <!-- Spotify's bar sits on the black canvas, labels always visible, and has
+         no active-indicator pill — the white icon alone marks the current tab. -->
+    <style name="Widget.Platter.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/void_black</item>
+        <item name="itemIconTint">@color/bottom_nav_item</item>
+        <item name="itemTextColor">@color/bottom_nav_item</item>
+        <item name="itemRippleColor">@color/white_10</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.Platter.BottomNavigation.Indicator</item>
+        <item name="itemTextAppearanceActive">@style/TextAppearance.Platter.NavLabel.Active</item>
+        <item name="itemTextAppearanceInactive">@style/TextAppearance.Platter.NavLabel</item>
+        <!-- Compact metrics: Material 3 reserves 16dp above the icon for the
+             active-indicator pill, which this bar does not draw. Reclaiming it
+             is what takes the strip from 80dp down to 58dp. -->
+        <item name="itemIconSize">@dimen/bottom_nav_icon_size</item>
+        <item name="itemPaddingTop">@dimen/bottom_nav_item_padding_top</item>
+        <item name="itemPaddingBottom">@dimen/bottom_nav_item_padding_bottom</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="Widget.Platter.BottomNavigation.Indicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@android:color/transparent</item>
+        <item name="android:width">0dp</item>
+        <item name="android:height">0dp</item>
+    </style>
+
+    <style name="TextAppearance.Platter.NavLabel" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">@font/inter_semi_bold</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!-- The selected tab is marked by a white, bolder label + white icon -
+         DESIGN.md rules out an indicator pill. -->
+    <style name="TextAppearance.Platter.NavLabel.Active">
+        <item name="android:fontFamily">@font/inter_bold</item>
+    </style>
+
+    <!-- Expanded title of a collapsing header (artist / album / playlist page) -->
+    <style name="TextAppearance.Platter.ArtistTitle" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">@color/pure_white</item>
+    </style>
+
+    <style name="Widget.Platter.PopupMenu" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup_menu</item>
+        <item name="android:popupElevation">0dp</item>
+    </style>
+
+    <style name="Widget.Platter.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@color/void_black</item>
+        <item name="titleTextColor">@color/pure_white</item>
+        <item name="subtitleTextColor">@color/mist</item>
+        <item name="iconTint">@color/pure_white</item>
+        <item name="android:elevation">0dp</item>
+    </style>
+
+    <!-- Detail-page toolbar title: the same Inter bold the rest of the app
+         uses, at the 20sp rail-heading size rather than Material's default. -->
+    <style name="TextAppearance.Platter.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <!-- Both attributes: Material's own fontFamily wins over the
+             framework one, and alone left the title in the regular weight. -->
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">@color/pure_white</item>
+    </style>
+
+    <style name="Widget.Platter.TabLayout" parent="Widget.Material3.TabLayout">
+        <item name="android:background">@color/void_black</item>
+        <item name="tabTextColor">@color/mist</item>
+        <item name="tabSelectedTextColor">@color/pure_white</item>
+        <item name="tabIndicatorColor">@color/spotify_green</item>
+        <item name="tabIndicatorHeight">2dp</item>
+        <item name="tabTextAppearance">@style/TextAppearance.Platter.NavLabel</item>
+    </style>
+
+    <!-- ============================ Surfaces ============================ -->
+    <style name="Widget.Platter.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/graphite</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardCornerRadius">@dimen/radius_card</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="rippleColor">@color/white_10</item>
+    </style>
+
+    <style name="Widget.Platter.Fab" parent="Widget.Material3.FloatingActionButton.Primary">
+        <item name="backgroundTint">@color/spotify_green</item>
+        <item name="tint">@color/void_black</item>
+        <item name="elevation">0dp</item>
+        <item name="hoveredFocusedTranslationZ">0dp</item>
+        <item name="pressedTranslationZ">0dp</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Platter.Pill</item>
+    </style>
+
+    <!-- ============================ Inputs ============================ -->
+    <!-- Search field: graphite fill, pill radius, no underline (DESIGN.md) -->
+    <style name="Widget.Platter.TextInputLayout" parent="Widget.Material3.TextInputLayout.FilledBox">
+        <item name="boxBackgroundColor">@color/graphite</item>
+        <item name="boxStrokeWidth">0dp</item>
+        <item name="boxStrokeWidthFocused">0dp</item>
+        <item name="boxCornerRadiusTopStart">@dimen/radius_pill</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/radius_pill</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/radius_pill</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/radius_pill</item>
+        <item name="hintTextColor">@color/bone</item>
+        <item name="android:textColorHint">@color/bone</item>
+        <item name="startIconTint">@color/pure_white</item>
+        <item name="endIconTint">@color/pure_white</item>
+    </style>
+
+    <!--
+        The query field on the search screen (DESIGN.md "Search Input"). The pill
+        itself is bg_search_field; this is only the text inside it — 16sp regular
+        white over the bone placeholder, on no background of its own, so the
+        field reads as one shape rather than a box inside a box.
+
+        Material's SearchBar/SearchView pair used to stand here. It was dropped
+        because its whole purpose is the transformation between the two, and this
+        screen has nothing to transform from: it opens straight into search.
+    -->
+    <style name="Widget.Platter.SearchField" parent="Widget.AppCompat.EditText">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/searchColor</item>
+        <item name="android:textColorHint">@color/searchPlaceholderColor</item>
+        <item name="android:background">@null</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:imeOptions">actionSearch</item>
+        <item name="android:inputType">text</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="Widget.Platter.Chip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/chip_background</item>
+        <item name="android:textColor">@color/chip_text</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="chipCornerRadius">@dimen/radius_pill</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="rippleColor">@color/white_10</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">@font/inter_semi_bold</item>
+    </style>
+
+    <!-- ============================ Dialogs ============================ -->
+    <style name="ThemeOverlay.Platter.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.Platter.BottomSheet</item>
+        <item name="elevationOverlayEnabled">false</item>
+    </style>
+
+    <style name="Widget.Platter.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/carbon</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.Platter.BottomSheet</item>
+    </style>
+
+    <style name="ShapeAppearance.Platter.BottomSheet" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">16dp</item>
+        <item name="cornerSizeTopRight">16dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="ThemeOverlay.Platter.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/graphite</item>
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Platter.Dialog</item>
+        <item name="alertDialogStyle">@style/MaterialAlertDialog.Platter</item>
+    </style>
+
+    <!-- Material 3's dialog with the action row pinned: see alert_dialog_platter_actions -->
+    <style name="MaterialAlertDialog.Platter" parent="MaterialAlertDialog.Material3">
+        <item name="android:layout">@layout/alert_dialog_platter</item>
+    </style>
+
+    <style name="ShapeAppearance.Platter.Dialog" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <!--
+        Preference dialogs - language, bitrate, cache size, corner size - are
+        built by androidx.preference with the plain appcompat AlertDialog
+        builder, which reads alertDialogTheme rather than the
+        materialAlertDialogTheme every dialog the app writes itself goes
+        through. That left them as the one surface in the app still wearing
+        AppCompat's #424242 grey with square corners; this puts them back on the
+        graphite card colour and the app's own accent.
+    -->
+    <style name="Theme.Platter.Dialog.Alert" parent="Theme.Material3.Dark.Dialog.Alert">
+        <item name="colorPrimary">@color/spotify_green</item>
+        <item name="colorOnPrimary">@color/void_black</item>
+        <item name="colorSurface">@color/graphite</item>
+        <item name="colorOnSurface">@color/pure_white</item>
+        <item name="colorSurfaceVariant">@color/smoke</item>
+        <item name="colorOnSurfaceVariant">@color/mist</item>
+        <item name="android:colorBackground">@color/graphite</item>
+        <item name="android:colorBackgroundFloating">@color/graphite</item>
+        <item name="colorAccent">@color/spotify_green</item>
+        <item name="colorControlActivated">@color/spotify_green</item>
+        <item name="colorControlNormal">@color/fog</item>
+        <item name="android:textColorPrimary">@color/pure_white</item>
+        <item name="android:textColorSecondary">@color/mist</item>
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="android:windowBackground">@drawable/bg_dialog_alert</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.Platter.Dialog</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.Platter.Button.DialogAction</item>
+    </style>
+
+    <style name="Widget.Platter.Button.DialogAction" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/pure_white</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <!-- Start/End as well as Left/Right: the Pill style, which is every
+             MaterialButton's default, sets 24dp paddingStart/End, and those win
+             over Left/Right - dialog buttons came out with 24dp a side and
+             stacked even when their labels would have fit side by side. -->
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+    </style>
+
+    <!-- ============================ Sections ============================ -->
+    <!--
+        One rhythm for every content rail on Home, Library and the detail
+        pages: a 16dp gutter, 24dp of air above the heading, 12dp under it, and
+        8dp below the rail - 32dp between sections, the low end of DESIGN.md's
+        "Section gap: 32-48px".
+    -->
+    <style name="SectionHeader">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:baselineAligned">false</item>
+        <item name="android:paddingStart">@dimen/content_gutter</item>
+        <item name="android:paddingEnd">@dimen/content_gutter</item>
+        <item name="android:paddingTop">@dimen/section_header_top</item>
+        <item name="android:paddingBottom">@dimen/section_header_bottom</item>
+    </style>
+
+    <!--
+        The header the artist, album and playlist pages share: the picture on
+        the gradient, the name under it, a caption saying what the page is,
+        and the page's two actions opening the content below. The three pages
+        had drifted apart - different picture sizes, the name repeated in a
+        grey toolbar, rules above and below the buttons on two of them only -
+        so the metrics live here rather than in each layout.
+    -->
+    <style name="PageHeader">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">@dimen/spacing_24</item>
+        <item name="android:paddingTop">@dimen/page_header_top</item>
+        <item name="android:paddingEnd">@dimen/spacing_24</item>
+        <!-- The action row under the header opens with its own 20dp, the
+             same as between the picture and the name, so the name block sits
+             evenly between the two. The 2dp here make up for the type: the
+             24sp name's line has more air above its letters than the 12sp
+             caption has below its own, and measured on screen the gap under
+             the caption came out 2dp short of the one over the name. -->
+        <item name="android:paddingBottom">2dp</item>
+    </style>
+
+    <style name="PageHeaderTitle" parent="HeadlineLarge">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:paddingTop">@dimen/spacing_20</item>
+    </style>
+
+    <!-- Who made it, under an album's name: white, since it is a way to the
+         artist page rather than a caption. -->
+    <style name="PageHeaderLink" parent="LabelMedium">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:paddingTop">@dimen/spacing_4</item>
+        <item name="android:paddingBottom">@dimen/spacing_4</item>
+        <item name="android:paddingStart">@dimen/spacing_8</item>
+        <item name="android:paddingEnd">@dimen/spacing_8</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="PageHeaderCaption" parent="LabelSmall">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:paddingTop">@dimen/spacing_4</item>
+    </style>
+
+    <!--
+        The header of a page that lists things rather than being one: all
+        genres, all albums, all artists, the tracks of a genre. The name large
+        at the left, a count under it, and the name moving into the black
+        toolbar once it has scrolled away (PageHeaderTitle). These pages used
+        to open on a 172dp band with the title at its foot - most of the first
+        screen empty - and 52dp round tonal buttons for their actions, found
+        nowhere else in the app; those are toolbar actions now.
+    -->
+    <style name="ListHeader">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">@dimen/content_gutter</item>
+        <item name="android:paddingTop">@dimen/page_header_top</item>
+        <item name="android:paddingEnd">@dimen/content_gutter</item>
+        <item name="android:paddingBottom">@dimen/spacing_16</item>
+    </style>
+
+    <style name="ListHeaderTitle" parent="HeadlineLarge">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">2</item>
+    </style>
+
+    <style name="ListHeaderCaption" parent="LabelSmall">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingTop">@dimen/spacing_4</item>
+    </style>
+
+    <style name="PageActions">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">@dimen/content_gutter</item>
+        <item name="android:paddingTop">@dimen/spacing_20</item>
+        <item name="android:paddingEnd">@dimen/content_gutter</item>
+        <item name="android:paddingBottom">@dimen/spacing_8</item>
+    </style>
+
+    <!--
+        Page dots under a paged rail (helper/view/PageDotsView), placed straight
+        after the rail. The last row's own 4dp and the rail's 8dp bottom padding
+        put the dots 12dp under it - DESIGN.md's element gap, close enough to
+        read as part of the rail - and 8dp under the dots restores the rail's
+        usual 8dp before the next heading, so sections stay 32dp apart. With a
+        single page the view is gone and the rail ends exactly as the others do.
+    -->
+    <style name="PageDots">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginBottom">@dimen/spacing_8</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+    <!-- Small caps kicker above a heading ('BECAUSE YOU LISTENED TO') -->
+    <style name="SectionEyebrow" parent="InterFontFamily">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/subtitleTextColor</item>
+    </style>
+
+    <!-- 'Show all' trailing link -->
+    <style name="SectionAction" parent="InterFontFamily">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textColor">@color/subtitleTextColor</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+    </style>
+
+    <!-- ====================== Loading placeholders ====================== -->
+    <!--
+        A skeleton stands in the rail's own footprint: same gutter, same end
+        padding, same 8dp below. See helper/view/SkeletonView.
+    -->
+    <style name="Widget.Platter.Skeleton" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingBottom">@dimen/spacing_8</item>
+    </style>
+
+    <style name="Widget.Platter.Skeleton.Rail">
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">@dimen/content_gutter</item>
+        <item name="android:paddingEnd">@dimen/rail_end_padding</item>
+    </style>
+
+    <style name="Widget.Platter.Skeleton.List">
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Widget.Platter.Skeleton.Hero">
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">@dimen/content_gutter</item>
+        <item name="android:paddingEnd">@dimen/content_gutter</item>
+        <item name="android:paddingTop">@dimen/spacing_8</item>
+        <item name="android:paddingBottom">@dimen/spacing_16</item>
+    </style>
+
+    <!-- ============================ Settings ============================ -->
+    <!--
+        androidx.preference ships its own theme overlay and, without this, the
+        settings screen was the one place in the app that never saw the Spotify
+        system: Material's own row layouts, Roboto, and a green category
+        heading. The overlay below hands every row a Platter layout instead, so
+        the list reads as the stack of graphite cards DESIGN.md describes -
+        #1F1F1F cards at the 6dp content radius on the black canvas, no
+        dividers, surface colour alone marking the boundaries.
+
+        The item styles carry no parent on purpose: all they need to declare is
+        which layout to inflate, and the androidx defaults for everything else
+        (selectable, persistent, single-line title) are already right.
+    -->
+    <style name="ThemeOverlay.Platter.Preference" parent="PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/Preference.Platter</item>
+        <item name="preferenceCategoryStyle">@style/Preference.Platter.Category</item>
+        <item name="dialogPreferenceStyle">@style/Preference.Platter</item>
+        <item name="switchPreferenceCompatStyle">@style/Preference.Platter.Switch</item>
+        <item name="seekBarPreferenceStyle">@style/Preference.Platter.SeekBar</item>
+    </style>
+
+    <!-- The card position is decided per row in SettingsFragment; a lone row is
+         the shape that is right when nothing overrides it. -->
+    <style name="Preference.Platter" parent="">
+        <item name="android:layout">@layout/preference_platter_single</item>
+    </style>
+
+    <style name="Preference.Platter.Category" parent="">
+        <item name="android:layout">@layout/preference_platter_category</item>
+    </style>
+
+    <style name="Preference.Platter.Switch" parent="">
+        <item name="android:layout">@layout/preference_platter_single</item>
+        <item name="android:widgetLayout">@layout/platter_widget_switch</item>
+    </style>
+
+    <style name="Preference.Platter.SeekBar" parent="">
+        <item name="android:layout">@layout/preference_platter_seekbar</item>
+    </style>
+
+    <!-- Category heading over the card below it -->
+    <style name="SettingsCategoryTitle" parent="InterFontFamily">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">@color/titleTextColor</item>
+    </style>
+
+    <!-- Explanatory paragraph between a heading and its card -->
+    <style name="SettingsNote" parent="InterFontFamily">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lineSpacingExtra">3dp</item>
+        <item name="android:textColor">@color/subtitleTextColor</item>
+    </style>
+
+    <!-- ============================ Misc ============================ -->
+    <style name="Divider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">0.5dp</item>
+        <item name="android:background">@color/dividerColor</item>
+    </style>
+
+    <!-- Offline banner pinned under the content area. The background has to be
+         android:background — the unprefixed "background" attribute belongs to
+         the ActionBar styleable and a TextView never reads it, which left the
+         banner transparent. -->
+    <style name="NoConnectionTextView">
+        <item name="android:background">?attr/colorErrorContainer</item>
+        <item name="android:textColor">?attr/colorOnErrorContainer</item>
+        <item name="android:fontFamily">@font/inter_semi_bold</item>
+        <item name="android:paddingTop">@dimen/spacing_4</item>
+        <item name="android:paddingBottom">@dimen/spacing_4</item>
+    </style>
+
+</resources>

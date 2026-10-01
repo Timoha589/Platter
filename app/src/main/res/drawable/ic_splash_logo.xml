@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash mark — the Platter disc on the black splash canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="@color/spotify_green"
+        android:pathData="M54,54 m-34,0 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0 Z" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54 m-25.5,0 a25.5,25.5 0 1,0 51,0 a25.5,25.5 0 1,0 -51,0"
+        android:strokeColor="@color/void_black"
+        android:strokeWidth="2.4" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54 m-17.5,0 a17.5,17.5 0 1,0 35,0 a17.5,17.5 0 1,0 -35,0"
+        android:strokeColor="@color/void_black"
+        android:strokeWidth="2.4" />
+
+    <path
+        android:fillColor="@color/void_black"
+        android:pathData="M54,54 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z" />
+</vector>

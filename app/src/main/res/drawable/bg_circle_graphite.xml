@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Graphite disc behind an empty-state glyph. DESIGN.md's card layer (#1F1F1F)
+     taken round: elevation here comes from the surface shift, not a shadow. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/graphite" />
+</shape>

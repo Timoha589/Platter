@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Timoha Premium offer on the login screen. DESIGN.md "Promotional
+    Banner": the magenta-to-blue sweep is the one brand-coloured surface the
+    system allows, and it is kept for exactly this - the offer to sign up.
+    6dp, the content radius, since the card is content rather than an action.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:endColor="@color/promo_blue"
+        android:startColor="@color/magenta_glow"
+        android:type="linear" />
+    <corners android:radius="@dimen/radius_card" />
+</shape>
