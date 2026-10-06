@@ -111,42 +111,70 @@ The first install of a build must be done by hand (adb or file); only updates ar
 On a phone with Google Play Protect the install can be stopped with "App blocked": More details >
 Install anyway.
 
-## 3b. Publishing a release for phone and Windows together
+## 3b. Publishing a release: phone, Windows, or both
 
-One GitHub release carries both files, `app-platter-release.apk` and `Platter-<version>.msi`, under one version. The
-phone reads `releases/latest` and takes the `.apk`; the Windows app lists the releases and takes the newest `.msi`
-(see `desktop/README.md`, "Самообновление"). Each ignores the other's file.
+There is one counter of versions for the whole project (1.0.1, 1.0.2, ...) and one GitHub release per number, tagged
+`v` + the number. A release carries the file of each app that changed in it:
 
-Rules that keep both updaters working:
+| What changed | Files in the release | How to publish |
+|---|---|---|
+| Phone only | `app-platter-release.apk` | plain `gh release create` |
+| Windows only | `app-platter-release.msi` | add `--latest=false` |
+| Both | the APK and the MSI | plain `gh release create` |
 
-- **One version for both.** Set the same number in `platterVersionName` (`app/build.gradle`) and `platterVersion`
-  (`desktop/build.gradle.kts`). Three numbers; the MSI needs each below 256.
-- **Every release carries both files**, even when only one app changed (the other is rebuilt with the new number).
-  A release with only an MSI would become "latest", and a phone that is a version behind would find no APK in it.
-- Never change `upgradeUuid` in `desktop/build.gradle.kts`: it is how Windows knows a new MSI replaces the old one.
-- Tags are `v` + the version and are never reused or overwritten; a mistake is fixed by the next version.
+The phone reads `releases/latest` and takes the `.apk`; the Windows app lists the releases and takes the newest `.msi`
+(see `desktop/README.md`, "Самообновление"). Each ignores the other's file, so an app that did not change in a release is
+not asked to update.
 
-Building the MSI needs the WiX Toolset 3 on the machine that builds (not on the ones that install). The first install
-on a computer is done by hand (run the MSI); later versions install themselves from inside the app.
+Rules:
 
-1. Raise both version numbers (see above) and commit.
-2. Phone: `./gradlew assemblePlatterRelease` (signed, see 2.2).
-3. Windows: `cd desktop && ./gradlew packageMsi` - the installer lands in `desktop/build/compose/binaries/main/msi/`.
-4. Give the MSI the same file name as the APK, so the release page shows `app-platter-release.apk` and
-   `app-platter-release.msi` (the updater only looks at the `.msi` ending, so the name is free):
+- **The number only goes up**, across both apps, and a tag is never reused or overwritten; a mistake is fixed by the next
+  number.
+- **Change the number only in the app you are releasing**: `platterVersionName` in `app/build.gradle` for the phone,
+  `platterVersion` in `desktop/build.gradle.kts` for Windows. Windows' number must be **exactly the tag's number**, or the
+  installed app would keep finding "a newer version" after it updated. So the numbers of the two apps may differ (the phone
+  at 1.0.1 while Windows is still at 1.0.0); each is the number of the last release that carried its file.
+- A release with **only an MSI must be published with `--latest=false`**. Otherwise it becomes "latest", and a phone that is
+  a version behind finds no APK in it and never updates.
+- The MSI needs each part of its number below 256. Never change `upgradeUuid` in `desktop/build.gradle.kts`: it is how
+  Windows knows a new MSI replaces the installed Platter instead of sitting beside it.
+- Give the files the same names every time, so the release page shows `app-platter-release.apk` and
+  `app-platter-release.msi` (the updaters only look at the `.apk` / `.msi` ending, so the names are free).
+
+Building the MSI needs the WiX Toolset 3 on the machine that builds (not on the ones that install). The first install on a
+computer is done by hand (run the MSI); later versions install themselves from inside the app.
+
+Before any release: set the number (see above), then
 
 ```
-cp desktop/build/compose/binaries/main/msi/Platter-1.0.1.msi desktop/build/compose/binaries/main/msi/app-platter-release.msi
+git add -A
+git commit -m "What changed"
+git push
 ```
 
-5. Publish one release with both files:
+**Phone** - `./gradlew assemblePlatterRelease` (signed with the same key as before, see 2.2). The APK is
+`app/build/outputs/apk/platter/release/app-platter-release.apk`.
+
+**Windows** - build the MSI and copy it under the release name:
 
 ```
-gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-release.apk desktop/build/compose/binaries/main/msi/app-platter-release.msi --repo Timoha589/Platter --title "Platter 1.0.1" --notes "What changed"
+cd desktop
+./gradlew packageMsi
+cp build/compose/binaries/main/msi/Platter-1.0.2.msi build/compose/binaries/main/msi/app-platter-release.msi
 ```
 
-To add the MSI to a release that already exists, upload it under that name: `gh release upload v1.0.0 <the copied .msi> --repo Timoha589/Platter`.
-A published asset can be renamed without a new version:
+Then publish (use the number you set; the first command is for both files, the next two for one):
+
+```
+gh release create v1.0.2 app/build/outputs/apk/platter/release/app-platter-release.apk desktop/build/compose/binaries/main/msi/app-platter-release.msi --repo Timoha589/Platter --title "Platter 1.0.2" --notes "What changed"
+
+gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-release.apk --repo Timoha589/Platter --title "Platter 1.0.1" --notes "What changed"
+
+gh release create v1.0.3 desktop/build/compose/binaries/main/msi/app-platter-release.msi --repo Timoha589/Platter --title "Platter 1.0.3" --notes "What changed" --latest=false
+```
+
+The notes are what the person sees in the update window. To add a file to a release that already exists:
+`gh release upload v1.0.0 <file> --repo Timoha589/Platter`. A published file can be renamed without a new version:
 `gh api -X PATCH repos/Timoha589/Platter/releases/assets/<asset id> -f name=<new name>` (ids: `gh api repos/Timoha589/Platter/releases/tags/v1.0.0 --jq '.assets[] | "\(.id) \(.name)"'`).
 
 ## 4. Google Play — an AAB, not an APK
