@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Cover of the liked tracks row in the library: a heart on a card surface.
+    Cover of the liked tracks, in the library row and at the top of their page:
+    a white heart on a slope from deep purple to pale blue, as the desktop app
+    draws it. The heart is 22 of the cover's 52, the same share as there.
     The surface carries the size of the cover it fills; without it the heart's
-    24dp would be the drawable's whole size, and the cover's centerCrop would
+    size would be the drawable's whole size, and the cover's centerCrop would
     blow the heart up to fill the square.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
@@ -11,13 +13,17 @@
             <size
                 android:width="52dp"
                 android:height="52dp" />
-            <solid android:color="@color/smoke" />
+            <gradient
+                android:angle="315"
+                android:endColor="@color/liked_cover_end"
+                android:startColor="@color/liked_cover_start"
+                android:type="linear" />
         </shape>
     </item>
 
     <item
-        android:width="24dp"
-        android:height="24dp"
+        android:width="22dp"
+        android:height="22dp"
         android:drawable="@drawable/ic_favorite_liked"
         android:gravity="center" />
 </layer-list>

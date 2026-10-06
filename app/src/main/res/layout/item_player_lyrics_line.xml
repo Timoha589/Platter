@@ -9,7 +9,9 @@
     style="@style/BodyLarge"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:fontFamily="@font/inter_bold"
     android:gravity="center"
-    android:paddingVertical="8dp"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="10dp"
     android:textColor="@color/lyricsTextColor"
     android:textSize="@dimen/lyrics_text_size" />

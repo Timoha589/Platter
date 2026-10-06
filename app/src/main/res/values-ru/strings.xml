@@ -189,7 +189,7 @@
     <string name="library_title_artist_see_all_button">Все</string>
     <string name="library_title_genre">Жанры</string>
     <string name="library_title_genre_see_all_button">Все</string>
-    <string name="library_title_liked_tracks">Мне нравится</string>
+    <string name="library_title_liked_tracks">Любимые треки</string>
     <string name="library_title_playlist">Плейлисты</string>
     <string name="library_title_playlist_see_all_button">Все</string>
     <string name="login_empty">Вы ещё не добавили свой сервер</string>
@@ -454,7 +454,7 @@
     <string name="song_list_page_most_played">Самые популярные треки</string>
     <string name="song_list_page_recently_added">Недавно добавленные треки</string>
     <string name="song_list_page_recently_played">Недавно воспроизведенные треки</string>
-    <string name="song_list_page_starred">Мне нравится</string>
+    <string name="song_list_page_starred">Любимые треки</string>
     <string name="song_list_page_cache_liked">Кэшировать треки</string>
     <string name="song_list_page_top">Лучшие треки: %1$s</string>
     <string name="song_list_page_year">Год %1$d</string>

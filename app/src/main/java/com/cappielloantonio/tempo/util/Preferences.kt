@@ -350,7 +350,7 @@ object Preferences {
 
     @JvmStatic
     fun getReplayGainMode(): String? {
-        return App.getInstance().preferences.getString(REPLAY_GAIN_MODE, "disabled")
+        return App.getInstance().preferences.getString(REPLAY_GAIN_MODE, "track")
     }
 
     @JvmStatic

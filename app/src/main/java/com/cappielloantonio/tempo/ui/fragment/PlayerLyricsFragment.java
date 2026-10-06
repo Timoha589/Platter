@@ -1,11 +1,17 @@
 package com.cappielloantonio.tempo.ui.fragment;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.res.Configuration;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
+import android.util.TypedValue;
 import android.view.Display;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -15,11 +21,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.PathInterpolator;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
+import androidx.annotation.RequiresApi;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.util.UnstableApi;
@@ -90,20 +98,60 @@ public class PlayerLyricsFragment extends Fragment {
     private static final long AUTO_SCROLL_HOLD = 3000;
 
     /**
-     * When the reader last moved the words themselves. A fling carries on after
-     * the finger has gone, and lands well inside the hold.
+     * Whether the reader is looking around rather than following the song:
+     * from the first drag until the hold has run out. While they are, nothing is
+     * blurred and the column stays where they put it.
      */
-    private long lastUserScrollAt;
+    private boolean browsing;
+
+    private final Runnable endBrowsing = () -> {
+        browsing = false;
+
+        if (bind == null) return;
+
+        applyLineStyles();
+        followActiveLine();
+    };
 
     /*
-     * The sung line is left at its own size and the rest are shrunk back from
-     * it. Enlarging the sung line instead is what cut long lines off: the column
-     * clips its children, so anything scaled past its own bounds lost its ends.
-     * Nothing here scales above 1, so nothing can be clipped.
+     * The sung line is left at its own size and strength and the rest are
+     * shrunk back from it, dimmed, and blurred the more the further they are
+     * from it - the blur is what tells the eye where the song is without
+     * anything being highlighted. Nothing here scales above 1, so nothing can be
+     * clipped.
      */
-    private static final float INACTIVE_SCALE = 0.88f;
-    private static final float INACTIVE_ALPHA = 0.35f;
-    private static final long LINE_ANIMATION_DURATION = 240;
+    private static final float INACTIVE_SCALE = 0.92f;
+    private static final float INACTIVE_ALPHA = 0.34f;
+    private static final float BROWSE_ALPHA = 0.6f;
+    private static final float BLUR_STEP_DP = 0.9f;
+    private static final int BLUR_LINES = 5;
+    private static final long LINE_ANIMATION_DURATION = 320;
+
+    /** The sung line rests this far down the view, not in the middle: what is coming matters more than what has gone. */
+    private static final float ANCHOR = 0.26f;
+
+    /**
+     * A change of line moves every line up together, the ones under the new
+     * line a little behind their upper neighbour, so the column pours into place
+     * instead of sliding as one board.
+     */
+    private static final long MOVE_DURATION = 700;
+    private static final long STAGGER = 85;
+    private static final int STAGGER_LINES = 7;
+    private static final int MOVE_REACH = 12;
+    private static final PathInterpolator SETTLE = new PathInterpolator(0.3f, 0f, 0.15f, 1f);
+
+    /** What each line is doing right now, parallel to {@link #lineViews}. */
+    private static class LineState {
+        float blur;
+        ValueAnimator blurAnimator;
+        ObjectAnimator move;
+    }
+
+    private final List<LineState> lineStates = new ArrayList<>();
+
+    /** The first placement of the column is a jump; every one after it pours. */
+    private boolean placed;
 
     private final List<TextView> lineViews = new ArrayList<>();
     private StructuredLyrics renderedLyrics;
@@ -185,10 +233,15 @@ public class PlayerLyricsFragment extends Fragment {
         super.onDestroyView();
 
         stopSyncTicker();
+        syncLyricsHandler.removeCallbacks(endBrowsing);
+        browsing = false;
 
+        cancelLineAnimations();
         lineViews.clear();
+        lineStates.clear();
         renderedLyrics = null;
         activeLineIndex = -1;
+        placed = false;
 
         bind = null;
     }
@@ -218,7 +271,7 @@ public class PlayerLyricsFragment extends Fragment {
             @Override
             public boolean onScroll(@Nullable MotionEvent from, @NonNull MotionEvent to, float distanceX, float distanceY) {
                 // Every move, so the hold is measured from the last of them.
-                lastUserScrollAt = to.getEventTime();
+                holdForReader();
                 return false;
             }
         });
@@ -228,6 +281,18 @@ public class PlayerLyricsFragment extends Fragment {
 
             return claim.onTouch(view, event);
         });
+    }
+
+    /** The reader has the words: unblurred and still for a while after their last move. */
+    private void holdForReader() {
+        syncLyricsHandler.removeCallbacks(endBrowsing);
+
+        if (!browsing) {
+            browsing = true;
+            applyLineStyles();
+        }
+
+        syncLyricsHandler.postDelayed(endBrowsing, AUTO_SCROLL_HOLD);
     }
 
     /**
@@ -279,9 +344,19 @@ public class PlayerLyricsFragment extends Fragment {
          */
         mediaBrowser.seekTo(Math.max(0, line.getStart() - renderedLyrics.getOffset()));
 
+        // The reader has chosen where to be: the column follows the song again from there.
+        syncLyricsHandler.removeCallbacks(endBrowsing);
+        boolean wasBrowsing = browsing;
+        browsing = false;
+
         // The highlight is the answer to the tap, and waiting a quarter second
         // for the ticker to notice would read as the tap having missed.
-        setActiveLine(index);
+        if (index == activeLineIndex) {
+            applyLineStyles();
+            if (wasBrowsing) followActiveLine();
+        } else {
+            setActiveLine(index);
+        }
     }
 
     private void initializeBrowser() {
@@ -443,7 +518,7 @@ public class PlayerLyricsFragment extends Fragment {
 
     private void showTextBlock(CharSequence text, int gravity) {
         bind.nowPlayingSongLyricsTextView.setText(text);
-        bind.nowPlayingSongLyricsTextView.setGravity(gravity);
+        bind.nowPlayingSongLyricsTextView.setGravity(gravity == Gravity.CENTER_HORIZONTAL && isLeftAligned() ? Gravity.START : gravity);
         bind.nowPlayingSongLyricsTextView.setVisibility(View.VISIBLE);
         bind.nowPlayingSongLyricsLines.setVisibility(View.GONE);
 
@@ -458,9 +533,12 @@ public class PlayerLyricsFragment extends Fragment {
     }
 
     private void clearSyncedLines() {
+        cancelLineAnimations();
         bind.nowPlayingSongLyricsLines.removeAllViews();
         bind.nowPlayingSongLyricsLines.setPadding(0, 0, 0, 0);
         lineViews.clear();
+        lineStates.clear();
+        placed = false;
         renderedLyrics = null;
         activeLineIndex = -1;
         introDots = null;
@@ -477,9 +555,12 @@ public class PlayerLyricsFragment extends Fragment {
 
         if (lyrics == renderedLyrics) return;
 
+        cancelLineAnimations();
         bind.nowPlayingSongLyricsLines.removeAllViews();
         lineViews.clear();
+        lineStates.clear();
         activeLineIndex = -1;
+        placed = false;
         renderedLyrics = lyrics;
         introDots = null;
 
@@ -491,19 +572,31 @@ public class PlayerLyricsFragment extends Fragment {
          * one - left at the resting state, the whole lyric read as greyed out.
          */
         boolean synced = LyricsUtil.isSynced(lyrics);
-        float alpha = synced ? INACTIVE_ALPHA : 1f;
-        float scale = synced ? INACTIVE_SCALE : 1f;
+        boolean leftAligned = isLeftAligned();
+        float textSize = lineTextSize(leftAligned);
 
         if (synced) addIntroDots(lyrics);
 
+        int position = 0;
         for (Line line : lyrics.getLine()) {
             if (line == null || line.getValue() == null) continue;
 
             TextView lineView = (TextView) inflater.inflate(R.layout.item_player_lyrics_line, bind.nowPlayingSongLyricsLines, false);
             lineView.setText(line.getValue().trim());
-            lineView.setAlpha(alpha);
-            lineView.setScaleX(scale);
-            lineView.setScaleY(scale);
+            lineView.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize);
+            lineView.setGravity(leftAligned ? Gravity.START : Gravity.CENTER_HORIZONTAL);
+
+            // Lines shrink toward the edge they are read from: the left one, or the middle when they are centred.
+            lineView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                v.setPivotX(leftAligned ? 0f : v.getWidth() / 2f);
+                v.setPivotY(v.getHeight() / 2f);
+            });
+
+            if (synced) {
+                lineView.setAlpha(INACTIVE_ALPHA);
+                lineView.setScaleX(INACTIVE_SCALE);
+                lineView.setScaleY(INACTIVE_SCALE);
+            }
 
             /*
              * A TextView reports that it renders overlapping content, so the
@@ -517,6 +610,13 @@ public class PlayerLyricsFragment extends Fragment {
 
             bind.nowPlayingSongLyricsLines.addView(lineView);
             lineViews.add(lineView);
+
+            LineState state = new LineState();
+            lineStates.add(state);
+
+            // Before the first line is sung every one of them is further from it than the last.
+            if (synced) setBlur(lineView, state, blurFor(position));
+            position++;
         }
 
         centreColumn();
@@ -540,35 +640,59 @@ public class PlayerLyricsFragment extends Fragment {
 
         introEnd = firstStart;
         introDots = new LyricsIntroDotsView(requireContext());
+        introDots.setLeftAligned(isLeftAligned());
         bind.nowPlayingSongLyricsLines.addView(introDots, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
 
     /*
-     * Half a panel of nothing above the first line and below the last, so that
-     * whatever is being sung can sit in the middle at every point of the song -
-     * the dots before the words, the first line once they start, the last line
-     * at the end - instead of being pinned to the top edge until the column has
-     * scrolled far enough to centre anything. Untimed lyrics have nothing being
-     * sung and keep reading from the top.
+     * Room above the first line for what is being sung to sit at its anchor, and
+     * below the last for the same - the dots before the words, the first line
+     * once they start, the last line at the end - instead of being pinned to the
+     * top edge until the column has scrolled far enough to hold anything there.
+     * Untimed lyrics have nothing being sung and keep reading from the top.
      */
     private void centreColumn() {
         if (bind == null) return;
 
-        int pad = LyricsUtil.isSynced(renderedLyrics) ? bind.nowPlayingSongLyricsSrollView.getHeight() / 2 : 0;
+        boolean synced = LyricsUtil.isSynced(renderedLyrics);
+        int height = bind.nowPlayingSongLyricsSrollView.getHeight();
+        int top = synced ? anchorPx() : 0;
+        int bottom = synced ? Math.max(0, height - top) : 0;
         View column = bind.nowPlayingSongLyricsLines;
 
-        if (column.getPaddingTop() != pad || column.getPaddingBottom() != pad) {
-            column.setPadding(0, pad, 0, pad);
+        if (column.getPaddingTop() != top || column.getPaddingBottom() != bottom) {
+            column.setPadding(0, top, 0, bottom);
         }
 
         // Once the padding is laid out: straight to what is being sung, no glide.
         column.post(() -> {
             View resting = restingView();
-            if (bind != null && resting != null) bind.nowPlayingSongLyricsSrollView.scrollTo(0, scrollTargetFor(resting));
+            if (bind != null && resting != null) {
+                bind.nowPlayingSongLyricsSrollView.scrollTo(0, scrollTargetFor(resting));
+                placed = true;
+            }
         });
     }
 
-    /** What belongs in the middle: the sung line, else the dots, else the first line. */
+    /** Where the sung line's top rests, from the top of the view. */
+    private int anchorPx() {
+        return (int) (bind.nowPlayingSongLyricsSrollView.getHeight() * ANCHOR);
+    }
+
+    /** Beside the player, on the right, the words keep to the left; under it they are centred. */
+    private boolean isLeftAligned() {
+        return getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+    }
+
+    /** As wide as the page allows, between 22 and 32sp - the desktop's rule, with the phone's smaller ceiling. */
+    private float lineTextSize(boolean leftAligned) {
+        float screenDp = getResources().getConfiguration().screenWidthDp;
+        float widthDp = (leftAligned ? screenDp * 0.5f : screenDp) - 48f;
+
+        return Math.max(22f, Math.min(32f, widthDp * 0.075f));
+    }
+
+    /** What belongs at the anchor: the sung line, else the dots, else the first line. */
     @Nullable
     private View restingView() {
         if (activeLineIndex >= 0 && activeLineIndex < lineViews.size()) return lineViews.get(activeLineIndex);
@@ -585,13 +709,9 @@ public class PlayerLyricsFragment extends Fragment {
     private void setActiveLine(int index) {
         if (index == activeLineIndex) return;
 
-        if (activeLineIndex >= 0 && activeLineIndex < lineViews.size()) {
-            animateLine(lineViews.get(activeLineIndex), false);
-        }
-
         activeLineIndex = index;
 
-        if (index >= 0 && index < lineViews.size()) animateLine(lineViews.get(index), true);
+        applyLineStyles();
 
         // The dots give way to the first line, and come back for a seek into the intro.
         if (introDots != null) {
@@ -599,48 +719,167 @@ public class PlayerLyricsFragment extends Fragment {
             if (index >= 0) introDots.setTimeLeft(0, false);
         }
 
-        View resting = restingView();
-        if (resting != null && !isReaderHoldingPosition()) {
-            bind.nowPlayingSongLyricsSrollView.smoothScrollTo(0, scrollTargetFor(resting));
+        if (!browsing) followActiveLine();
+    }
+
+    /**
+     * Brings every line to what it should be now: the sung one whole and sharp,
+     * the rest smaller, dimmer and blurrier the further they are from it - and,
+     * while the reader is looking around, all of them readable.
+     */
+    private void applyLineStyles() {
+        boolean synced = LyricsUtil.isSynced(renderedLyrics);
+
+        for (int index = 0; index < lineViews.size(); index++) {
+            TextView lineView = lineViews.get(index);
+            boolean sung = !synced || index == activeLineIndex;
+
+            float alpha = sung ? 1f : browsing ? BROWSE_ALPHA : INACTIVE_ALPHA;
+            float scale = sung ? 1f : INACTIVE_SCALE;
+
+            /*
+             * Text is rasterised at the size it lands on screen, so a line being
+             * scaled is a line whose every glyph is drawn again at a new size on
+             * every frame. Inside a layer the words are drawn once and the
+             * animation only stretches the picture of them; the layer is let go
+             * at the end, so a line at rest is sharp text again.
+             */
+            lineView.animate()
+                    .alpha(alpha)
+                    .scaleX(scale)
+                    .scaleY(scale)
+                    .setDuration(LINE_ANIMATION_DURATION)
+                    .withLayer()
+                    .start();
+
+            animateBlur(index, synced && !sung && !browsing ? blurFor(index) : 0f);
+        }
+    }
+
+    /** How blurred line [index] is when it is not being sung: a step more for each line away from the sung one, up to a ceiling. */
+    private float blurFor(int index) {
+        return Math.min(Math.abs(index - activeLineIndex), BLUR_LINES) * BLUR_STEP_DP * getResources().getDisplayMetrics().density;
+    }
+
+    /** Blur is a render effect: from Android 12. Earlier, the dimming and the size alone say where the song is. */
+    private void animateBlur(int index, float target) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+
+        TextView lineView = lineViews.get(index);
+        LineState state = lineStates.get(index);
+
+        if (state.blurAnimator != null) state.blurAnimator.cancel();
+        if (Math.abs(state.blur - target) < 0.01f) return;
+
+        // Lines far from the screen have nobody to see them change.
+        if (Math.abs(index - Math.max(activeLineIndex, 0)) > MOVE_REACH) {
+            setBlur(lineView, state, target);
+            return;
+        }
+
+        state.blurAnimator = ValueAnimator.ofFloat(state.blur, target);
+        state.blurAnimator.setDuration(LINE_ANIMATION_DURATION);
+        state.blurAnimator.addUpdateListener(animation -> setBlur(lineView, state, (float) animation.getAnimatedValue()));
+        state.blurAnimator.start();
+    }
+
+    private void setBlur(View view, LineState state, float radius) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+
+        state.blur = radius;
+        Blur.apply(view, radius);
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private static final class Blur {
+        static void apply(View view, float radius) {
+            view.setRenderEffect(radius < 0.5f ? null : RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.DECAL));
         }
     }
 
     /**
-     * Whether the words were moved by hand recently enough that pulling them
-     * back to the sung line would be taking them away from someone reading.
+     * Takes the column to the sung line in one jump and lets each line walk
+     * back to where it was: the ones above the new line and the line itself
+     * first, the ones under it one after another. Where the line is far off - a
+     * seek across the song - there is nothing to pour, and it is simply there.
      */
-    private boolean isReaderHoldingPosition() {
-        return SystemClock.uptimeMillis() - lastUserScrollAt < AUTO_SCROLL_HOLD;
+    private void followActiveLine() {
+        View resting = restingView();
+        if (bind == null || resting == null) return;
+
+        int height = bind.nowPlayingSongLyricsSrollView.getHeight();
+        int target = scrollTargetFor(resting);
+        int delta = target - bind.nowPlayingSongLyricsSrollView.getScrollY();
+
+        if (delta == 0) return;
+
+        if (!placed || Math.abs(delta) > height * 1.5f) {
+            placed = true;
+            bind.nowPlayingSongLyricsSrollView.scrollTo(0, target);
+            return;
+        }
+
+        int before = bind.nowPlayingSongLyricsSrollView.getScrollY();
+        bind.nowPlayingSongLyricsSrollView.scrollTo(0, target);
+        int moved = bind.nowPlayingSongLyricsSrollView.getScrollY() - before;
+
+        if (moved != 0) pourLines(moved);
     }
 
-    /*
-     * Text is rasterised at the size it lands on screen, so a line being scaled
-     * is a line whose every glyph is drawn again at a new size on every frame -
-     * two lines of large bold type, fifteen sizes each, all on the render thread
-     * at the moment the column is also scrolling. That is what dropped the frame
-     * rate on each change of line. Inside a layer the words are drawn once and
-     * the animation only stretches the picture of them; the layer is let go at
-     * the end, so a line at rest is sharp text again.
-     */
-    private void animateLine(TextView lineView, boolean active) {
-        lineView.animate()
-                .alpha(active ? 1f : INACTIVE_ALPHA)
-                .scaleX(active ? 1f : INACTIVE_SCALE)
-                .scaleY(active ? 1f : INACTIVE_SCALE)
-                .setDuration(LINE_ANIMATION_DURATION)
-                .withLayer()
-                .start();
+    /** The column has just been scrolled [moved] px at once: every line is shifted back by as much, and walks home. */
+    private void pourLines(int moved) {
+        for (int index = 0; index < lineViews.size(); index++) {
+            LineState state = lineStates.get(index);
+            if (state.move != null) state.move.cancel();
+
+            View lineView = lineViews.get(index);
+
+            if (Math.abs(index - Math.max(activeLineIndex, 0)) > MOVE_REACH) {
+                lineView.setTranslationY(0f);
+                continue;
+            }
+
+            float start = lineView.getTranslationY() + moved;
+            lineView.setTranslationY(start);
+
+            // The dots stand before line 0, like the lines above the sung one.
+            long wait = index <= activeLineIndex ? 0 : Math.min(index - activeLineIndex, STAGGER_LINES) * STAGGER;
+
+            state.move = ObjectAnimator.ofFloat(lineView, View.TRANSLATION_Y, start, 0f);
+            state.move.setDuration(MOVE_DURATION);
+            state.move.setStartDelay(wait);
+            state.move.setInterpolator(SETTLE);
+            state.move.start();
+        }
+
+        if (introDots != null) {
+            float start = introDots.getTranslationY() + moved;
+            introDots.setTranslationY(start);
+
+            ObjectAnimator dots = ObjectAnimator.ofFloat(introDots, View.TRANSLATION_Y, start, 0f);
+            dots.setDuration(MOVE_DURATION);
+            dots.setInterpolator(SETTLE);
+            dots.start();
+        }
+    }
+
+    private void cancelLineAnimations() {
+        for (int index = 0; index < lineViews.size() && index < lineStates.size(); index++) {
+            LineState state = lineStates.get(index);
+            if (state.move != null) state.move.cancel();
+            if (state.blurAnimator != null) state.blurAnimator.cancel();
+
+            lineViews.get(index).animate().cancel();
+        }
     }
 
     /**
-     * @return the scroll offset that puts {@code lineView} in the middle of the
-     * visible area - reachable for every line, given the column's half-panel
-     * padding at both ends
+     * @return the scroll offset that puts the top of {@code lineView} at the
+     * anchor - reachable for every line, given the column's padding at both
+     * ends
      */
     private int scrollTargetFor(View lineView) {
-        int centre = bind.nowPlayingSongLyricsLines.getTop() + lineView.getTop() + lineView.getHeight() / 2;
-
-        return Math.max(0, centre - bind.nowPlayingSongLyricsSrollView.getHeight() / 2);
+        return Math.max(0, bind.nowPlayingSongLyricsLines.getTop() + lineView.getTop() - anchorPx());
     }
 
     /**

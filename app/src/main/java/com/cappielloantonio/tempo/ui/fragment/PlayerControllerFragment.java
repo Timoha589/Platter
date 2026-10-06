@@ -1,6 +1,5 @@
 package com.cappielloantonio.tempo.ui.fragment;
 
-import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.content.ComponentName;
 import android.content.res.ColorStateList;
@@ -20,6 +19,7 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.constraintlayout.widget.Guideline;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
@@ -31,6 +31,7 @@ import androidx.media3.common.util.RepeatModeUtil;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
 import androidx.media3.session.SessionToken;
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -75,6 +76,7 @@ public class PlayerControllerFragment extends Fragment {
 
     private static final long FADE_OUT_DURATION = 160;
     private static final long FADE_IN_DURATION = 220;
+    private static final long SLIDE_DURATION = 380;
 
     private InnerFragmentPlayerControllerBinding bind;
     private ViewPager2 playerMediaCoverViewPager;
@@ -100,19 +102,51 @@ public class PlayerControllerFragment extends Fragment {
     private ListenableFuture<MediaBrowser> mediaBrowserListenableFuture;
 
     /*
-     * The player is painted with the average colour of the artwork, fading into
-     * the canvas black so the transport controls at the foot keep the contrast
-     * they were designed against. Both the drawable and the colour it is
-     * currently showing are held so a track change can be tweened rather than
-     * cut.
+     * The player is painted with a slope between the two strongest colours of
+     * the artwork, from its top left corner to its bottom right one, falling off
+     * into the canvas black so the transport controls at the foot keep the
+     * contrast they were designed against - the same background the desktop
+     * player has. Both the drawable and the two colours it is currently showing
+     * are held so a track change can be tweened rather than cut.
      */
+    private static final long BACKGROUND_DURATION = 800;
+
     private GradientDrawable playerBackground;
     private ValueAnimator playerBackgroundAnimator;
     @ColorInt
-    private int playerBackgroundTint;
+    private int playerBackgroundFirst;
     @ColorInt
-    private int playerBackgroundTintTarget;
+    private int playerBackgroundSecond;
+    @ColorInt
+    private int playerBackgroundFirstTarget;
+    @ColorInt
+    private int playerBackgroundSecondTarget;
     private CustomTarget<Bitmap> coverColorTarget;
+
+    /*
+     * Landscape only. Without the words the player and the cover are a pair,
+     * close together and centred in the window. With them the player is on the
+     * left, where it slides to, and the words take the rest. The four guidelines
+     * the layout hangs from are placed here; the player's two slide, and the
+     * cover's page - which becomes the words - is put in its place at once, while
+     * it is faded out and nothing shows of it.
+     */
+    private static final float PAGE_MARGIN_DP = 24f;
+    private static final float PAIR_GAP_DP = 28f;
+    private static final float WORDS_GAP_DP = 12f;
+    private static final float CONTROLS_WIDTH_DP = 360f;
+    private static final float CONTROLS_MIN_WIDTH_DP = 280f;
+
+    private Guideline controlsStartGuide;
+    private Guideline controlsEndGuide;
+    private Guideline pagerStartGuide;
+    private Guideline pagerEndGuide;
+    private ConstraintLayout landscapeLayout;
+    private ValueAnimator slideAnimator;
+    private boolean showingWords;
+
+    /** 0 with the cover, 1 with the words, and in between while the player is sliding. */
+    private float slide;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -124,6 +158,7 @@ public class PlayerControllerFragment extends Fragment {
         playerBottomSheetViewModel = new ViewModelProvider(requireActivity()).get(PlayerBottomSheetViewModel.class);
 
         init();
+        initLandscapePair();
         initPlayerBackground();
         initQuickActionView();
         initCoverLyricsSlideView();
@@ -157,6 +192,11 @@ public class PlayerControllerFragment extends Fragment {
         if (playerBackgroundAnimator != null) {
             playerBackgroundAnimator.cancel();
             playerBackgroundAnimator = null;
+        }
+
+        if (slideAnimator != null) {
+            slideAnimator.cancel();
+            slideAnimator = null;
         }
 
         coverColorTarget = null;
@@ -239,13 +279,15 @@ public class PlayerControllerFragment extends Fragment {
     }
 
     private void initPlayerBackground() {
-        playerBackgroundTint = ContextCompat.getColor(requireContext(), R.color.carbon);
-        playerBackgroundTintTarget = playerBackgroundTint;
-        playerBackground = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, gradientFor(playerBackgroundTint));
+        playerBackgroundFirst = playerBackgroundFirstTarget = ContextCompat.getColor(requireContext(), R.color.steel);
+        playerBackgroundSecond = playerBackgroundSecondTarget = ContextCompat.getColor(requireContext(), R.color.iron);
+        playerBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR, gradientFor(playerBackgroundFirst, playerBackgroundSecond));
         playerBackground.setGradientType(GradientDrawable.LINEAR_GRADIENT);
+        // Colours this dark and a slope this long change by a level every few pixels: dithered, the steps are noise, not stripes.
+        playerBackground.setDither(true);
 
         bind.getRoot().setBackground(playerBackground);
-        setPlayPauseTint(playerBackgroundTint);
+        setPlayPauseTint(playerBackgroundFirst);
     }
 
     /**
@@ -258,14 +300,14 @@ public class PlayerControllerFragment extends Fragment {
         playerPlayPauseButton.setBackgroundTintList(ColorStateList.valueOf(CoverColorUtil.toAccentTint(tint)));
     }
 
-    private int[] gradientFor(@ColorInt int tint) {
+    private int[] gradientFor(@ColorInt int first, @ColorInt int second) {
         int canvas = ContextCompat.getColor(requireContext(), R.color.void_black);
-        return new int[]{tint, ColorUtils.blendARGB(tint, canvas, 0.7f), canvas};
+        return new int[]{first, second, ColorUtils.blendARGB(second, canvas, 0.7f)};
     }
 
     /**
-     * Pulls the artwork down to a thumbnail purely to average it — the player
-     * only needs one colour out of it, and the full-size cover is already being
+     * Pulls the artwork down to a thumbnail purely to count its colours - the
+     * player only needs two out of it, and the full-size cover is already being
      * decoded for the cover page.
      */
     private void setBackgroundFromCover(MediaMetadata mediaMetadata) {
@@ -273,7 +315,7 @@ public class PlayerControllerFragment extends Fragment {
         Object cover = CustomGlideRequest.coverModel(requireContext(), coverArtId, !Preferences.isDataSavingMode());
 
         if (cover == null) {
-            animateBackgroundTint(ContextCompat.getColor(requireContext(), R.color.carbon));
+            animateBackground(ContextCompat.getColor(requireContext(), R.color.steel), ContextCompat.getColor(requireContext(), R.color.iron));
             return;
         }
 
@@ -284,14 +326,18 @@ public class PlayerControllerFragment extends Fragment {
             public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
                 if (bind == null) return;
 
-                int fallback = ContextCompat.getColor(requireContext(), R.color.carbon);
-                animateBackgroundTint(CoverColorUtil.toBackgroundTint(CoverColorUtil.averageColor(resource, fallback)));
+                int[] palette = CoverColorUtil.palette(
+                        resource,
+                        ContextCompat.getColor(requireContext(), R.color.steel),
+                        ContextCompat.getColor(requireContext(), R.color.iron)
+                );
+                animateBackground(palette[0], palette[1]);
             }
 
             @Override
             public void onLoadFailed(@Nullable Drawable errorDrawable) {
                 if (bind == null) return;
-                animateBackgroundTint(ContextCompat.getColor(requireContext(), R.color.carbon));
+                animateBackground(ContextCompat.getColor(requireContext(), R.color.steel), ContextCompat.getColor(requireContext(), R.color.iron));
             }
 
             @Override
@@ -308,21 +354,31 @@ public class PlayerControllerFragment extends Fragment {
                 .into(coverColorTarget);
     }
 
-    private void animateBackgroundTint(@ColorInt int tint) {
-        if (playerBackground == null || tint == playerBackgroundTintTarget) return;
+    private void animateBackground(@ColorInt int first, @ColorInt int second) {
+        if (playerBackground == null) return;
+        if (first == playerBackgroundFirstTarget && second == playerBackgroundSecondTarget) return;
 
         if (playerBackgroundAnimator != null) playerBackgroundAnimator.cancel();
 
-        playerBackgroundTintTarget = tint;
+        playerBackgroundFirstTarget = first;
+        playerBackgroundSecondTarget = second;
 
-        playerBackgroundAnimator = ValueAnimator.ofObject(new ArgbEvaluator(), playerBackgroundTint, tint);
-        playerBackgroundAnimator.setDuration(500);
+        // Both colours turn over together, from wherever the last turn had got to.
+        final int fromFirst = playerBackgroundFirst;
+        final int fromSecond = playerBackgroundSecond;
+
+        playerBackgroundAnimator = ValueAnimator.ofFloat(0f, 1f);
+        playerBackgroundAnimator.setDuration(BACKGROUND_DURATION);
+        playerBackgroundAnimator.setInterpolator(new FastOutSlowInInterpolator());
         playerBackgroundAnimator.addUpdateListener(animation -> {
             if (playerBackground == null) return;
 
-            playerBackgroundTint = (int) animation.getAnimatedValue();
-            playerBackground.setColors(gradientFor(playerBackgroundTint));
-            setPlayPauseTint(playerBackgroundTint);
+            float fraction = (float) animation.getAnimatedValue();
+            playerBackgroundFirst = ColorUtils.blendARGB(fromFirst, first, fraction);
+            playerBackgroundSecond = ColorUtils.blendARGB(fromSecond, second, fraction);
+
+            playerBackground.setColors(gradientFor(playerBackgroundFirst, playerBackgroundSecond));
+            setPlayPauseTint(playerBackgroundFirst);
         });
         playerBackgroundAnimator.start();
     }
@@ -467,6 +523,81 @@ public class PlayerControllerFragment extends Fragment {
         }
     }
 
+    private void initLandscapePair() {
+        landscapeLayout = bind.getRoot().findViewById(R.id.now_playing_media_controller_layout);
+        if (landscapeLayout == null) return;
+
+        controlsStartGuide = landscapeLayout.findViewById(R.id.controls_start_guideline);
+        controlsEndGuide = landscapeLayout.findViewById(R.id.vertical_guideline);
+        pagerStartGuide = landscapeLayout.findViewById(R.id.pager_start_guideline);
+        pagerEndGuide = landscapeLayout.findViewById(R.id.pager_end_guideline);
+
+        if (controlsStartGuide == null || pagerStartGuide == null || pagerEndGuide == null) {
+            landscapeLayout = null;
+            return;
+        }
+
+        landscapeLayout.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) placeLandscape(slide);
+        });
+    }
+
+    /**
+     * Puts the guidelines where they belong for this window, [progress] of the
+     * way from the pair to the player-and-words. The pair: the player's
+     * controls (up to 360dp wide) and the cover, a square as tall as the room
+     * between the margins, with a small gap, together in the middle. The words:
+     * the controls on the left margin and the words from there to the right one.
+     */
+    private void placeLandscape(float progress) {
+        if (landscapeLayout == null) return;
+
+        float density = getResources().getDisplayMetrics().density;
+        float width = landscapeLayout.getWidth();
+        float height = landscapeLayout.getHeight();
+        if (width <= 0 || height <= 0) return;
+
+        float margin = PAGE_MARGIN_DP * density;
+        float gap = PAIR_GAP_DP * density;
+        float cover = Math.max(0f, height - 2 * margin);
+        float controls = Math.max(CONTROLS_MIN_WIDTH_DP * density, Math.min(CONTROLS_WIDTH_DP * density, width - cover - gap - 2 * margin));
+
+        // Where the player's text begins, and so where the pair begins.
+        float left = Math.max(margin, (width - (controls + gap + cover)) / 2f);
+
+        float pairStart = left - margin;
+        float pairEnd = pairStart + controls + 2 * margin;
+        float wordsEnd = controls + 2 * margin;
+
+        controlsStartGuide.setGuidelineBegin(Math.round(pairStart * (1f - progress)));
+        controlsEndGuide.setGuidelineBegin(Math.round(pairEnd + (wordsEnd - pairEnd) * progress));
+
+        if (showingWords) {
+            pagerStartGuide.setGuidelineBegin(Math.round(wordsEnd + WORDS_GAP_DP * density));
+            pagerEndGuide.setGuidelineBegin(Math.round(width - margin));
+        } else {
+            pagerStartGuide.setGuidelineBegin(Math.round(left + controls + gap));
+            pagerEndGuide.setGuidelineBegin(Math.round(left + controls + gap + cover));
+        }
+    }
+
+    private void slideLandscape(boolean words) {
+        if (landscapeLayout == null || showingWords == words) return;
+
+        showingWords = words;
+
+        if (slideAnimator != null) slideAnimator.cancel();
+
+        slideAnimator = ValueAnimator.ofFloat(slide, words ? 1f : 0f);
+        slideAnimator.setDuration(SLIDE_DURATION);
+        slideAnimator.setInterpolator(new FastOutSlowInInterpolator());
+        slideAnimator.addUpdateListener(animation -> {
+            slide = (float) animation.getAnimatedValue();
+            placeLandscape(slide);
+        });
+        slideAnimator.start();
+    }
+
     private void initCoverLyricsSlideView() {
         playerMediaCoverViewPager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         playerMediaCoverViewPager.setAdapter(new PlayerControllerHorizontalPager(this));
@@ -488,6 +619,7 @@ public class PlayerControllerFragment extends Fragment {
                 super.onPageSelected(position);
 
                 setLyricsToggleState(position == 1);
+                slideLandscape(position == 1);
 
                 /*
                  * Nothing else to do here. The lyrics page used to switch the

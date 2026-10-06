@@ -66,6 +66,15 @@ class LyricsIntroDotsView @JvmOverloads constructor(
 
     private var lastFrame = 0L
 
+    /** Beside the player the words keep to the left, and the dots and the count with them. */
+    var leftAligned = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private val inset = 12f * density
+
     /** How long until the first line, and whether that time is running down. */
     fun setTimeLeft(millis: Long, isPlaying: Boolean) {
         remaining = millis
@@ -102,7 +111,7 @@ class LyricsIntroDotsView @JvmOverloads constructor(
             digitSince = now
         }
 
-        val centreX = width / 2f
+        val centreX = if (leftAligned) inset + step + radius else width / 2f
         val centreY = paddingTop + (height - paddingTop - paddingBottom) / 2f
 
         when {

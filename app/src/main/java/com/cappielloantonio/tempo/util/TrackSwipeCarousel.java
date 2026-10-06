@@ -580,6 +580,15 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
 
         for (int i = 0; i < slots.length; i++) {
             slots[i].setTranslationX((i - 1) * page + offset);
+
+            /*
+             * A neighbour is parked a page away, which is off the screen only
+             * when the page is as wide as the strip. Where the strip is a square
+             * in a wider page - the player in landscape - its edge was left
+             * showing beside the cover. Neighbours are there to be dragged in,
+             * so at rest they are not drawn.
+             */
+            if (i != 1) slots[i].setAlpha(offset == 0f ? 0f : 1f);
         }
     }
 

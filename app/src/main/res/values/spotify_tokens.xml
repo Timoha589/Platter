@@ -9,8 +9,9 @@
     <!-- Accents -->
     <color name="spotify_green">#1ED760</color>
     <color name="signal_red">#B85850</color>
-    <!-- The heart on the liked tracks cover. Signal red is too muddy to read as a heart. -->
-    <color name="liked_red">#E5484D</color>
+    <!-- The liked tracks cover: a white heart on a slope from deep purple to pale blue, the same picture as in the desktop app. -->
+    <color name="liked_cover_start">#4500F7</color>
+    <color name="liked_cover_end">#8FA6E6</color>
 
     <!-- Surfaces, canvas -> elevated -->
     <color name="void_black">#000000</color>

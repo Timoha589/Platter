@@ -2,7 +2,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingHorizontal="24dp">
+    android:paddingHorizontal="12dp">
 
     <ImageView
         android:id="@+id/empty_description_image_view"
@@ -65,7 +65,9 @@
                 style="@style/BodyLarge"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:fontFamily="@font/inter_bold"
                 android:lineSpacingMultiplier="1.25"
+                android:paddingHorizontal="12dp"
                 android:textSize="@dimen/lyrics_text_size" />
 
             <!-- Timed lyrics: one view per line, filled in at runtime. -->
