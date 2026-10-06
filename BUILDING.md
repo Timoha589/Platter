@@ -111,6 +111,35 @@ The first install of a build must be done by hand (adb or file); only updates ar
 On a phone with Google Play Protect the install can be stopped with "App blocked": More details >
 Install anyway.
 
+## 3b. Publishing a release for phone and Windows together
+
+One GitHub release carries both files, `app-platter-release.apk` and `Platter-<version>.msi`, under one version. The
+phone reads `releases/latest` and takes the `.apk`; the Windows app lists the releases and takes the newest `.msi`
+(see `desktop/README.md`, "Самообновление"). Each ignores the other's file.
+
+Rules that keep both updaters working:
+
+- **One version for both.** Set the same number in `platterVersionName` (`app/build.gradle`) and `platterVersion`
+  (`desktop/build.gradle.kts`). Three numbers; the MSI needs each below 256.
+- **Every release carries both files**, even when only one app changed (the other is rebuilt with the new number).
+  A release with only an MSI would become "latest", and a phone that is a version behind would find no APK in it.
+- Never change `upgradeUuid` in `desktop/build.gradle.kts`: it is how Windows knows a new MSI replaces the old one.
+- Tags are `v` + the version and are never reused or overwritten; a mistake is fixed by the next version.
+
+Building the MSI needs the WiX Toolset 3 on the machine that builds (not on the ones that install). The first install
+on a computer is done by hand (run the MSI); later versions install themselves from inside the app.
+
+1. Raise both version numbers (see above) and commit.
+2. Phone: `./gradlew assemblePlatterRelease` (signed, see 2.2).
+3. Windows: `cd desktop && ./gradlew packageMsi` - the installer lands in `desktop/build/compose/binaries/main/msi/`.
+4. Publish one release with both files:
+
+```
+gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-release.apk desktop/build/compose/binaries/main/msi/Platter-1.0.1.msi --repo Timoha589/Platter --title "Platter 1.0.1" --notes "What changed"
+```
+
+To add the MSI to a release that already exists (what v1.0.0 needed): `gh release upload v1.0.0 <the .msi> --repo Timoha589/Platter`.
+
 ## 4. Google Play — an AAB, not an APK
 
 Play requires an Android App Bundle:
