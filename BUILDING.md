@@ -132,13 +132,22 @@ on a computer is done by hand (run the MSI); later versions install themselves f
 1. Raise both version numbers (see above) and commit.
 2. Phone: `./gradlew assemblePlatterRelease` (signed, see 2.2).
 3. Windows: `cd desktop && ./gradlew packageMsi` - the installer lands in `desktop/build/compose/binaries/main/msi/`.
-4. Publish one release with both files:
+4. Give the MSI the same file name as the APK, so the release page shows `app-platter-release.apk` and
+   `app-platter-release.msi` (the updater only looks at the `.msi` ending, so the name is free):
 
 ```
-gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-release.apk desktop/build/compose/binaries/main/msi/Platter-1.0.1.msi --repo Timoha589/Platter --title "Platter 1.0.1" --notes "What changed"
+cp desktop/build/compose/binaries/main/msi/Platter-1.0.1.msi desktop/build/compose/binaries/main/msi/app-platter-release.msi
 ```
 
-To add the MSI to a release that already exists (what v1.0.0 needed): `gh release upload v1.0.0 <the .msi> --repo Timoha589/Platter`.
+5. Publish one release with both files:
+
+```
+gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-release.apk desktop/build/compose/binaries/main/msi/app-platter-release.msi --repo Timoha589/Platter --title "Platter 1.0.1" --notes "What changed"
+```
+
+To add the MSI to a release that already exists, upload it under that name: `gh release upload v1.0.0 <the copied .msi> --repo Timoha589/Platter`.
+A published asset can be renamed without a new version:
+`gh api -X PATCH repos/Timoha589/Platter/releases/assets/<asset id> -f name=<new name>` (ids: `gh api repos/Timoha589/Platter/releases/tags/v1.0.0 --jq '.assets[] | "\(.id) \(.name)"'`).
 
 ## 4. Google Play — an AAB, not an APK
 
