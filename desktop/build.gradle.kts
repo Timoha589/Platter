@@ -7,7 +7,7 @@ plugins {
 }
 
 /** The one place the version is written: the installer, the running app (`-Dplatter.version`) and the updater all read it. */
-val platterVersion = "1.0.0"
+val platterVersion = "1.0.1"
 
 group = "com.platter"
 version = platterVersion
