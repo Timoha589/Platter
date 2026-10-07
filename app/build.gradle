@@ -8,7 +8,7 @@ apply plugin: 'kotlin-parcelize'
  * update whose versionCode is not higher than the installed one. 1.2.3 -> 10203.
  * The self-updater compares the GitHub release tag (v1.2.3) with this name.
  */
-def platterVersionName = '1.0.1'
+def platterVersionName = '1.0.2'
 def (vMajor, vMinor, vPatch) = platterVersionName.tokenize('.').collect { it as int }
 
 android {
