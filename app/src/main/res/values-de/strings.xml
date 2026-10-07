@@ -315,6 +315,8 @@
     <string name="settings_title_data">Daten</string>
     <string name="settings_title_general">Allgemein</string>
     <string name="settings_title_replay_gain">Replay Gain</string>
+    <string name="settings_crossfade_title">Überblenden</string>
+    <string name="settings_crossfade_summary">Das Ende eines Titels geht in den Anfang des nächsten über. Nicht zwischen aufeinanderfolgenden Titeln desselben Albums.</string>
     <string name="settings_title_scrobble">Scrobble</string>
     <string name="settings_title_skip_min_star_rating_dialog">Tracks mit einer Bewertung von:</string>
     <string name="settings_title_share">Teilen</string>

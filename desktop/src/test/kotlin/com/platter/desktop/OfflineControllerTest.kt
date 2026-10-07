@@ -200,15 +200,39 @@ class OfflineControllerTest {
     }
 
     @Test
-    fun `with smart download on, what is played is saved, marked as saved by listening`() = FakeSubsonic().use { fake ->
+    fun `with smart download on, what is played and liked is saved, marked as saved by listening`() = FakeSubsonic().use { fake ->
         val app = app(fake) { smartDownload = true }
-        app.player.play(listOf(song("s1-1")))
+        app.player.play(listOf(song("s1-1"))) // liked on the server
         waitUntil("the song to be saved as it plays") { app.isDownloaded("s1-1") }
         assertEquals(Source.SMART, app.downloadedSongs().single().source)
     }
 
     @Test
+    fun `a song that is listened to but not liked is not saved, until it is liked while it plays`() = FakeSubsonic().use { fake ->
+        val app = app(fake) { smartDownload = true }
+        app.player.play(listOf(song("s1-2", track = 2)))
+        waitUntil("playback") { app.player.state.value.isPlaying }
+        Thread.sleep(800)
+        assertFalse(app.isDownloaded("s1-2"), "listening alone saves nothing")
+
+        app.toggleLike(song("s1-2", track = 2))
+        waitUntil("the like to save it") { app.isDownloaded("s1-2") }
+        assertEquals(Source.SMART, app.downloadedSongs().single().source)
+    }
+
+    @Test
+    fun `a like on a song that is not the one playing saves nothing`() = FakeSubsonic().use { fake ->
+        val app = app(fake) { smartDownload = true }
+        app.player.play(listOf(song("s1-2", track = 2)))
+        waitUntil("playback") { app.player.state.value.isPlaying }
+        app.toggleLike(song("s1-3", track = 3))
+        Thread.sleep(800)
+        assertTrue(savedIds(app).isEmpty())
+    }
+
+    @Test
     fun `the songs played longest ago make room, and what the listener asked for is never let go`() = FakeSubsonic().use { fake ->
+        fake.starredSongs += setOf("s1-2", "s1-3")
         val app = app(fake) { smartDownload = true; smartCount = 2 }
         app.download(listOf(song("mine", "Mine", track = 9)))
         waitUntil("the one asked for") { app.isDownloaded("mine") }
@@ -224,6 +248,7 @@ class OfflineControllerTest {
 
     @Test
     fun `a song saved by listening and then asked for by hand is not let go`() = FakeSubsonic().use { fake ->
+        fake.starredSongs += "s1-2"
         val app = app(fake) { smartDownload = true; smartCount = 1 }
         app.player.play(listOf(song("s1-1")))
         waitUntil("saved by listening") { app.isDownloaded("s1-1") }
@@ -249,32 +274,6 @@ class OfflineControllerTest {
         assertFalse(app.isDownloaded("s1-2"), "nothing new is saved")
     }
 
-    // --- keeping liked songs --------------------------------------------------------------------------
-
-    @Test
-    fun `liked songs are saved on start, and a copy kept for a like goes when the like does`() = FakeSubsonic().use { fake ->
-        val app = app(fake) { keepLiked = true }
-        waitUntil("both liked songs to be saved") { savedIds(app) == setOf("s1-1", "s4-2") }
-        assertTrue(app.downloadedSongs().all { it.source == Source.LIKED })
-
-        app.toggleLike(song("s1-1").apply { starred = "2024-01-01T00:00:00Z" }) // unliked: the server drops it from its starred list
-        waitUntil("the copy to go with the like") { savedIds(app) == setOf("s4-2") }
-    }
-
-    @Test
-    fun `a song downloaded by hand outlives its like`() = FakeSubsonic().use { fake ->
-        val app = app(fake)
-        app.download(listOf(song("s1-1")))
-        waitUntil("saved by hand") { app.isDownloaded("s1-1") }
-        app.changeKeepLiked(true)
-        waitUntil("the other liked song") { app.isDownloaded("s4-2") }
-        assertEquals(Source.MANUAL, app.downloadedSongs().first { it.id == "s1-1" }.source, "a like does not weaken it")
-
-        app.toggleLike(song("s1-1").apply { starred = "2024-01-01T00:00:00Z" })
-        Thread.sleep(800)
-        assertTrue(app.isDownloaded("s1-1"), "it was asked for, not kept for the like")
-    }
-
     @Test
     fun `settings for downloads are kept across a restart`() = FakeSubsonic().use { fake ->
         val store = store()
@@ -282,15 +281,12 @@ class OfflineControllerTest {
         app.changeDownloadBitrate(192)
         app.changeSmartDownload(true)
         app.changeSmartCount(50)
-        app.changeKeepLiked(true)
         val saved = store.load()
         assertEquals(192, saved.downloadBitrate)
         assertTrue(saved.smartDownload)
         assertEquals(50, saved.smartCount)
-        assertTrue(saved.keepLiked)
 
         val again = app(fake, store)
         assertEquals(50, again.smartCount)
-        assertTrue(again.keepLiked)
     }
 }

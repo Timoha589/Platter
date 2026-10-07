@@ -156,7 +156,6 @@ sealed interface AppDialog {
     data class NewPlaylist(val songs: List<Song>) : AppDialog
     data class RenamePlaylist(val playlist: Playlist) : AppDialog
     data class DeletePlaylist(val playlist: Playlist) : AppDialog
-    data class Rate(val song: Song) : AppDialog
     data class TrackInfo(val song: Song) : AppDialog
     data object ArrangeHome : AppDialog
     data object AddPodcast : AppDialog
@@ -281,6 +280,9 @@ class AppController(
     private var ahead by mutableStateOf<List<Screen>>(emptyList())
     val canGoForward: Boolean get() = ahead.isNotEmpty()
 
+    /** Where the pages of the trail were scrolled to, so Back and Forward land where a page was left. */
+    val scrollMemory = com.platter.desktop.ui.ScrollMemory()
+
     var searchQuery by mutableStateOf("")
 
     /** The panel on the right; what was open when the app was closed is open again. */
@@ -346,6 +348,8 @@ class AppController(
     var scrobbling by mutableStateOf(saved.scrobbling)
         private set
     var equalizerButton by mutableStateOf(saved.equalizerButton)
+        private set
+    var crossfade by mutableStateOf(saved.crossfade)
         private set
     var maxBitrate by mutableStateOf(saved.maxBitrate)
         private set
@@ -447,8 +451,6 @@ class AppController(
         private set
     var smartCount by mutableStateOf(saved.smartCount)
         private set
-    var keepLiked by mutableStateOf(saved.keepLiked)
-        private set
 
     /** Bumped whenever something is saved, changed or removed, so what lists downloads loads again. */
     var downloadsVersion by mutableStateOf(0)
@@ -480,6 +482,7 @@ class AppController(
         },
         initialVolume = saved.volume,
         initialEqualizer = EqSettings(saved.eqEnabled, saved.eqPreamp, saved.eqBands),
+        initialCrossfade = saved.crossfade,
         vlcArgs = vlcArgs + replayGainArgs(saved.replayGain),
     )
 
@@ -667,11 +670,14 @@ class AppController(
         // Going somewhere that is not a result of the search leaves the search behind, field and all.
         if (to == Screen.Home || to == Screen.Library || to == Screen.Settings) searchQuery = ""
         ahead = emptyList()
+        val before = stack
         stack = when (to) {
             // The top-level places replace the trail; pages stack on it so Back works.
             Screen.Home, Screen.Library, Screen.Search, Screen.Settings -> listOf(to)
             else -> if (stack.last() == to) stack else stack + to
         }
+        // A page reached anew starts at the top; the ones before it on the trail keep the place they were left at.
+        if (stack !== before) scrollMemory.forgetFrom(stack.size - 1)
         rememberScreens()
     }
 
@@ -722,6 +728,7 @@ class AppController(
         client = signedIn
         ahead = emptyList()
         stack = listOf(Screen.Home)
+        scrollMemory.forgetFrom(0)
         rememberScreens()
         refreshPlaylists()
         afterSignIn()
@@ -772,6 +779,7 @@ class AppController(
         dialog = null
         ahead = emptyList()
         stack = listOf(Screen.Home)
+        scrollMemory.forgetFrom(0)
         rememberScreens()
     }
 
@@ -818,7 +826,7 @@ class AppController(
             // Put the heart back if the server did not take it.
             runCatching { if (now) client?.star(songId = id) else client?.unstar(songId = id) }
                 .onFailure { likes[id] = !now }
-                .onSuccess { syncLikedDownloads() }
+                .onSuccess { if (now) saveIfListening(song) }
         }
     }
 
@@ -1306,6 +1314,12 @@ class AppController(
         if (on) saveQueueSoon()
     }
 
+    fun changeCrossfade(on: Boolean) {
+        crossfade = on
+        player.setCrossfade(on)
+        store.update { crossfade = on }
+    }
+
     fun changeEqualizerButton(on: Boolean) {
         equalizerButton = on
         store.update { equalizerButton = on }
@@ -1591,16 +1605,14 @@ class AppController(
         trimSmartDownloads()
     }
 
-    fun changeKeepLiked(on: Boolean) {
-        keepLiked = on
-        store.update { keepLiked = on }
-        if (on) syncLikedDownloads()
-    }
-
     private var lastListenedId: String? = null
+    private var listening: Song? = null
 
-    /** A song has started: it is heard (so it is the last to be let go), and with smart download on it is kept. */
-    private fun onListening(song: Song?) {
+    /**
+     * A song has started: it is heard (so it is the last to be let go), and with smart download on it is kept - but only
+     * if it is liked. Listening alone saves nothing; a like given while it plays saves it then ([saveIfListening]).
+     */
+    private suspend fun onListening(song: Song?) {
         if (song == null || !song.isMusic) return
         val id = song.id ?: return
         val key = serverKey() ?: return
@@ -1608,7 +1620,28 @@ class AppController(
         // Pausing and resuming is not listening again.
         if (!smartDownload || id == lastListenedId) return
         lastListenedId = id
+        listening = song
+        if (isLikedNow(song)) saveSmart(song)
+    }
+
+    /** What the heart says, and where this computer has not heard of the song yet, what the server says. */
+    private suspend fun isLikedNow(song: Song): Boolean {
+        val id = song.id ?: return false
+        likes[id]?.let { return it }
+        if (song.starred != null) return true
+        return runCatching { liked().songs.orEmpty().any { it.id == id } }.getOrDefault(false)
+    }
+
+    /** A like on the song that is being listened to: it is listened to and liked now, so it is kept. */
+    private fun saveIfListening(song: Song) {
+        if (!smartDownload) return
+        val heard = listening?.takeIf { it.id == song.id && it.id == lastListenedId } ?: return
+        saveSmart(heard)
+    }
+
+    private fun saveSmart(song: Song) {
         val c = client ?: return
+        val key = serverKey() ?: return
         val (cap, format) = downloadQuality()
         downloader.enqueue(c, key, listOf(song), Source.SMART, cap, format)
         trimSmartDownloads()
@@ -1619,23 +1652,8 @@ class AppController(
         if (!smartDownload) return
         val key = serverKey() ?: return
         val saved = downloads.all(key).filter { it.source == Source.SMART }.sortedBy { it.lastPlayedAt }
-        // What the listener asked for, or keeps by liking, is not counted and is never let go.
+        // What the listener asked for is not counted and is never let go.
         saved.take((saved.size - smartCount).coerceAtLeast(0)).forEach { downloader.remove(key, it.id) }
-    }
-
-    /** Brings the disk into line with the likes on the server: saves what is missing, and lets go of copies kept for a like that is gone. */
-    fun syncLikedDownloads() {
-        if (!keepLiked) return
-        val c = client ?: return
-        val key = serverKey() ?: return
-        scope.launch {
-            // A failed request is not an empty list: nothing may be taken back on it.
-            val songs = runCatching { liked().songs.orEmpty() }.getOrNull() ?: return@launch
-            val (cap, format) = downloadQuality()
-            downloader.enqueue(c, key, songs, Source.LIKED, cap, format)
-            val still = songs.mapNotNull { it.id }.toSet()
-            downloads.all(key).filter { it.source == Source.LIKED && it.id !in still }.forEach { downloader.remove(key, it.id) }
-        }
     }
 
     // --- Deezer, through Deemix plus -------------------------------------------------------------------
@@ -1857,7 +1875,6 @@ class AppController(
     private val background = ArrayList<Job>()
 
     private fun afterSignIn() {
-        syncLikedDownloads()
         flushPending()
         checkSavedQueue()
         scope.launch { checkAddress() }

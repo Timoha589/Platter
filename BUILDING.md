@@ -141,7 +141,9 @@ Rules:
 - Give the files the same names every time, so the release page shows `app-platter-release.apk` and
   `app-platter-release.msi` (the updaters only look at the `.apk` / `.msi` ending, so the names are free).
 
-Building the MSI needs the WiX Toolset 3 on the machine that builds (not on the ones that install). The first install on a
+Building the MSI needs the WiX Toolset 3 on the machine that builds (not on the ones that install). It also needs a
+64-bit VLC installed there (`C:\Program Files\VideoLAN\VLC`, or `-PvlcHome=<folder>` / `VLC_HOME`): the build copies
+its libvlc, audio plugins only, into the installer (about 40 MB), so the people who install Platter need no VLC. The first install on a
 computer is done by hand (run the MSI); later versions install themselves from inside the app.
 
 Before any release: set the number (see above), then

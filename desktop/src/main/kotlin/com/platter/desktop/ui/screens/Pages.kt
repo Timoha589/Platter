@@ -1,5 +1,7 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageListState
+import com.platter.desktop.ui.rememberPageGridState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.clickable
@@ -117,7 +119,7 @@ fun AlbumPage(app: AppController, id: String) {
 
     LoadView(loader) { album ->
         val songs = album.songs.orEmpty()
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
             item {
                 PageHeader(
                     app, album.coverArtId, t("Album"), album.name.orEmpty(),
@@ -185,6 +187,7 @@ fun ArtistPage(app: AppController, id: String) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(PlatterSpacing.CardCell),
             modifier = Modifier.fillMaxSize(),
+            state = rememberPageGridState(),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column {

@@ -278,6 +278,8 @@
     <string name="settings_title_data">Dados</string>
     <string name="settings_title_general">Geral</string>
     <string name="settings_title_replay_gain">Replay Gain</string>
+    <string name="settings_crossfade_title">Crossfade</string>
+    <string name="settings_crossfade_summary">O fim de uma faixa se sobrepõe ao início da próxima. Não se aplica entre faixas consecutivas do mesmo álbum.</string>
     <string name="settings_title_scrobble">Scrobble</string>
     <string name="settings_title_skip_min_star_rating_dialog">Músicas com uma classificação de:</string>
     <string name="settings_title_share">Compartilhar</string>

@@ -1,5 +1,7 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageListState
+import com.platter.desktop.ui.rememberPageGridState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.layout.Arrangement
@@ -82,7 +84,7 @@ private fun PagedAlbumGrid(
     var failure by remember(key) { mutableStateOf<String?>(null) }
     var loading by remember(key) { mutableStateOf(false) }
     var attempt by remember(key) { mutableStateOf(0) }
-    val grid = rememberLazyGridState()
+    val grid = rememberPageGridState()
 
     suspend fun more() {
         if (loading || finished) return
@@ -177,7 +179,7 @@ fun LikedPage(app: AppController) {
 
     LoadView(loader) { songs ->
         BoxWithConstraints(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
             item {
                 TracksHeader(
                     app, LikedTint, t("Playlist"), t("Liked Songs"), null, songs,
@@ -209,7 +211,7 @@ fun LikedArtistsPage(app: AppController) {
     val client = app.client ?: return
     val loader = rememberLoader(client) { app.liked().artists.orEmpty() }
     LoadView(loader) { artists ->
-        LazyVerticalGrid(columns = GridCells.Adaptive(PlatterSpacing.CardCell), modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(columns = GridCells.Adaptive(PlatterSpacing.CardCell), modifier = Modifier.fillMaxSize(), state = rememberPageGridState()) {
             item(span = { GridItemSpan(maxLineSpan) }) { Title(t("Liked artists")) }
             cards(artists) { ArtistCard(app, it) }
         }

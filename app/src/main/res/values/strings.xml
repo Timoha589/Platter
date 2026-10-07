@@ -107,8 +107,8 @@
     <string name="download_filter_smart">Smart download</string>
     <string name="download_source_manual">You downloaded these yourself. They stay until you remove them.</string>
     <string name="download_source_liked">Kept because you like them. Unlike a track and its download goes.</string>
-    <string name="download_source_smart">Saved as you listen. Up to %1$s are kept; the ones played longest ago make room.</string>
-    <string name="download_source_smart_off">Saved as you listened. Smart download is off, so these stay until you remove them.</string>
+    <string name="download_source_smart">Saved as you listen to what you like. Up to %1$s are kept; the ones played longest ago make room.</string>
+    <string name="download_source_smart_off">Saved as you listened to what you like. Smart download is off, so these stay until you remove them.</string>
     <string name="downloaded_bottom_sheet_add_to_queue">Add to queue</string>
     <string name="downloaded_bottom_sheet_play_next">Play next</string>
     <string name="downloaded_bottom_sheet_remove">Remove</string>
@@ -411,12 +411,14 @@
     <string name="settings_summary_transcoding_download">Download transcoded media. If enabled, the download endpoint will not be used, but the following settings. \n\n If \"Transcode format for donwloads\" is set to \"Direct download\" the bitrate of the file will not be changed.</string>
     <string name="settings_summary_transcoding_estimate_content_length">When the file is transcoded on the fly, the client usually does not show the track length. It is possible to request the servers that support the functionality to estimate the duration of the track being played, but the response times may take longer.</string>
     <string name="settings_smart_download_cache_size">Cache size</string>
-    <string name="settings_smart_download_title">Save tracks as you listen</string>
-    <string name="settings_summary_smart_download">Tracks are saved for offline play while you listen to them, in the background and without notifications. Once the cache is full, the tracks played longest ago make room. Tracks you download yourself or keep as liked are never counted.</string>
+    <string name="settings_smart_download_title">Save liked tracks you listen to</string>
+    <string name="settings_summary_smart_download">A track you listen to and have liked is saved for offline play, in the background and without notifications. Listening alone saves nothing; a like given while it plays counts too. Once the cache is full, the tracks played longest ago make room. Tracks you download yourself or keep as liked are never counted.</string>
     <string name="settings_title_data">Data</string>
     <string name="settings_title_smart_download">Smart download</string>
     <string name="settings_title_general">General</string>
     <string name="settings_title_replay_gain">Replay Gain</string>
+    <string name="settings_crossfade_title">Crossfade</string>
+    <string name="settings_crossfade_summary">The end of a track overlaps with the start of the next. Not applied between consecutive tracks of the same album.</string>
     <string name="settings_title_scrobble">Scrobble</string>
     <string name="settings_title_skip_min_star_rating_dialog">Songs with a rating of:</string>
     <string name="settings_title_share">Share</string>

@@ -21,6 +21,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.platter.desktop.data.SettingsStore
+import com.platter.desktop.log.AppLog
 import com.platter.desktop.ui.PlatterColors
 import com.platter.desktop.ui.PlatterTheme
 import com.platter.desktop.ui.windowIcons
@@ -45,8 +46,14 @@ private fun reachable(x: Int, y: Int, width: Int): Boolean {
     return GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.any { it.defaultConfiguration.bounds.intersects(grip) }
 }
 
+fun main() {
+    // First of all: whatever goes wrong from here on is written to the log file.
+    AppLog.install()
+    runApp()
+}
+
 @OptIn(FlowPreview::class)
-fun main() = application {
+private fun runApp() = application {
     val app = remember { AppController(SettingsStore(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
     val window = remember {
         // The window opens where and as big as it was left; a place that is no longer on any screen (a monitor unplugged) is dropped.

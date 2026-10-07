@@ -171,22 +171,12 @@ class InteractionTest {
     }
 
     @Test
-    fun `a song's menu rates it and a new playlist can be started from the dialog`() = FakeSubsonic().use { fake ->
+    fun `a new playlist can be started from a song's menu`() = FakeSubsonic().use { fake ->
         runDesktopComposeUiTest(1280, 800) {
             val app = app(fake)
             open(app)
             app.navigate(Screen.Album("a2"))
             step()
-
-            onAllNodesWithContentDescription("More")[1].performClick() // the first song's dots
-            step()
-            onNodeWithText("Rate…").performClick()
-            step()
-            onNodeWithContentDescription("4 stars").performClick()
-            onNodeWithText("Save").performClick()
-            step()
-            waitUntil("the rating to reach the server") { fake.requestsTo("setRating").any { it.queryParameter("rating") == "4" } }
-            assertEquals("s2-1", fake.requestsTo("setRating").single().queryParameter("id"))
 
             onAllNodesWithContentDescription("More")[1].performClick()
             step()
@@ -246,8 +236,8 @@ class InteractionTest {
             assertEquals("album", app.replayGain)
 
             assertTrue(app.scrobbling)
-            // The equalizer button is the first switch on the page, scrobbling the second.
-            onAllNodes(isToggleable())[1].performClick()
+            // Crossfade is the first switch on the page, the equalizer button the second, scrobbling the third.
+            onAllNodes(isToggleable())[2].performClick()
             step()
             assertFalse(app.scrobbling)
             app.shutdown()
@@ -345,8 +335,8 @@ class InteractionTest {
             app.navigate(Screen.Settings)
             step()
             assertTrue(app.syncQueue)
-            // The equalizer button is the first switch, scrobbling the second, syncing the third.
-            onAllNodes(isToggleable())[2].performClick()
+            // Crossfade is the first switch, the equalizer button the second, scrobbling the third, syncing the fourth.
+            onAllNodes(isToggleable())[3].performClick()
             step()
             assertFalse(app.syncQueue)
             app.shutdown()
@@ -499,7 +489,7 @@ class InteractionTest {
             app.navigate(Screen.Playlist("p1"))
             step(20)
 
-            fun menuLeft(): Float = onNodeWithText("Play radio").fetchSemanticsNode().boundsInWindow.left
+            fun menuLeft(): Float = onNodeWithText("Instant mix").fetchSemanticsNode().boundsInWindow.left
 
             // A right-click well along the row: the menu starts at the pointer.
             val row = onAllNodesWithText("Blue Train").onFirst()
@@ -510,7 +500,7 @@ class InteractionTest {
             step()
             val atClick = menuLeft()
             assertTrue(kotlin.math.abs(atClick - clickX) < 40f, "menu at x=$atClick for a click at x=$clickX")
-            onNodeWithText("Play radio").performKeyInput { pressKey(Key.Escape) }
+            onNodeWithText("Instant mix").performKeyInput { pressKey(Key.Escape) }
             app.dialog = null
             step()
         }

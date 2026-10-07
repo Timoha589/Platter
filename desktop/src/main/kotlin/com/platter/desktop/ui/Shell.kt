@@ -56,7 +56,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import kotlin.math.roundToInt
 import java.awt.Cursor
@@ -153,7 +155,12 @@ fun Shell(app: AppController) {
             Column(Modifier.weight(1f).fillMaxHeight()) {
             Column(Modifier.weight(1f).fillMaxWidth().clip(PlatterShapes.Card).background(PlatterColors.Carbon)) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (val screen = app.screen) {
+                    val screen = app.screen
+                    // One composition per place on the trail: its scrollers are put back where they were left, and a page of the
+                    // same kind reached from another (an album from an album) starts afresh instead of inheriting this one.
+                    key(app.stack.size, screen) {
+                    CompositionLocalProvider(LocalPageScroll provides PageScroll(app.scrollMemory, app.stack.size - 1)) {
+                    when (screen) {
                         Screen.Home -> HomeScreen(app)
                         Screen.Library -> LibraryScreen(app)
                         Screen.Search -> SearchScreen(app)
@@ -168,6 +175,8 @@ fun Shell(app: AppController) {
                         Screen.LikedArtists -> LikedArtistsPage(app)
                         is Screen.Genre -> GenrePage(app, screen.name)
                         is Screen.AlbumList -> AlbumListPage(app, screen)
+                    }
+                    }
                     }
                 }
             }

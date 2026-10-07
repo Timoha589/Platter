@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageListState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.background
@@ -67,7 +68,7 @@ fun DownloadsScreen(app: AppController) {
     val songs = shown.map { it.toSong() }
     val transfers = app.downloader.transfers.entries.toList()
 
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
         item {
             Column(Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
                 Text(t("Downloads"), style = MaterialTheme.typography.headlineMedium)

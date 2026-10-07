@@ -78,6 +78,9 @@ class Settings {
     /** The server's address on the home network, used while it answers; null for none. */
     var localAddress: String? = null
 
+    /** The end of a track overlaps with the start of the next. On, as on the phone. */
+    var crossfade: Boolean = true
+
     /** The equalizer's button in the player bar; off, it is reached from Settings only. */
     var equalizerButton: Boolean = false
 
@@ -98,12 +101,9 @@ class Settings {
     /** Cap on the bitrate of a download in kbps, 0 for the original file. */
     var downloadBitrate: Int = 0
 
-    /** Save songs as they are listened to, keeping this many; the ones played longest ago make room. */
+    /** Save the songs that are listened to and liked, keeping this many; the ones played longest ago make room. */
     var smartDownload: Boolean = false
     var smartCount: Int = 100
-
-    /** Keep every liked song downloaded. */
-    var keepLiked: Boolean = false
 
     /** Widths in dp of the sidebar on the left and of the queue / lyrics panel on the right, as the listener dragged them. */
     var sidebarWidth: Int = 340

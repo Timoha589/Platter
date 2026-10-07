@@ -46,6 +46,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
     private lateinit var mediaLibrarySession: MediaLibrarySession
     private lateinit var librarySessionCallback: MediaLibrarySessionCallback
     private lateinit var scrobbleTracker: ScrobbleTracker
+    private lateinit var crossfader: Crossfader
 
     /*
      * The gain is only worked out when the tracks change, so without this a
@@ -62,6 +63,8 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
      * now it is redrawn as soon as the state of the track playing changes.
      */
     private val favoriteObserver = Observer<String> { mediaId ->
+        // Smart download saves what is listened to and liked: a like that comes late counts too.
+        SmartDownloads.onFavoriteChanged(this, mediaId)
         if (this::mediaLibrarySession.isInitialized &&
                 mediaId == mediaLibrarySession.player.currentMediaItem?.mediaMetadata?.extras?.getString("id")
         ) {
@@ -119,6 +122,17 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
                 .build()
     }
 
+    /*
+     * The second player a crossfade is made with. It plays what the main one
+     * is leaving, so it is built the same - but it takes no audio focus, which
+     * would make the main player give way to it.
+     */
+    private fun newHelperPlayer(): ExoPlayer = ExoPlayer.Builder(this)
+            .setRenderersFactory(getRenderersFactory())
+            .setMediaSourceFactory(getMediaSourceFactory())
+            .setAudioAttributes(AudioAttributes.DEFAULT, false)
+            .build()
+
     private fun initializeCastPlayer() {
         if (GoogleApiAvailability.getInstance()
                         .isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS
@@ -171,6 +185,11 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
 
         scrobbleTracker = ScrobbleTracker(player)
         player.addListener(scrobbleTracker)
+
+        // Overlaps the end of a track with the start of the next one.
+        crossfader = Crossfader(player, ::newHelperPlayer) {
+            !(this::castPlayer.isInitialized && castPlayer.isCastSessionAvailable)
+        }
 
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -329,6 +348,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         // a stale entry to time out on its own.
         MediaManager.reportPlayback(player.currentMediaItem, PlaybackState.STOPPED, player.currentPosition)
         scrobbleTracker.release()
+        crossfader.release()
         App.getInstance().preferences.unregisterOnSharedPreferenceChangeListener(replayGainModeListener)
         FavoriteState.changes().removeObserver(favoriteObserver)
 

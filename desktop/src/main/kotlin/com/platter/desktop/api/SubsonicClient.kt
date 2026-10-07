@@ -121,7 +121,7 @@ class SubsonicClient(val credentials: Credentials, http: OkHttpClient = defaultH
     suspend fun topSongs(artistName: String, count: Int = 10): List<Song> =
         call { it.getTopSongs(params, artistName, count) }.topSongs?.songs.orEmpty()
 
-    /** Songs like [id] - a song, album or artist id. The "radio" behind Play radio. */
+    /** Songs like [id] - a song, album or artist id. The "radio" behind the instant mix. */
     suspend fun similarSongs(id: String, count: Int = 50): List<Song> =
         call { it.getSimilarSongs2(params, id, count) }.similarSongs2?.songs.orEmpty()
 

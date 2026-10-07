@@ -23,6 +23,7 @@ object Preferences {
     private const val NEXT_SERVER_SWITCH = "next_server_switch"
     private const val PLAYBACK_SPEED = "playback_speed"
     private const val SKIP_SILENCE = "skip_silence"
+    const val CROSSFADE = "crossfade"
     private const val IMAGE_CACHE_SIZE = "image_cache_size"
     private const val STREAMING_CACHE_SIZE = "streaming_cache_size"
     private const val IMAGE_SIZE = "image_size"
@@ -210,6 +211,11 @@ object Preferences {
     @JvmStatic
     fun setPlaybackSpeed(playbackSpeed: Float) {
         App.getInstance().preferences.edit().putFloat(PLAYBACK_SPEED, playbackSpeed).apply()
+    }
+
+    @JvmStatic
+    fun isCrossfadeEnabled(): Boolean {
+        return App.getInstance().preferences.getBoolean(CROSSFADE, true)
     }
 
     @JvmStatic

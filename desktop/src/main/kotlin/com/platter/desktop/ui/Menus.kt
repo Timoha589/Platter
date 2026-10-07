@@ -108,8 +108,7 @@ fun SongMenu(
     PlatterMenu(expanded, onDismiss) {
         // Where nothing says what playing it means (the player's own menu), "Play" would only restart the queue.
         if (onPlay != null) MenuEntry(t("Play"), onDismiss) { onPlay() }
-        MenuEntry(t("Play radio"), onDismiss) { app.startRadio(song) }
-        MenuEntry(t("Add similar songs to queue"), onDismiss) { app.addInstantMix(song) }
+        MenuEntry(t("Instant mix"), onDismiss) { app.addInstantMix(song) }
         MenuEntry(t("Play next"), onDismiss) { app.playNext(listOf(song)) }
         MenuEntry(t("Add to queue"), onDismiss) { app.addToQueue(listOf(song)) }
         HorizontalDivider(color = PlatterColors.Iron)
@@ -127,7 +126,6 @@ fun SongMenu(
                 app.moveInPlaylist(inPlaylist.playlistId, inPlaylist.songs, inPlaylist.index, inPlaylist.index + 1)
             }
         }
-        MenuEntry(t("Rate…"), onDismiss) { app.dialog = AppDialog.Rate(song) }
         // Subsonic has no dislike; rating 1 stands in, and on a wave track it steers the wave away.
         if (song.isMusic) MenuEntry(if (app.isDisliked(song)) t("Remove dislike") else t("Dislike"), onDismiss) { app.toggleDislike(song) }
         HorizontalDivider(color = PlatterColors.Iron)

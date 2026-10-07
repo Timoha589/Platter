@@ -21,6 +21,9 @@ import java.util.regex.Pattern;
 
 @OptIn(markerClass = UnstableApi.class)
 public class ReplayGainUtil {
+    private static float volume = 1f;
+    private static float fade = 1f;
+
     private static final Pattern DECIBELS = Pattern.compile("[-+]?\\d+(?:[.,]\\d+)?");
 
     /*
@@ -178,6 +181,21 @@ public class ReplayGainUtil {
      * it is, and only louder tracks are brought down.
      */
     private static void setGain(ExoPlayer player, float gain) {
-        player.setVolume((float) Math.min(1.0, Math.pow(10f, gain / 20f)));
+        volume = (float) Math.min(1.0, Math.pow(10f, gain / 20f));
+        player.setVolume(volume * fade);
+    }
+
+    /*
+     * A crossfade fades a track in and out on top of its replay gain, so both
+     * go through here: whichever changes, the player gets their product.
+     */
+    public static void setFade(ExoPlayer player, float fade) {
+        ReplayGainUtil.fade = fade;
+        player.setVolume(volume * fade);
+    }
+
+    /* The volume the replay gain asks for, before any fade. */
+    public static float getVolume() {
+        return volume;
     }
 }

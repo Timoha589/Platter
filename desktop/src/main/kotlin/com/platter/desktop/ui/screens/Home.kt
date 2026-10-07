@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageScrollState
 import com.platter.desktop.i18n.t
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,7 +58,7 @@ fun HomeScreen(app: AppController) {
     // Asking early lets the server have a first batch ready by the time the card is pressed.
     LaunchedEffect(client) { app.prepareWave() }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = PlatterSpacing.Section)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberPageScrollState()).padding(bottom = PlatterSpacing.Section)) {
         if (app.waveAvailable) WaveCard(app)
         if (reachable.state is Load.Failed) {
             LoadView(reachable, Modifier.fillMaxWidth().height(240.dp)) {}

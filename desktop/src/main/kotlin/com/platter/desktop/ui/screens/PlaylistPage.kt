@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageListState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.background
@@ -76,7 +77,7 @@ fun PlaylistPage(app: AppController, id: String) {
         val songs = playlist.entries.orEmpty()
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val showAlbum = maxWidth >= TABLE_ALBUM_MIN_WIDTH
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
                 item { PlaylistHeader(app, id, playlist, songs) }
                 if (songs.isEmpty()) {
                     item {

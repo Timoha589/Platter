@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageScrollState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.background
@@ -86,7 +87,7 @@ private val REPLAY_GAIN = listOf("off" to "Off", "track" to "Track", "album" to 
 @Composable
 fun SettingsScreen(app: AppController) {
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = PlatterSpacing.Gutter, vertical = 24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberPageScrollState()).padding(horizontal = PlatterSpacing.Gutter, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Text(t("Settings"), style = MaterialTheme.typography.headlineMedium)
@@ -118,6 +119,9 @@ fun SettingsScreen(app: AppController) {
             }
             Setting(t("Volume levelling"), t("ReplayGain evens out loud and quiet records from the tags in the files. Applies the next time Platter starts.")) {
                 Choice(REPLAY_GAIN.map { it.first }, app.replayGain, { key -> t(REPLAY_GAIN.first { it.first == key }.second) }) { app.changeReplayGain(it) }
+            }
+            Setting(t("Crossfade"), t("The end of a track overlaps with the start of the next. Not applied between consecutive tracks of the same album.")) {
+                Toggle(app.crossfade) { app.changeCrossfade(it) }
             }
             Setting(t("Equalizer"), t("Shape the sound with ten bands.")) {
                 OutlinedPill(if (app.equalizer.enabled) t("Equalizer: on…") else t("Equalizer…")) { app.dialog = AppDialog.Equalizer }
@@ -174,8 +178,8 @@ fun SettingsScreen(app: AppController) {
                 Choice(BITRATES, app.downloadBitrate, { if (it == 0) t("Original") else "$it kbps" }) { app.changeDownloadBitrate(it) }
             }
             Setting(
-                t("Save songs as you listen"),
-                t("Songs are saved in the background while you play them. Once the limit is reached, the ones played longest ago make room. Songs you download yourself, or keep by liking, are never counted."),
+                t("Smart download"),
+                t("A song you listen to and have liked is saved in the background. Listening alone saves nothing; a like given while it plays counts too. Once the limit is reached, the ones played longest ago make room. Songs you download yourself are never counted."),
             ) {
                 Toggle(app.smartDownload) { app.changeSmartDownload(it) }
             }
@@ -183,12 +187,6 @@ fun SettingsScreen(app: AppController) {
                 Setting(t("Keep up to"), t("How many songs saved this way to keep.")) {
                     Choice(SMART_COUNTS, app.smartCount, { tn(it, "%d song", "%d songs") }) { app.changeSmartCount(it) }
                 }
-            }
-            Setting(
-                t("Keep liked songs downloaded"),
-                t("Every song you like is saved, and a copy kept only for a like goes when you unlike the song."),
-            ) {
-                Toggle(app.keepLiked) { app.changeKeepLiked(it) }
             }
             Setting(t("Delete all downloads"), t("Every song saved on this computer is deleted from the disk. Your library on the server is not touched.")) {
                 OutlinedPill(t("Delete all downloads…")) { app.dialog = AppDialog.DeleteAllDownloads }

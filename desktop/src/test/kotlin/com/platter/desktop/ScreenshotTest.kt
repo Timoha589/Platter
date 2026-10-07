@@ -193,8 +193,6 @@ class ScreenshotTest {
             shoot("26-dialog-add-to-playlist")
             app.dialog = AppDialog.NewPlaylist(emptyList())
             shoot("27-dialog-new-playlist")
-            app.dialog = AppDialog.Rate(songs[1])
-            shoot("28-dialog-rate")
             app.dialog = AppDialog.TrackInfo(songs[1])
             shoot("29-dialog-track-info")
             app.dialog = AppDialog.ArrangeHome

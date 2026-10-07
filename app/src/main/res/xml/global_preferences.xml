@@ -6,6 +6,12 @@
             android:title="@string/settings_equalizer_title"
             android:summary="@string/settings_equalizer_summary" />
 
+        <SwitchPreferenceCompat
+            android:key="crossfade"
+            android:title="@string/settings_crossfade_title"
+            android:summary="@string/settings_crossfade_summary"
+            android:defaultValue="true" />
+
         <Preference
             android:key="scan_library"
             android:title="@string/settings_scan_title" />

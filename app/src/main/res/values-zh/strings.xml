@@ -293,6 +293,8 @@
     <string name="settings_title_data">数据</string>
     <string name="settings_title_general">通用</string>
     <string name="settings_title_replay_gain">播放增益</string>
+    <string name="settings_crossfade_title">淡入淡出</string>
+    <string name="settings_crossfade_summary">一首歌的结尾与下一首的开头重叠。同一专辑中相邻的曲目之间不适用。</string>
     <string name="settings_title_scrobble">音乐记录</string>
     <string name="settings_title_share">分享</string>
     <string name="settings_title_syncing">同步</string>

@@ -276,6 +276,8 @@
     <string name="settings_title_data">Données</string>
     <string name="settings_title_general">Géneral</string>
     <string name="settings_title_replay_gain">Replay Gain</string>
+    <string name="settings_crossfade_title">Fondu enchaîné</string>
+    <string name="settings_crossfade_summary">La fin d\'un titre se superpose au début du suivant. Sans effet entre des titres consécutifs d\'un même album.</string>
     <string name="settings_title_scrobble">Scrobble</string>
     <string name="settings_title_skip_min_star_rating_dialog">Musiques avec une note de:</string>
     <string name="settings_title_share">Partage</string>

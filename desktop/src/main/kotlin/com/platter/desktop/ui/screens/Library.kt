@@ -2,6 +2,7 @@
 
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageGridState
 import com.platter.desktop.i18n.t
 import com.platter.desktop.i18n.tn
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -87,6 +88,8 @@ fun LibraryScreen(app: AppController) {
     val albumSort = app.enumChoice("library.albumSort", AlbumSort.Name)
     val artistSort = app.enumChoice("library.artistSort", ArtistSort.Name)
     val wanted = QueryVariants.normalize(filter)
+    // A filtered grid is not the one that comes back on return (the filter does not), so its place is kept apart.
+    val slot = if (wanted.isEmpty()) tab.name else "${tab.name}?"
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = PlatterSpacing.Gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -115,7 +118,7 @@ fun LibraryScreen(app: AppController) {
                                 }
                             }
                     }
-                    LibraryGrid { cards(albums) { AlbumCard(app, it) } }
+                    LibraryGrid(slot) { cards(albums) { AlbumCard(app, it) } }
                 }
             }
             LibraryTab.Artists -> {
@@ -126,12 +129,12 @@ fun LibraryScreen(app: AppController) {
                             .filter { wanted.isEmpty() || QueryVariants.normalize(it.name).contains(wanted) }
                             .let { list -> if (artistSort == ArtistSort.Albums) list.sortedByDescending { it.albumCount ?: 0 } else list }
                     }
-                    LibraryGrid { cards(artists) { ArtistCard(app, it) } }
+                    LibraryGrid(slot) { cards(artists) { ArtistCard(app, it) } }
                 }
             }
             LibraryTab.Playlists -> {
                 val playlists = app.playlists.filter { wanted.isEmpty() || QueryVariants.normalize(it.name).contains(wanted) }
-                LibraryGrid {
+                LibraryGrid(slot) {
                     if (wanted.isEmpty()) {
                         card { TextTile(t("Liked Songs"), t("Playlist"), Icons.Filled.Favorite) { app.navigate(Screen.Liked) } }
                         card { TextTile(t("New playlist"), t("Start an empty one"), Icons.Outlined.Add) { app.dialog = AppDialog.NewPlaylist(emptyList()) } }
@@ -143,7 +146,7 @@ fun LibraryScreen(app: AppController) {
                 val loader = rememberLoader(client) { client.genres().filter { !it.value.isNullOrBlank() }.sortedByDescending { it.albumCount ?: 0 } }
                 LoadView(loader) { genres ->
                     val shown = genres.filter { wanted.isEmpty() || QueryVariants.normalize(it.value).contains(wanted) }
-                    LibraryGrid { cards(shown) { GenreCard(app, it) } }
+                    LibraryGrid(slot) { cards(shown) { GenreCard(app, it) } }
                 }
             }
         }
@@ -169,10 +172,11 @@ private fun SortMenu(current: String, options: List<String>, onPick: (Int) -> Un
 }
 
 @Composable
-private fun LibraryGrid(content: LazyGridScope.() -> Unit) {
+private fun LibraryGrid(slot: String, content: LazyGridScope.() -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(PlatterSpacing.CardCell),
         modifier = Modifier.fillMaxSize(),
+        state = rememberPageGridState(slot),
         contentPadding = PaddingValues(vertical = 12.dp),
         content = content,
     )

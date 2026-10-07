@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageListState
 import com.platter.desktop.i18n.t
 import androidx.compose.foundation.layout.Arrangement
 import com.platter.desktop.ui.PlatterSpacing
@@ -55,7 +56,7 @@ fun PodcastPage(app: AppController, id: String) {
 
     LoadView(loader) { channel ->
         val episodes = channel.episodes.orEmpty()
-        LazyColumn(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
             item {
                 Column {
                     Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.Bottom) {

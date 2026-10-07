@@ -139,8 +139,7 @@ fun DialogHost(app: AppController) {
                 is AppDialog.DeletePlaylist -> ConfirmDialog(
                     t("Delete playlist?"), t("“%s” will be deleted from your server. Its songs stay in your library.", dialog.playlist.name.orEmpty()), t("Delete"), close,
                 ) { app.deletePlaylist(dialog.playlist); close() }
-                is AppDialog.Rate -> RateDialog(app, dialog.song, close)
-                is AppDialog.TrackInfo -> TrackInfoDialog(dialog.song, close)
+                is AppDialog.TrackInfo -> TrackInfoDialog(app, dialog.song, close)
                 AppDialog.ArrangeHome -> ArrangeHomeDialog(app, close)
                 is AppDialog.ConfirmDeezer -> ConfirmDialog(
                     if (dialog.hit.kind == DeezerHit.Kind.ALBUM) t("Download “%s”?", dialog.hit.title) else t("Download everything by %s?", dialog.hit.title),
@@ -308,50 +307,8 @@ private fun AddToPlaylistDialog(app: AppController, songs: List<Song>, close: ()
 }
 
 @Composable
-private fun RateDialog(app: AppController, song: Song, close: () -> Unit) {
-    var stars by remember { mutableStateOf(app.ratingOf(song)) }
-    DialogCard(t("Rate “%s”", song.title.orEmpty())) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            for (n in 1..5) {
-                Icon(
-                    if (n <= stars) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    tn(n, "%d star", "%d stars"),
-                    tint = if (n <= stars) PlatterColors.White else PlatterColors.Mist,
-                    modifier = Modifier.size(40.dp).clip(CircleShape).clickable { stars = n },
-                )
-            }
-        }
-        Text(
-            t("One star marks a song as disliked, the same as the thumbs-down in the player."),
-            style = MaterialTheme.typography.bodySmall,
-            color = PlatterColors.Mist,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        Row(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            if (stars > 0) {
-                Text(
-                    t("Clear"),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.clip(PlatterShapes.Pill).clickable { stars = 0 }.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            Text(
-                t("Cancel"),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.clip(PlatterShapes.Pill).clickable(onClick = close).padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            PrimaryPill(t("Save")) { app.rate(song, stars); close() }
-        }
-    }
-}
-
-@Composable
-private fun TrackInfoDialog(song: Song, close: () -> Unit) {
+private fun TrackInfoDialog(app: AppController, song: Song, close: () -> Unit) {
     val rows = listOf(
-        t("Title") to song.title,
-        t("Artist") to song.artistLine(),
-        t("Album") to song.album,
         t("Track") to song.track?.takeIf { it > 0 }?.let { n -> song.discNumber?.takeIf { it > 0 }?.let { "$it · $n" } ?: n.toString() },
         t("Year") to song.year?.takeIf { it > 0 }?.toString(),
         t("Genre") to song.genre,
@@ -368,10 +325,22 @@ private fun TrackInfoDialog(song: Song, close: () -> Unit) {
     ).filter { !it.second.isNullOrBlank() }
 
     DialogCard(t("Track info"), width = 520.dp) {
-        Column(Modifier.heightIn(max = 420.dp)) {
-            rows.forEach { (label, value) ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Text(label, style = MaterialTheme.typography.bodySmall, color = PlatterColors.Mist, modifier = Modifier.width(88.dp))
+        // Who the song is, once, at the top; the rows below are what the file is.
+        Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Cover(app, song.coverArtId, 72.dp, PlatterShapes.Card)
+            Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                Text(song.title.orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(song.artistLine().orEmpty(), style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Mist, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                if (!song.album.isNullOrBlank()) {
+                    Text(song.album.orEmpty(), style = MaterialTheme.typography.bodySmall, color = PlatterColors.Fog, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+        }
+        Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+            rows.forEachIndexed { i, (label, value) ->
+                if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(PlatterColors.Iron))
+                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+                    Text(label, style = MaterialTheme.typography.bodySmall, color = PlatterColors.Mist, maxLines = 1, softWrap = false, modifier = Modifier.width(132.dp).padding(top = 1.dp))
                     Text(value.orEmpty(), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
             }

@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageGridState
 import com.platter.desktop.i18n.t
 import androidx.compose.foundation.background
 import com.platter.desktop.ui.cards
@@ -206,6 +207,7 @@ fun DeezerScreen(app: AppController, kind: DeezerHit.Kind, id: Long) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(PlatterSpacing.CardCell),
             modifier = Modifier.fillMaxSize(),
+            state = rememberPageGridState(),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column {

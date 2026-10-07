@@ -1,5 +1,6 @@
 package com.platter.desktop.ui.screens
 
+import com.platter.desktop.ui.rememberPageScrollState
 import com.platter.desktop.i18n.t
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -108,7 +109,7 @@ fun SearchScreen(app: AppController) {
             return@LoadView
         }
         val currentId = player.current?.id
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = PlatterSpacing.Section)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberPageScrollState("results")).padding(bottom = PlatterSpacing.Section)) {
             TopAndSongs(app, result, currentId, query)
 
             if (lyricMatches.isNotEmpty()) {
@@ -226,7 +227,7 @@ private fun Recent(app: AppController, typed: Boolean) {
         }
         return
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = PlatterSpacing.Bleed)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberPageScrollState("recent")).padding(horizontal = PlatterSpacing.Bleed)) {
         SectionHeader(t("Recent searches"), Modifier.padding(horizontal = PlatterSpacing.Bleed))
         app.recentSearches.forEach { recent ->
             Row(

@@ -105,8 +105,8 @@
     <string name="download_filter_smart">Умное скачивание</string>
     <string name="download_source_manual">Вы скачали их сами — останутся, пока вы их не удалите.</string>
     <string name="download_source_liked">Скачаны, потому что вам нравятся. Снимете лайк — трек удалится.</string>
-    <string name="download_source_smart">Сохраняются, пока вы слушаете. Хранится до %1$s — давно не игравшие уступают место.</string>
-    <string name="download_source_smart_off">Сохранены, пока вы слушали. Умное скачивание выключено — они останутся, пока вы их не удалите.</string>
+    <string name="download_source_smart">Сохраняются лайкнутые треки, пока вы их слушаете. Хранится до %1$s — давно не игравшие уступают место.</string>
+    <string name="download_source_smart_off">Сохранены лайкнутые треки, пока вы их слушали. Умное скачивание выключено — они останутся, пока вы их не удалите.</string>
     <string name="downloaded_bottom_sheet_add_to_queue">Добавить в очередь</string>
     <string name="downloaded_bottom_sheet_play_next">Играть дальше</string>
     <string name="downloaded_bottom_sheet_remove">Удалить</string>
@@ -408,12 +408,14 @@
     <string name="settings_summary_transcoding_download">Загрузите перекодированные медиафайлы. Если этот параметр включен, будет использоваться не конечная точка загрузки, а следующие настройки. Если для параметра «Формат перекодирования для загрузки» установлено значение «Прямая загрузка», битрейт файла не изменится.</string>
     <string name="settings_summary_transcoding_estimate_content_length">Когда файл перекодируется на лету, клиент обычно не показывает длину трека. Можно запросить у серверов, поддерживающих данную функцию, оценку длительности воспроизводимого трека, но время ответа может занять больше времени.</string>
     <string name="settings_smart_download_cache_size">Размер кэша</string>
-    <string name="settings_smart_download_title">Сохранять прослушиваемые треки</string>
-    <string name="settings_summary_smart_download">Треки, которые вы слушаете, сохраняются для офлайна в фоне и без уведомлений. Когда кэш заполнен, место освобождают треки, которые вы слушали давнее всего. Скачанные вручную и лайкнутые треки в кэш не входят.</string>
+    <string name="settings_smart_download_title">Сохранять прослушанные лайкнутые треки</string>
+    <string name="settings_summary_smart_download">Трек, который вы слушаете и который лайкнут, сохраняется для офлайна в фоне и без уведомлений. Одного прослушивания мало; лайк, поставленный во время прослушивания, тоже считается. Когда кэш заполнен, место освобождают треки, которые вы слушали давнее всего. Скачанные вручную и лайкнутые треки в кэш не входят.</string>
     <string name="settings_title_data">Данные</string>
     <string name="settings_title_smart_download">Умное скачивание</string>
     <string name="settings_title_general">Основное</string>
     <string name="settings_title_replay_gain">Усиление воспроизведения</string>
+    <string name="settings_crossfade_title">Кроссфейд</string>
+    <string name="settings_crossfade_summary">Конец трека накладывается на начало следующего. Между подряд идущими треками одного альбома не применяется.</string>
     <string name="settings_title_scrobble">Скробблинг</string>
     <string name="settings_title_skip_min_star_rating_dialog">Треки с рейтингом:</string>
     <string name="settings_title_share">Поделиться</string>
