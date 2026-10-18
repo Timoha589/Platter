@@ -124,14 +124,18 @@ public class PlaylistEditorDialog extends DialogFragment {
         });
 
         bind.playlistShareButton.setOnClickListener(view -> {
-            playlistEditorViewModel.sharePlaylist().observe(requireActivity(), sharedPlaylist -> {
-                ClipboardManager clipboardManager = (ClipboardManager) requireActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+            playlistEditorViewModel.sharePlaylist().observe(this, sharedPlaylist -> {
+                // Null when the server would not share it.
+                if (sharedPlaylist == null || getContext() == null) return;
+                ClipboardManager clipboardManager = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
                 ClipData clipData = ClipData.newPlainText(getString(R.string.app_name), sharedPlaylist.getUrl());
                 clipboardManager.setPrimaryClip(clipData);
             });
         });
 
-        bind.playlistShareButton.setVisibility(Preferences.isSharingEnabled() ? View.VISIBLE : View.GONE);
+        // Only a playlist that exists can be shared - not one being made from a track.
+        boolean canShare = Preferences.isSharingEnabled() && playlistEditorViewModel.getPlaylistToEdit() != null;
+        bind.playlistShareButton.setVisibility(canShare ? View.VISIBLE : View.GONE);
     }
 
     /**

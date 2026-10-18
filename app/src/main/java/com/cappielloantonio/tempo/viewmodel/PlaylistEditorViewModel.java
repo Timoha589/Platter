@@ -3,6 +3,7 @@ package com.cappielloantonio.tempo.viewmodel;
 import android.app.Application;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -84,14 +85,15 @@ public class PlaylistEditorViewModel extends AndroidViewModel {
         songLiveList.postValue(songs);
     }
 
+    /* The tracks as edited, or null when they never loaded - which is not the same as none. */
+    @Nullable
     private ArrayList<String> getPlaylistSongIds() {
         List<Child> songs = songLiveList.getValue();
-        ArrayList<String> ids = new ArrayList<>();
+        if (songs == null) return null;
 
-        if (songs != null && !songs.isEmpty()) {
-            for (Child song : songs) {
-                ids.add(song.getId());
-            }
+        ArrayList<String> ids = new ArrayList<>();
+        for (Child song : songs) {
+            ids.add(song.getId());
         }
 
         return ids;

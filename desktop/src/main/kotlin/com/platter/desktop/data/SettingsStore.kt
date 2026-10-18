@@ -39,6 +39,9 @@ class Settings {
     var salt: String? = null
     var volume: Int = 100
 
+    /** What the volume was before it was muted, for unmuting back to it. */
+    var unmutedVolume: Int = 100
+
     /** The interface language, as an [com.platter.desktop.i18n.AppLanguage] tag; null follows the system. */
     var language: String? = null
 

@@ -40,8 +40,12 @@ public class ArtistCatalogueViewModel extends AndroidViewModel {
                         if (response.isSuccessful() && response.body() != null && response.body().getSubsonicResponse().getArtists() != null) {
                             List<ArtistID3> artists = new ArrayList<>();
 
-                            for (IndexID3 index : response.body().getSubsonicResponse().getArtists().getIndices()) {
-                                artists.addAll(index.getArtists());
+                            // A server leaves out empty lists: an empty library has no index, an empty letter no artists.
+                            List<IndexID3> indices = response.body().getSubsonicResponse().getArtists().getIndices();
+                            if (indices != null) {
+                                for (IndexID3 index : indices) {
+                                    if (index != null && index.getArtists() != null) artists.addAll(index.getArtists());
+                                }
                             }
 
                             artistList.setValue(artists);

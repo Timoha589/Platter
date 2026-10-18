@@ -14,13 +14,13 @@ import com.cappielloantonio.tempo.model.Download;
 import com.cappielloantonio.tempo.repository.DownloadRepository;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 
+import java.nio.charset.StandardCharsets;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class MusicUtil {
     private static final String TAG = "MusicUtil";
@@ -41,7 +41,8 @@ public class MusicUtil {
 
         String uri = App.getSubsonicClientInstance(false).getUrl() + "stream" + query;
 
-        Log.d(TAG, "getStreamUri: " + uri);
+        // The id only: the address carries the user name and token, or with low security the password.
+        Log.d(TAG, "getStreamUri: " + id);
 
         return Uri.parse(uri);
     }
@@ -62,7 +63,8 @@ public class MusicUtil {
             uri = download.getDownloadUri();
         }
 
-        Log.d(TAG, "getDownloadUri: " + uri);
+        // The id only: the address carries the user name and token, or with low security the password.
+        Log.d(TAG, "getDownloadUri: " + id);
 
         return Uri.parse(uri);
     }
@@ -81,7 +83,8 @@ public class MusicUtil {
 
         String uri = App.getSubsonicClientInstance(false).getUrl() + "stream" + query;
 
-        Log.d(TAG, "getTranscodedDownloadUri: " + uri);
+        // The id only: the address carries the user name and token, or with low security the password.
+        Log.d(TAG, "getTranscodedDownloadUri: " + id);
 
         return Uri.parse(uri);
     }
@@ -217,7 +220,7 @@ public class MusicUtil {
             return getReadableString(string)
                     .replaceAll("&#34;", "\"")
                     .replaceAll("&#39;", "'")
-                    .replaceAll("&amp;", "'")
+                    .replaceAll("&amp;", "&")
                     .replaceAll("<a\\s+([^>]+)>((?:.(?!</a>))*.)</a>", "");
         }
 
@@ -229,7 +232,7 @@ public class MusicUtil {
             return string
                     .replaceAll("&#34;", "\"")
                     .replaceAll("&#39;", "'")
-                    .replaceAll("&amp;", "'")
+                    .replaceAll("&amp;", "&")
                     .replaceAll("&#xA;", "\n");
         }
 
@@ -257,8 +260,15 @@ public class MusicUtil {
         return String.format("%.1f %ciB", value / 1024.0, ci.current());
     }
 
+    /*
+     * Subsonic's p=enc: is the hex of the password's UTF-8 bytes, two digits
+     * each. Hex of the Java chars matched it only for ASCII: a Cyrillic letter
+     * came out as three digits of its UTF-16 code and the server refused it.
+     */
     public static String passwordHexEncoding(String plainPassword) {
-        return "enc:" + plainPassword.chars().mapToObj(Integer::toHexString).collect(Collectors.joining());
+        StringBuilder hex = new StringBuilder("enc:");
+        for (byte b : plainPassword.getBytes(StandardCharsets.UTF_8)) hex.append(String.format("%02x", b));
+        return hex.toString();
     }
 
     public static String getBitratePreference() {

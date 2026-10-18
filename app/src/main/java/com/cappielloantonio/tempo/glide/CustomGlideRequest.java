@@ -175,7 +175,8 @@ public class CustomGlideRequest {
 
         String uri = App.getSubsonicClientInstance(false).getUrl() + "getCoverArt" + query;
 
-        Log.d(TAG, "createUrl() " + uri);
+        // The id only: the address carries the user name and token, or with low security the password.
+        Log.d(TAG, "createUrl() " + item);
 
         return uri;
     }

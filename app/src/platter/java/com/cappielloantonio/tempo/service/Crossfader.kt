@@ -3,6 +3,7 @@ package com.cappielloantonio.tempo.service
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -18,7 +19,9 @@ import com.cappielloantonio.tempo.util.Constants
 import com.cappielloantonio.tempo.util.Preferences
 import com.cappielloantonio.tempo.util.ReplayGainUtil
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.roundToLong
 import kotlin.math.sin
 
 /**
@@ -29,11 +32,17 @@ import kotlin.math.sin
  * is playing - the notification, the scrobbler and the lyrics all read it -
  * and a second one, the helper, carries the tail of the track being left:
  *
- *  - Ten seconds before the fade the helper is made, pointed at the same
- *    track a little past where the fade will begin, and left paused and muted.
- *  - When the main player reaches that point the helper starts. For a moment
- *    both play the same audio - the main one fading out, the helper in - which
- *    hides that two players never line up to the millisecond.
+ *  - Twelve seconds before the fade the helper is made and loaded with the
+ *    same track, paused.
+ *  - Eight seconds before the fade it starts playing along with the main
+ *    player, muted. A player is heard only some tens of milliseconds after it
+ *    is told to start, and never after quite the same time, so the two are
+ *    compared once they have played for a while and the helper's sound is
+ *    shifted by the difference, sample by sample (see [SampleShifter]).
+ *  - At the fade the two swap over: for a moment both play the same audio,
+ *    the main one fading out, the helper in. Two copies that are off by more
+ *    than a few milliseconds play a bit of the track twice, which is heard as
+ *    a stutter.
  *  - The main player then moves on to the next track, silent, and fades it in
  *    while the helper fades out what is left of the old one. From here the
  *    main player is already on the new track, so the app shows it at once.
@@ -49,10 +58,10 @@ import kotlin.math.sin
 @UnstableApi
 class Crossfader(
         private val player: ExoPlayer,
-        private val newHelper: () -> ExoPlayer,
+        private val newHelper: (SampleShifter) -> ExoPlayer,
         private val canFade: () -> Boolean
 ) : Player.Listener, SharedPreferences.OnSharedPreferenceChangeListener {
-    private enum class Phase { IDLE, HANDOFF, FADING }
+    private enum class Phase { IDLE, ALIGNING, HANDOFF, FADING }
 
     private class Plan(
             val fromIndex: Int,
@@ -72,12 +81,24 @@ class Crossfader(
     private var phase = Phase.IDLE
     private var plan: Plan? = null
     private var helper: ExoPlayer? = null
-    private var helperReady = false
+    private var shifter: SampleShifter? = null
     private var helperFailed = false
     private var messages = emptyList<PlayerMessage>()
 
     // Our own seek to the next track must not be mistaken for the listener's.
     private var ownSeek = false
+
+    // Lining the helper up: where its position started to count from, when a shift will have been heard,
+    // the differences read since, and whether they are close enough. The first difference after the helper
+    // is put somewhere says how far off the lead was.
+    private var settleFrom = C.TIME_UNSET
+    private var shiftHeardAt = 0L
+    private var samples = 0
+    private var helperAhead = Long.MIN_VALUE
+    private var mainAhead = Long.MIN_VALUE
+    private val readings = ArrayDeque<Long>(READINGS)
+    private var aligned = false
+    private var justMoved = false
 
     private var outVolume = 1f
     private var handoffFrom = C.TIME_UNSET
@@ -88,6 +109,7 @@ class Crossfader(
     private val tick = object : Runnable {
         override fun run() {
             when (phase) {
+                Phase.ALIGNING -> align()
                 Phase.HANDOFF -> handoff()
                 Phase.FADING -> fade()
                 Phase.IDLE -> return
@@ -166,11 +188,22 @@ class Crossfader(
     }
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        /*
+         * A pause before the fade lets the helper go rather than keep it and
+         * its ticking for however long the pause lasts; playing again arms the
+         * fade afresh, and the helper is made and lined up anew.
+         */
+        if (phase == Phase.ALIGNING && !playWhenReady) {
+            end(refreshAfter = false)
+            return
+        }
         helper?.takeIf { phase != Phase.IDLE }?.playWhenReady = playWhenReady
+        if (phase == Phase.IDLE && playWhenReady) refresh()
     }
 
     override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
         helper?.playbackParameters = playbackParameters
+        if (phase == Phase.ALIGNING) resettle()
     }
 
     override fun onPlayerError(error: PlaybackException) {
@@ -210,14 +243,16 @@ class Crossfader(
     private fun arm(wanted: Plan) {
         Log.d(TAG, "armed: crossfade at ${wanted.startMs} ms of ${wanted.durationMs}")
         plan = wanted
-        helperReady = false
         helperFailed = false
 
         val prewarmAt = maxOf(0L, wanted.startMs - PREWARM_MS)
+        val alignAt = maxOf(0L, wanted.startMs - PREROLL_MS)
+        val now = player.currentPosition
         val pending = ArrayList<PlayerMessage>(2)
-        if (player.currentPosition >= prewarmAt) prewarm() else pending += at(wanted.fromIndex, prewarmAt) { prewarm() }
-        pending += at(wanted.fromIndex, wanted.startMs) { begin() }
+        if (now >= prewarmAt) prewarm() else pending += at(wanted.fromIndex, prewarmAt) { prewarm() }
+        if (now < alignAt) pending += at(wanted.fromIndex, alignAt) { startAligning() }
         messages = pending
+        if (now >= alignAt) startAligning()
     }
 
     private fun disarm() {
@@ -239,55 +274,164 @@ class Crossfader(
         if (helper != null || phase != Phase.IDLE) return
         if (player.currentMediaItemIndex != armed.fromIndex) return
 
-        val made = newHelper()
+        val shifts = SampleShifter()
+        val made = newHelper(shifts)
         made.volume = 0f
         made.playbackParameters = player.playbackParameters
         made.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (helper !== made) return
-                if (playbackState == Player.STATE_READY) helperReady = true
-            }
-
             override fun onPlayerError(error: PlaybackException) {
                 if (helper !== made) return
                 helperFailed = true
-                if (phase != Phase.IDLE) end()
+                // Before the fade it is the track playing that failed, and would only fail again; during it,
+                // the one being left, so the new track is armed for its own fade as usual.
+                if (phase != Phase.IDLE) end(refreshAfter = phase == Phase.FADING)
             }
         })
-        made.setMediaItem(player.getMediaItemAt(armed.fromIndex), armed.startMs + ALIGN_MS)
+        made.setMediaItem(player.getMediaItemAt(armed.fromIndex), maxOf(0L, armed.startMs - PREROLL_MS) + lead)
         made.playWhenReady = false
         made.prepare()
         helper = made
+        shifter = shifts
     }
 
     private fun dropHelper() {
         helper?.release()
         helper = null
-        helperReady = false
+        shifter = null
     }
 
-    /* The main player is at the point where the fade begins. */
-    private fun begin() {
-        val armed = plan ?: return
-        messages = emptyList()
+    /* A few seconds before the fade: the helper starts playing along, muted, to be lined up. */
+    private fun startAligning() {
+        val h = helper
+        if (plan == null || h == null || helperFailed || phase != Phase.IDLE) return
 
-        val ready = helper?.takeIf { helperReady && !helperFailed }
-        val stillRight = player.currentMediaItemIndex == armed.fromIndex &&
-                player.nextMediaItemIndex == armed.toIndex &&
-                player.currentMediaItem?.mediaId == armed.fromId
-        if (ready == null || !stillRight || !player.isPlaying) {
-            Log.d(TAG, "no crossfade: helper ready=${ready != null}, queue unchanged=$stillRight")
-            disarm()
+        phase = Phase.ALIGNING
+        aligned = false
+        moveHelper(h)
+        h.playWhenReady = player.playWhenReady
+        handler.removeCallbacks(tick)
+        handler.post(tick)
+    }
+
+    /*
+     * Puts the helper where the main player is plus the time it takes to be
+     * heard, as last found. Only roughly: it is lined up by shifting from there.
+     */
+    private fun moveHelper(h: ExoPlayer) {
+        h.seekTo(player.currentPosition + lead)
+        resettle()
+        justMoved = true
+    }
+
+    private fun resettle() {
+        settleFrom = C.TIME_UNSET
+        clearSamples()
+        readings.clear()
+        aligned = false
+        justMoved = false
+    }
+
+    /*
+     * Both players play the old track, the helper unheard, until the two are
+     * lined up and the main one reaches the fade. If they cannot be lined up
+     * in time the fade waits, and is shorter for it; with too little of the
+     * track left for one, the track simply ends.
+     */
+    private fun align() {
+        val armed = plan
+        val h = helper
+        val s = shifter
+        if (armed == null || h == null || s == null || helperFailed || !stillOn(armed)) {
+            end(refreshAfter = !helperFailed)
             return
         }
 
+        val now = player.currentPosition
+        measure(h, s)
+
+        if (now < armed.startMs) return
+        if (aligned && player.isPlaying) {
+            startHandoff()
+        } else if (armed.durationMs - now < MIN_FADE_MS + HANDOFF_MS) {
+            Log.d(TAG, "no crossfade: the helper could not be lined up in time")
+            end(refreshAfter = false)
+        }
+    }
+
+    /* Compares where the two players are heard, once both have played for a while, and shifts the helper by that. */
+    private fun measure(h: ExoPlayer, s: SampleShifter) {
+        if (!h.isPlaying || !player.isPlaying) {
+            settleFrom = C.TIME_UNSET
+            clearSamples()
+            readings.clear()
+            return
+        }
+
+        // For a second or so after it is heard a player eases what it reports towards where it is.
+        val position = h.currentPosition
+        if (settleFrom == C.TIME_UNSET) settleFrom = position
+        if (position < settleFrom + SETTLE_MS) return
+
+        // A shift is heard only once the sound already handed to the speaker has played.
+        val clock = SystemClock.elapsedRealtime()
+        if (s.isShifting) shiftHeardAt = clock + SHIFT_HEARD_MS
+        if (clock < shiftHeardAt) return
+
+        /*
+         * A player tells the app where it is only every ten milliseconds or so,
+         * each on its own beat, so either number can be up to that much behind.
+         * Against the clock the latest is the one furthest ahead, so over a run
+         * of samples each player's furthest is taken as where it is.
+         */
+        helperAhead = maxOf(helperAhead, position + s.shiftedMs - clock)
+        mainAhead = maxOf(mainAhead, player.currentPosition - clock)
+        if (++samples < OFFSET_SAMPLES) return
+
+        readings.addLast(helperAhead - mainAhead)
+        clearSamples()
+        if (readings.size > READINGS) readings.removeFirst()
+        if (readings.size < READINGS) return
+
+        // Even then each reading wanders by some milliseconds, so a second's worth of them is averaged.
+        val offset = readings.average().roundToLong()
+        val tolerance = if (aligned) ALIGN_LOOSE_MS else ALIGN_TOLERANCE_MS
+        if (abs(offset) <= tolerance) {
+            if (!aligned) Log.d(TAG, "aligned: helper is $offset ms ahead of the main player")
+            aligned = true
+            justMoved = false
+            return
+        }
+
+        if (justMoved && abs(offset) <= MAX_LEAD_MS) lead = (lead - offset).coerceIn(0L, MAX_LEAD_MS)
+        justMoved = false
+        aligned = false
+        readings.clear()
+        if (abs(offset) > MAX_SHIFT_MS) {
+            Log.d(TAG, "aligning: helper is $offset ms ahead of the main player, moving it")
+            moveHelper(h)
+        } else {
+            Log.d(TAG, "aligning: helper is $offset ms ahead of the main player, shifting it")
+            s.shift(-offset)
+            shiftHeardAt = clock + SHIFT_HEARD_MS
+        }
+    }
+
+    private fun clearSamples() {
+        samples = 0
+        helperAhead = Long.MIN_VALUE
+        mainAhead = Long.MIN_VALUE
+    }
+
+    private fun stillOn(armed: Plan) = player.currentMediaItemIndex == armed.fromIndex &&
+            player.nextMediaItemIndex == armed.toIndex &&
+            player.currentMediaItem?.mediaId == armed.fromId
+
+    /* The main player is at the point where the fade begins, with the helper lined up. */
+    private fun startHandoff() {
         outVolume = ReplayGainUtil.getVolume()
         handoffFrom = C.TIME_UNSET
         handoffWaitedMs = 0
         phase = Phase.HANDOFF
-        ready.playWhenReady = true
-        handler.removeCallbacks(tick)
-        handler.post(tick)
     }
 
     /*
@@ -315,7 +459,7 @@ class Crossfader(
 
         if (handoffFrom == C.TIME_UNSET) {
             handoffFrom = h.currentPosition
-            Log.d(TAG, "handoff: helper is ${h.currentPosition - player.currentPosition} ms ahead of the main player")
+            Log.d(TAG, "handoff: helper is ${h.currentPosition + (shifter?.shiftedMs ?: 0) - player.currentPosition} ms ahead of the main player")
         }
 
         val progress = ((h.currentPosition - handoffFrom) / HANDOFF_MS.toFloat()).coerceIn(0f, 1f)
@@ -427,11 +571,37 @@ class Crossfader(
         /* A fade that would begin within this of the present is not worth arming. */
         const val MIN_LEAD_MS = 300L
 
-        /* The helper is pointed this far past the fade's start, which is about
-         * how late the main player has got by the time the helper is heard. */
-        const val ALIGN_MS = 8L
+        /* How long before the fade the helper starts playing, unheard, to be lined up. */
+        const val PREROLL_MS = 8_000L
 
-        const val HANDOFF_MS = 150L
+        /* How long a started helper plays before what it reports is believed, and
+         * how long a shift takes to be heard, at most, once it has gone through. */
+        const val SETTLE_MS = 1_500L
+        const val SHIFT_HEARD_MS = 1_000L
+
+        /* Samples of the two positions in one reading, and readings averaged. */
+        const val OFFSET_SAMPLES = 12
+        const val READINGS = 8
+
+        /* Two copies of a track this close together sound as one. Once lined up
+         * the helper is left alone unless it is found further off than the
+         * looser limit, so that a wandering reading does not undo it. */
+        const val ALIGN_TOLERANCE_MS = 3L
+        const val ALIGN_LOOSE_MS = 6L
+
+        /* Further off than this the helper is put back by seeking, not shifted. */
+        const val MAX_SHIFT_MS = 1_000L
+
+        /*
+         * How far ahead of the main player a helper is put when it starts:
+         * about how late it is heard. Each device has its own; this is a first
+         * guess, and what was found the last time is used from then on.
+         */
+        var lead = 60L
+        const val MAX_LEAD_MS = 250L
+
+        /* Short, so that two copies a few milliseconds apart are not heard together for long. */
+        const val HANDOFF_MS = 60L
         const val HANDOFF_WAIT_MS = 1_500L
         const val TICK_MS = 10L
     }

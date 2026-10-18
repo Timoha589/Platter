@@ -1,7 +1,6 @@
 package com.platter.desktop.player
 
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
-import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import java.nio.file.Path
@@ -53,7 +52,10 @@ class PreviewPlayer(private val vlcArgs: List<String>, private val onEnd: (finis
     private fun engine(): MediaPlayer? {
         player?.let { return it }
         return try {
-            if (!NativeDiscovery().discover()) return null
+            // The same search as the main player's, which looks first at the libvlc that comes with the app: vlcj's own
+            // looked only for an installed VLC, so without one there were no previews, and with one its plugins could
+            // be set over the bundled library's.
+            if (VlcDiscovery.loadedFrom == null && !VlcDiscovery.discover()) return null
             val f = MediaPlayerFactory(listOf("--no-video", "--quiet") + vlcArgs)
             val p = f.mediaPlayers().newMediaPlayer()
             p.events().addMediaPlayerEventListener(events)

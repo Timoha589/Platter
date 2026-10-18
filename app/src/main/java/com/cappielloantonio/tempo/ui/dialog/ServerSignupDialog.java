@@ -122,6 +122,21 @@ public class ServerSignupDialog extends DialogFragment {
             return false;
         }
 
+        /*
+         * A saved server opens with its password field empty, so as not to show
+         * the password. Left empty, the saved one is kept rather than replaced
+         * by nothing - unless the low-security box was changed, which stores it
+         * in another form and so needs it typed again.
+         */
+        Server saved = loginViewModel.getServerToEdit();
+        if (saved != null && TextUtils.isEmpty(bind.passwordTextView.getText())) {
+            if (saved.isLowSecurity() != lowSecurity) {
+                bind.passwordTextView.setError(getString(R.string.error_required));
+                return false;
+            }
+            password = saved.getPassword();
+        }
+
         if (!TextUtils.isEmpty(localAddress) && !localAddress.matches("^https?://(.*)")) {
             bind.localAddressTextView.setError(getString(R.string.error_server_prefix));
             return false;

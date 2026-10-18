@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import okhttp3.Request
 import java.io.IOException
 import java.nio.file.Files
@@ -44,7 +45,9 @@ class Downloader(
     private val store: DownloadStore,
     private val root: () -> Path,
     private val coversDir: Path,
-    private val http: OkHttpClient = SubsonicClient.defaultHttp,
+    // Without the Subsonic client's call timeout, which covers reading the whole body and so cut off any song
+    // that took more than two minutes to arrive - a big FLAC on a slow line. Stalls are still caught by the read timeout.
+    private val http: OkHttpClient = SubsonicClient.defaultHttp.newBuilder().callTimeout(0, TimeUnit.MILLISECONDS).build(),
     private val clock: () -> Long = System::currentTimeMillis,
     /** Told whenever something finished, failed or went - so screens that list downloads load again. */
     private val onChange: () -> Unit = {},

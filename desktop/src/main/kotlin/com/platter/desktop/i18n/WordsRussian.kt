@@ -406,7 +406,7 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "Open on GitHub" to "Открыть на GitHub",
     "Update available" to "Доступно обновление",
     "Platter %s is available. You have %s." to "Доступен Platter %s. У вас %s.",
-    "What's new" to "Что нового",
+    "What's new" to "Что изменилось",
     "Later" to "Позже",
     "Update" to "Обновить",
     "Downloading… %d%%" to "Загрузка… %d%%",

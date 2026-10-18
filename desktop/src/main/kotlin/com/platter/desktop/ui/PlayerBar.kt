@@ -202,7 +202,7 @@ fun PlayerBar(app: AppController) {
                 IconAction(
                     if (s.volume == 0) Icons.Outlined.VolumeOff else Icons.Outlined.VolumeUp,
                     t("Mute"),
-                ) { app.setVolume(if (s.volume == 0) 100 else 0) }
+                ) { app.toggleMute() }
                 Spacer(Modifier.width(4.dp))
                 ProgressBar(s.volume / 100f, { app.setVolume((it * 100).toInt()) }, Modifier.width(96.dp))
             }

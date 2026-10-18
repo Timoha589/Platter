@@ -307,13 +307,15 @@ private fun Arranged(app: AppController, s: PlayerState, song: Song?, forward: B
         val poses = remember(maxWidth, maxHeight, upright, app.wordsHeight) {
             if (upright) uprightPoses(maxWidth, maxHeight, app.wordsHeight) else widePoses(maxWidth, maxHeight)
         }
-        val t by animateFloatAsState(if (app.fullPlayerLyrics) 1f else 0f, tween(WORDS_MS, easing = FastOutSlowInEasing), label = "full-player-words")
+        // Words are for music: an episode or a station has none, and no button to leave them by, so it shows the cover.
+        val showWords = app.fullPlayerLyrics && song?.isMusic != false
+        val t by animateFloatAsState(if (showWords) 1f else 0f, tween(WORDS_MS, easing = FastOutSlowInEasing), label = "full-player-words")
         val cover = lerp(poses.plain.cover, poses.words.cover, t)
         val header = lerp(poses.plain.header, poses.words.header, t)
         val footer = lerp(poses.plain.footer, poses.words.footer, t)
 
         // Under the controls, which cross its place on their way: a press on the button that opened it must not land on a line.
-        if (app.fullPlayerLyrics || t > 0.001f) {
+        if (showWords || t > 0.001f) {
             val words = poses.lyrics
             Box(
                 Modifier.offset(words.x, words.y).size(words.w, words.h)
@@ -324,7 +326,7 @@ private fun Arranged(app: AppController, s: PlayerState, song: Song?, forward: B
             }
             // An upright window's words can be made taller or shorter by their top edge, as the panel under the page can: the
             // handle sits in the gap above them, and a double press gives the window's own split back.
-            if (upright && app.fullPlayerLyrics && t > 0.99f && poses.wordsMax > poses.wordsMin) {
+            if (upright && showWords && t > 0.99f && poses.wordsMax > poses.wordsMin) {
                 Box(Modifier.offset(words.x, words.y - 10.dp).size(words.w, 8.dp)) {
                     ResizeHandle(
                         "resize-words", width = { words.h.value.roundToInt() },
@@ -519,7 +521,7 @@ private fun Volume(app: AppController, s: PlayerState, modifier: Modifier) {
         IconAction(
             if (s.volume == 0) Icons.Outlined.VolumeOff else Icons.Outlined.VolumeUp,
             t("Mute"), tint = PlatterColors.White.copy(alpha = 0.8f), size = 22.dp,
-        ) { app.setVolume(if (s.volume == 0) 100 else 0) }
+        ) { app.toggleMute() }
         Spacer(Modifier.width(8.dp))
         ProgressBar(s.volume / 100f, { app.setVolume((it * 100).toInt()) }, Modifier.width(160.dp))
     }

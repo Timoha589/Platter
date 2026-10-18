@@ -221,8 +221,8 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
 
         bind.discoveryTextViewClickable.setOnClickListener(v -> {
             homeViewModel.getRandomShuffleSample().observe(getViewLifecycleOwner(), songs -> {
-
-                if (!songs.isEmpty()) {
+                // Null when the request failed.
+                if (songs != null && !songs.isEmpty()) {
                     MediaManager.startQueue(mediaBrowserListenableFuture, songs, 0);
                     activity.setBottomSheetInPeek(true);
                 }

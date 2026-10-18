@@ -8,6 +8,7 @@ import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.deemix.DeezerHit
 import com.platter.desktop.player.PlayQueue
 import com.platter.desktop.player.RepeatMode
+import com.platter.desktop.wave.WaveState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -180,5 +181,37 @@ class RememberedStateTest {
 
         saved.write("a|tim", PlayQueue(), 0) // an empty queue removes the file
         assertFalse(Files.exists(file))
+    }
+
+    @Test
+    fun `the wave a restored queue came from knows its tracks again`() {
+        val saved = SavedQueue(dir.resolve("queue-wave.json"))
+        val wave = WaveState().apply {
+            restore(WaveState.Memory("session-1", "calm", listOf(WaveState.Memory.Track("x", 0.4, 120.0))))
+        }
+        saved.write("a|tim", PlayQueue(listOf(song("x"), song("y")), 0), 10, wave.memory())
+
+        val again = WaveState()
+        saved.read("a|tim")!!.wave?.let(again::restore)
+        assertTrue(again.isWaveTrack("x"))
+        assertFalse(again.isWaveTrack("y"))
+        assertEquals("session-1", again.session())
+        assertEquals("calm", again.vibe.value)
+        assertEquals(120.0, again.info("x")?.tempo)
+    }
+
+    @Test
+    fun `unmuting gives back the level muted from, after a restart too`() = FakeSubsonic().use { fake ->
+        val first = open(fake)
+        first.setVolume(30)
+        first.toggleMute()
+        assertEquals(0, first.player.state.value.volume)
+        first.toggleMute()
+        assertEquals(30, first.player.state.value.volume)
+
+        first.toggleMute()
+        val second = restart(fake, first)
+        second.toggleMute()
+        assertEquals(30, second.player.state.value.volume)
     }
 }

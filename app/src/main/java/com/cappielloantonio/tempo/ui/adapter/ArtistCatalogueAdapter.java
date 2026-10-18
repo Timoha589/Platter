@@ -43,6 +43,7 @@ public class ArtistCatalogueAdapter extends RecyclerView.Adapter<ArtistCatalogue
 
             FilterResults results = new FilterResults();
             results.values = filteredList;
+            results.count = filteredList.size();
 
             return results;
         }
@@ -92,7 +93,8 @@ public class ArtistCatalogueAdapter extends RecyclerView.Adapter<ArtistCatalogue
     }
 
     public void setItems(List<ArtistID3> artists) {
-        this.artists = artists;
+        // A copy: the filter empties and refills this list, and it must not be the one the view model holds.
+        this.artists = new ArrayList<>(artists);
         this.artistFull = new ArrayList<>(artists);
         notifyDataSetChanged();
     }

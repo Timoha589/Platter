@@ -41,6 +41,7 @@ public class PodcastChannelCatalogueAdapter extends RecyclerView.Adapter<Podcast
 
             FilterResults results = new FilterResults();
             results.values = filteredList;
+            results.count = filteredList.size();
 
             return results;
         }
@@ -90,7 +91,8 @@ public class PodcastChannelCatalogueAdapter extends RecyclerView.Adapter<Podcast
     }
 
     public void setItems(List<PodcastChannel> podcastChannels) {
-        this.podcastChannels = podcastChannels;
+        // A copy: the filter empties and refills this list, and it must not be the one the view model holds.
+        this.podcastChannels = new ArrayList<>(podcastChannels);
         this.podcastChannelsFull = new ArrayList<>(podcastChannels);
         notifyDataSetChanged();
     }

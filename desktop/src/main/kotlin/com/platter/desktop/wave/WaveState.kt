@@ -14,8 +14,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * picks up again. The same test tells the controller when to fetch more and
  * the home screen what to draw.
  *
- * Unlike the phone's, this lives in memory only: the desktop player does not
- * restore its queue after a restart, so there is no wave to resume either.
+ * It is kept with the queue across a restart (see [memory]): the queue comes
+ * back, and without this its wave tracks would no longer be known as the
+ * wave's, so the wave would neither refill nor hear what was skipped.
  */
 class WaveState {
     data class Info(val energy: Double?, val tempo: Double?)
@@ -47,6 +48,26 @@ class WaveState {
             tracks[id] = Info(track.energy, track.tempo)
         }
         while (tracks.size > MAX_TRACKS) tracks.remove(tracks.keys.first())
+    }
+
+    /** What a restart needs to know the wave's tracks again; null while there is no wave. */
+    class Memory(var session: String? = null, var vibe: String? = null, var tracks: List<Track> = emptyList()) {
+        class Track(var id: String? = null, var energy: Double? = null, var tempo: Double? = null)
+    }
+
+    @Synchronized
+    fun memory(): Memory? = session?.let { s ->
+        Memory(s, _vibe.value, tracks.map { (id, info) -> Memory.Track(id, info.energy, info.tempo) })
+    }
+
+    /** Takes back what [memory] kept, unless a wave has started since. An expired session is renewed by the server. */
+    @Synchronized
+    fun restore(memory: Memory) {
+        if (session != null || memory.session == null) return
+        session = memory.session
+        _vibe.value = memory.vibe
+        tracks.clear()
+        memory.tracks.forEach { t -> t.id?.let { tracks[it] = Info(t.energy, t.tempo) } }
     }
 
     @Synchronized

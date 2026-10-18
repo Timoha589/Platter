@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import com.platter.desktop.UpdateState
+import com.platter.desktop.update.ReleaseNotes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +71,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.platter.desktop.AppController
 import com.platter.desktop.AppDialog
@@ -191,6 +194,23 @@ private fun Buttons(cancel: String = t("Cancel"), ok: String, enabled: Boolean =
 
 // --- the dialogs ----------------------------------------------------------------------
 
+/** One line of a release's notes: an item of the list with its bullet, a heading, or a plain line. */
+@Composable
+private fun ReleaseNote(block: ReleaseNotes.Block, first: Boolean) {
+    val style = MaterialTheme.typography.bodyMedium
+    when (block) {
+        is ReleaseNotes.Item -> Row {
+            Text("•", style = style, color = PlatterColors.Green, modifier = Modifier.width(18.dp).padding(start = 4.dp))
+            Text(block.text, style = style, color = PlatterColors.Mist, modifier = Modifier.weight(1f))
+        }
+        is ReleaseNotes.Heading -> Text(
+            block.text, style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(top = if (first) 0.dp else 8.dp),
+        )
+        is ReleaseNotes.Line -> Text(block.text, style = style, color = PlatterColors.Mist)
+    }
+}
+
 /** Offers the release the updater found, and follows its download; the program restarts itself when the installer has it. */
 @Composable
 private fun UpdateDialog(app: AppController, close: () -> Unit) {
@@ -206,10 +226,14 @@ private fun UpdateDialog(app: AppController, close: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = PlatterColors.Mist,
         )
-        if (offer.notes.isNotEmpty()) {
-            Text(t("What's new"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            Box(Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
-                Text(offer.notes, style = MaterialTheme.typography.bodySmall, color = PlatterColors.Mist)
+        val notes = remember(offer.notes) { ReleaseNotes.parse(offer.notes) }
+        if (notes.isNotEmpty()) {
+            Text(t("What's new"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+            Column(
+                Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()).testTag("update-notes"),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                notes.forEachIndexed { i, block -> ReleaseNote(block, first = i == 0) }
             }
         }
         when (state) {
@@ -371,12 +395,15 @@ private fun StationDialog(app: AppController, station: RadioStation?, close: () 
 @Composable
 private fun VerticalSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     var height by remember { mutableStateOf(1f) }
+    // The gestures outlive a recomposition, so they call the latest onChange: the one they started with carries the
+    // other bands as they were then, and moving this one would put those back.
+    val latestOnChange by rememberUpdatedState(onChange)
     fun fromY(y: Float): Float = (range.endInclusive - (y / height).coerceIn(0f, 1f) * (range.endInclusive - range.start))
     Canvas(
         modifier
             .onSizeChanged { height = it.height.toFloat().coerceAtLeast(1f) }
-            .pointerInput(enabled) { if (enabled) detectTapGestures { onChange(fromY(it.y)) } }
-            .pointerInput(enabled) { if (enabled) detectDragGestures { change, _ -> onChange(fromY(change.position.y)) } },
+            .pointerInput(enabled) { if (enabled) detectTapGestures { latestOnChange(fromY(it.y)) } }
+            .pointerInput(enabled) { if (enabled) detectDragGestures { change, _ -> latestOnChange(fromY(change.position.y)) } },
     ) {
         val x = size.width / 2
         val fraction = (range.endInclusive - value) / (range.endInclusive - range.start)
@@ -416,10 +443,10 @@ private fun EqualizerDialog(app: AppController, close: () -> Unit) {
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            EqColumn(t("Preamp"), eq.preamp, eq.enabled) { app.changeEqualizer(eq.copy(preamp = it)) }
+            EqColumn(t("Preamp"), "eq-preamp", eq.preamp, eq.enabled) { app.changeEqualizer(eq.copy(preamp = it)) }
             Spacer(Modifier.width(8.dp))
             gains.forEachIndexed { band, gain ->
-                EqColumn(EqSettings.FREQUENCIES[band], gain, eq.enabled) { value ->
+                EqColumn(EqSettings.FREQUENCIES[band], "eq-band-$band", gain, eq.enabled) { value ->
                     app.changeEqualizer(eq.copy(bands = gains.toMutableList().also { it[band] = value }))
                 }
             }
@@ -429,14 +456,14 @@ private fun EqualizerDialog(app: AppController, close: () -> Unit) {
 }
 
 @Composable
-private fun EqColumn(label: String, gain: Float, enabled: Boolean, onChange: (Float) -> Unit) {
+private fun EqColumn(label: String, tag: String, gain: Float, enabled: Boolean, onChange: (Float) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(48.dp)) {
         Text("%+.0f".format(gain), style = MaterialTheme.typography.labelSmall, color = if (enabled) PlatterColors.White else PlatterColors.Fog)
         Spacer(Modifier.height(4.dp))
         VerticalSlider(
             // Whole decibels: a finer step is not something an ear can tell, and it keeps the labels honest.
             gain, -EqSettings.RANGE_DB..EqSettings.RANGE_DB, { onChange(kotlin.math.round(it)) },
-            Modifier.width(32.dp).height(150.dp), enabled,
+            Modifier.width(32.dp).height(150.dp).testTag(tag), enabled,
         )
         Spacer(Modifier.height(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = PlatterColors.Mist)

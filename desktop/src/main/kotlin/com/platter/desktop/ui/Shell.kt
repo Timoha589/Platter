@@ -76,6 +76,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -294,16 +295,22 @@ internal fun ResizeHandle(
     val hovered by source.collectIsHoveredAsState()
     var dragging by remember { mutableStateOf(false) }
     val density = LocalDensity.current.density
+    // The gestures outlive recompositions, so they call what was passed last: the full player's handle hands in its
+    // current height and limits each time, and the first ones made a second drag jump back to where the first began.
+    val currentWidth by rememberUpdatedState(width)
+    val currentOnResize by rememberUpdatedState(onResize)
+    val currentOnDone by rememberUpdatedState(onDone)
+    val currentOnReset by rememberUpdatedState(onReset)
     val drag = Modifier
-        .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onReset() }) }
+        .pointerInput(Unit) { detectTapGestures(onDoubleTap = { currentOnReset() }) }
         .pointerInput(vertical) {
             var start = 0
             var travelled = 0f
-            val begin = { _: androidx.compose.ui.geometry.Offset -> dragging = true; start = width(); travelled = 0f }
-            val end = { dragging = false; onDone() }
+            val begin = { _: androidx.compose.ui.geometry.Offset -> dragging = true; start = currentWidth(); travelled = 0f }
+            val end = { dragging = false; currentOnDone() }
             val move = { _: androidx.compose.ui.input.pointer.PointerInputChange, delta: Float ->
                 travelled += delta / density
-                onResize(start + (if (growsForward) travelled else -travelled).roundToInt())
+                currentOnResize(start + (if (growsForward) travelled else -travelled).roundToInt())
             }
             if (vertical) detectVerticalDragGestures(begin, end, end, move) else detectHorizontalDragGestures(begin, end, end, move)
         }

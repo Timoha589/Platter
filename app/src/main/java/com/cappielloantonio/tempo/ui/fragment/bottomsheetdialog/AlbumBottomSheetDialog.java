@@ -131,6 +131,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
         playRandom.setOnClickListener(v -> {
             AlbumRepository albumRepository = new AlbumRepository();
             albumRepository.getAlbumTracks(album.getId()).observe(getViewLifecycleOwner(), songs -> {
+                if (songs == null) return; // The request failed; a tap asks again.
                 Collections.shuffle(songs);
 
                 MediaManager.startQueue(mediaBrowserListenableFuture, songs, 0);
@@ -142,6 +143,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
         TextView playNext = view.findViewById(R.id.play_next_text_view);
         playNext.setOnClickListener(v -> albumBottomSheetViewModel.getAlbumTracks().observe(getViewLifecycleOwner(), songs -> {
+            if (songs == null) return; // The request failed; a tap asks again.
             MediaManager.enqueue(mediaBrowserListenableFuture, songs, true);
             ((MainActivity) requireActivity()).setBottomSheetInPeek(true);
 
@@ -150,6 +152,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
         TextView addToQueue = view.findViewById(R.id.add_to_queue_text_view);
         addToQueue.setOnClickListener(v -> albumBottomSheetViewModel.getAlbumTracks().observe(getViewLifecycleOwner(), songs -> {
+            if (songs == null) return; // The request failed; a tap asks again.
             MediaManager.enqueue(mediaBrowserListenableFuture, songs, false);
             ((MainActivity) requireActivity()).setBottomSheetInPeek(true);
 
@@ -158,6 +161,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
         TextView downloadAll = view.findViewById(R.id.download_all_text_view);
         albumBottomSheetViewModel.getAlbumTracks().observe(getViewLifecycleOwner(), songs -> {
+            if (songs == null) return; // The request failed: nothing to download.
             List<MediaItem> mediaItems = MappingUtil.mapDownloads(songs);
             List<Download> downloads = songs.stream().map(Download::new).collect(Collectors.toList());
 
@@ -169,6 +173,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
         TextView removeAll = view.findViewById(R.id.remove_all_text_view);
         albumBottomSheetViewModel.getAlbumTracks().observe(getViewLifecycleOwner(), songs -> {
+            if (songs == null) return; // The request failed: nothing to remove.
             List<MediaItem> mediaItems = MappingUtil.mapDownloads(songs);
             List<Download> downloads = songs.stream().map(Download::new).collect(Collectors.toList());
 
@@ -221,6 +226,7 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
     private void initDownloadUI(TextView removeAll) {
         albumBottomSheetViewModel.getAlbumTracks().observe(getViewLifecycleOwner(), songs -> {
+            if (songs == null) return;
             List<MediaItem> mediaItems = MappingUtil.mapDownloads(songs);
 
             if (DownloadUtil.getDownloadTracker(requireContext()).areDownloaded(mediaItems)) {

@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.platter.desktop.api.Song
 import com.platter.desktop.player.PlayQueue
 import com.platter.desktop.player.RepeatMode
+import com.platter.desktop.wave.WaveState
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -27,14 +28,16 @@ class SavedQueue(private val file: Path) {
         var shuffle: Boolean = false,
         /** With shuffle on: where each song of the order they came in sits in [songs]. */
         var original: List<Int>? = null,
+        /** The wave the queue's wave tracks came from, so they are known as its own again. */
+        var wave: WaveState.Memory? = null,
     )
 
-    class Restored(val queue: PlayQueue, val positionMs: Long)
+    class Restored(val queue: PlayQueue, val positionMs: Long, val wave: WaveState.Memory?)
 
     private val gson = Gson()
 
     @Synchronized
-    fun write(owner: String, queue: PlayQueue, positionMs: Long) {
+    fun write(owner: String, queue: PlayQueue, positionMs: Long, wave: WaveState.Memory? = null) {
         if (queue.songs.isEmpty() || queue.index !in queue.songs.indices) {
             clear()
             return
@@ -48,6 +51,7 @@ class SavedQueue(private val file: Path) {
             repeat = queue.repeat.name,
             shuffle = queue.shuffle,
             original = queue.original?.mapNotNull { at[it] },
+            wave = wave,
         )
         Files.createDirectories(file.parent)
         val tmp = file.resolveSibling(file.fileName.toString() + ".tmp")
@@ -68,7 +72,7 @@ class SavedQueue(private val file: Path) {
             } else {
                 val repeat = RepeatMode.entries.firstOrNull { it.name == snapshot.repeat } ?: RepeatMode.Off
                 val original = if (snapshot.shuffle) snapshot.original?.mapNotNull { songs.getOrNull(it) } else null
-                Restored(PlayQueue(songs, snapshot.index, repeat, snapshot.shuffle, original), snapshot.positionMs)
+                Restored(PlayQueue(songs, snapshot.index, repeat, snapshot.shuffle, original), snapshot.positionMs, snapshot.wave)
             }
         }
     } catch (e: Exception) {

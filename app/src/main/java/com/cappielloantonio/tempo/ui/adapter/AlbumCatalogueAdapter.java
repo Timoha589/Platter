@@ -33,6 +33,8 @@ public class AlbumCatalogueAdapter extends RecyclerView.Adapter<AlbumCatalogueAd
             List<AlbumID3> filteredList = new ArrayList<>();
 
             if (constraint == null || constraint.length() == 0) {
+                // Cleared, so a list arriving later is not narrowed by what was typed before.
+                currentFilter = "";
                 filteredList.addAll(albumsFull);
             } else {
                 String filterPattern = constraint.toString().toLowerCase().trim();

@@ -61,6 +61,8 @@ public class SongHorizontalAdapter extends RecyclerView.Adapter<SongHorizontalAd
             List<Child> filteredList = new ArrayList<>();
 
             if (constraint == null || constraint.length() == 0) {
+                // Cleared, so a list arriving later is not narrowed by what was typed before.
+                currentFilter = "";
                 filteredList.addAll(songsFull);
             } else {
                 String filterPattern = constraint.toString().toLowerCase().trim();

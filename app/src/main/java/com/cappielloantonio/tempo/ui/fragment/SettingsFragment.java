@@ -67,6 +67,10 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
     private ActivityResultLauncher<Intent> someActivityResultLauncher;
 
+    // Asks how a library scan is getting on, a second apart, while this screen is there to show it.
+    private static final long SCAN_POLL_MS = 1_000;
+    private final Handler scanPoll = new Handler(Looper.getMainLooper());
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -107,6 +111,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        scanPoll.removeCallbacksAndMessages(null);
         bind = null;
     }
 
@@ -476,8 +481,9 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
                 @Override
                 public void onSuccess(boolean isScanning, long count) {
+                    if (bind == null) return;
                     findPreference("scan_library").setSummary(getString(R.string.settings_scan_progress, count));
-                    if (isScanning) getScanStatus();
+                    if (isScanning) scanPoll.postDelayed(SettingsFragment.this::getScanStatus, SCAN_POLL_MS);
                 }
             });
 
@@ -577,17 +583,24 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         });
     }
 
+    /*
+     * Polled with a pause between answers: it used to ask again the moment an
+     * answer came, and asked with startScan, so a scan that ended was started
+     * over and the server was never left alone.
+     */
     private void getScanStatus() {
         settingViewModel.getScanStatus(new ScanCallback() {
             @Override
             public void onError(Exception exception) {
+                if (bind == null) return;
                 findPreference("scan_library").setSummary(exception.getMessage());
             }
 
             @Override
             public void onSuccess(boolean isScanning, long count) {
+                if (bind == null) return;
                 findPreference("scan_library").setSummary(getString(R.string.settings_scan_progress, count));
-                if (isScanning) getScanStatus();
+                if (isScanning) scanPoll.postDelayed(SettingsFragment.this::getScanStatus, SCAN_POLL_MS);
             }
         });
     }

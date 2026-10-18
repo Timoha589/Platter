@@ -125,10 +125,11 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
     /*
      * The second player a crossfade is made with. It plays what the main one
      * is leaving, so it is built the same - but it takes no audio focus, which
-     * would make the main player give way to it.
+     * would make the main player give way to it, and its sound goes through
+     * the shifter it is lined up with.
      */
-    private fun newHelperPlayer(): ExoPlayer = ExoPlayer.Builder(this)
-            .setRenderersFactory(getRenderersFactory())
+    private fun newHelperPlayer(shifter: SampleShifter): ExoPlayer = ExoPlayer.Builder(this)
+            .setRenderersFactory(DownloadUtil.buildRenderersFactory(this, false, shifter))
             .setMediaSourceFactory(getMediaSourceFactory())
             .setAudioAttributes(AudioAttributes.DEFAULT, false)
             .build()
@@ -280,7 +281,8 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
                 if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                     MediaManager.reportPlayback(
                             newPosition.mediaItem,
-                            if (player.isPlaying) PlaybackState.PLAYING else PlaybackState.PAUSED,
+                            // Not isPlaying: a seek leaves the player buffering, so that read false on every seek.
+                            if (player.playWhenReady) PlaybackState.PLAYING else PlaybackState.PAUSED,
                             newPosition.positionMs
                     )
                 }

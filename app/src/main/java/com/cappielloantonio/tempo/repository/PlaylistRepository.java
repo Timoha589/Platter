@@ -1,6 +1,7 @@
 package com.cappielloantonio.tempo.repository;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -123,14 +124,44 @@ public class PlaylistRepository {
                 });
     }
 
-    public void updatePlaylist(String playlistId, String name, ArrayList<String> songsId) {
+    /*
+     * Saves an edited playlist in place: createPlaylist with the playlist's id
+     * replaces its tracks and keeps everything else - id, cover, who can see
+     * it - and the name follows once that is done, so the two cannot land the
+     * wrong way round. It used to delete the playlist and create a new one,
+     * which lost all that, and every track too when they had not loaded yet.
+     * With [songsId] null (the tracks never loaded) only the name is changed.
+     */
+    public void updatePlaylist(String playlistId, String name, @Nullable ArrayList<String> songsId) {
+        if (songsId == null) {
+            rename(playlistId, name);
+            return;
+        }
+
         App.getSubsonicClientInstance(false)
                 .getPlaylistClient()
-                .deletePlaylist(playlistId)
+                .createPlaylist(playlistId, null, songsId)
                 .enqueue(new Callback<ApiResponse>() {
                     @Override
                     public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
-                        createPlaylist(null, name, songsId);
+                        rename(playlistId, name);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
+
+                    }
+                });
+    }
+
+    private void rename(String playlistId, String name) {
+        App.getSubsonicClientInstance(false)
+                .getPlaylistClient()
+                .updatePlaylist(playlistId, name, null, null, null)
+                .enqueue(new Callback<ApiResponse>() {
+                    @Override
+                    public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
+
                     }
 
                     @Override

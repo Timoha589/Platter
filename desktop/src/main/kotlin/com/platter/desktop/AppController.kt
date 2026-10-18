@@ -792,6 +792,17 @@ class AppController(
         store.update { this.volume = volume }
     }
 
+    /** Mutes, or gives back the level it was muted from - not a full 100, which jumped a quiet room to loud. */
+    fun toggleMute() {
+        val now = player.state.value.volume
+        if (now == 0) {
+            setVolume(store.load().unmutedVolume.takeIf { it > 0 } ?: 100)
+        } else {
+            store.update { unmutedVolume = now }
+            setVolume(0)
+        }
+    }
+
     // --- likes and ratings ------------------------------------------------------
 
     fun isLiked(id: String?, starred: String?): Boolean = id?.let { likes[id] } ?: (starred != null)
@@ -1334,7 +1345,7 @@ class AppController(
     private fun keepQueue() {
         val key = serverKey() ?: return
         val s = player.state.value
-        runCatching { savedQueue.write(key, s.queue, s.positionMs) }
+        runCatching { savedQueue.write(key, s.queue, s.positionMs, waveState.memory()) }
     }
 
     private suspend fun saveQueueNow() {
@@ -1943,7 +1954,12 @@ class AppController(
         if (client != null) {
             pendingPlays = serverKey()?.let { pending.count(it) } ?: 0
             // With the queue kept on the server, that one is the truth (another device may have moved it on): it is offered below.
-            if (!syncQueue) serverKey()?.let { key -> savedQueue.read(key)?.let { player.restore(it.queue, it.positionMs) } }
+            if (!syncQueue) serverKey()?.let { key ->
+                savedQueue.read(key)?.let {
+                    it.wave?.let(waveState::restore)
+                    player.restore(it.queue, it.positionMs)
+                }
+            }
             afterSignIn()
         }
         startBackgroundWork()

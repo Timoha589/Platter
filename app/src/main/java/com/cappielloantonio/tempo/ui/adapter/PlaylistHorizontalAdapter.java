@@ -47,6 +47,7 @@ public class PlaylistHorizontalAdapter extends RecyclerView.Adapter<PlaylistHori
 
             FilterResults results = new FilterResults();
             results.values = filteredList;
+            results.count = filteredList.size();
 
             return results;
         }
@@ -96,7 +97,8 @@ public class PlaylistHorizontalAdapter extends RecyclerView.Adapter<PlaylistHori
     }
 
     public void setItems(List<Playlist> playlists) {
-        this.playlists = playlists;
+        // A copy: the filter empties and refills this list, and it must not be the one the view model holds.
+        this.playlists = new ArrayList<>(playlists);
         this.playlistsFull = new ArrayList<>(playlists);
         notifyDataSetChanged();
     }

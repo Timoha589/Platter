@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.MouseButton
@@ -543,6 +544,15 @@ class InteractionTest {
             assertTrue(app.equalizer.gains().all { it == 0f })
             assertTrue(app.equalizer.enabled, "reset levels the bands, it does not switch the equalizer off")
 
+            // One band and then another: the second keeps the first where it was put.
+            onNodeWithTag("eq-band-0", useUnmergedTree = true).performMouseInput { click(Offset(width / 2f, 0f)) }
+            step()
+            onNodeWithTag("eq-band-1", useUnmergedTree = true).performMouseInput { click(Offset(width / 2f, height - 1f)) }
+            step()
+            assertEquals(com.platter.desktop.player.EqSettings.RANGE_DB, app.equalizer.gains()[0], "the first band stays up")
+            assertEquals(-com.platter.desktop.player.EqSettings.RANGE_DB, app.equalizer.gains()[1])
+            assertTrue(app.equalizer.gains().drop(2).all { it == 0f }, "the rest stay level")
+
             onNode(isToggleable()).performClick()
             step()
             assertFalse(app.equalizer.enabled)
@@ -645,10 +655,16 @@ class InteractionTest {
             assertTrue(dragged > 0, "dragged up: $dragged")
             assertEquals(dragged, store.load().wordsHeight, "the height is saved when the drag ends")
 
+            // A second drag goes on from there, not from where the handle first appeared.
+            onNodeWithTag("resize-words").performMouseInput { moveTo(center); press(); moveBy(Offset(0f, -20f)); release() }
+            step()
+            assertTrue(app.wordsHeight > dragged, "a second drag adds to the first: ${app.wordsHeight} after $dragged")
+            val twice = app.wordsHeight
+
             // Far past the limit, it stops short of squeezing the cover away.
             onNodeWithTag("resize-words").performMouseInput { moveTo(center); press(); moveBy(Offset(0f, -2000f)); release() }
             step()
-            assertTrue(app.wordsHeight > dragged && app.wordsHeight < 1200, "stopped at the limit: ${app.wordsHeight}")
+            assertTrue(app.wordsHeight > twice && app.wordsHeight < 1200, "stopped at the limit: ${app.wordsHeight}")
 
             // Dragged down it goes the other way: shorter words, a larger cover, down to the few lines the words keep.
             onNodeWithTag("resize-words").performMouseInput { moveTo(center); press(); moveBy(Offset(0f, 2000f)); release() }

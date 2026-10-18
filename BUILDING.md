@@ -107,6 +107,31 @@ gh release create v1.0.1 app/build/outputs/apk/platter/release/app-platter-relea
 ```
 
 The release must be public, not a draft or pre-release, and the asset name must end in `.apk`.
+
+### What changed: the release notes
+
+The release's description is what both apps show under "Что изменилось" when they offer the update. Write it as a
+Markdown list, one change per line:
+
+```
+- Добавлен кроссфейд между треками
+- Исправлен поиск по исполнителям
+- Пароль сервера больше не стирается при редактировании
+```
+
+Each `- ` line (or `* `, `1. `) becomes an item with a bullet. A `### Телефон` line becomes a heading, for a release that
+groups its changes; a line with no marker shows as plain text. Bold, `code` and links show as plain words. A
+"What's Changed"/"Что изменилось" heading of your own is left out (the dialog has its own), and so is GitHub's
+"Full Changelog" line. Both apps read the notes in `update/ReleaseNotes.kt`.
+
+Easiest is to keep the notes in a file and pass it, so the line breaks survive the shell:
+
+```
+gh release create v1.0.3 app/build/outputs/apk/platter/release/app-platter-release.apk --repo Timoha589/Platter --title "Platter 1.0.3" --notes-file notes.md
+```
+
+The notes of a published release can be changed later with `gh release edit v1.0.3 --repo Timoha589/Platter
+--notes-file notes.md`; the apps read them again on their next check.
 The first install of a build must be done by hand (adb or file); only updates are automatic.
 On a phone with Google Play Protect the install can be stopped with "App blocked": More details >
 Install anyway.

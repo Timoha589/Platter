@@ -36,6 +36,8 @@ public class ArtistHorizontalAdapter extends RecyclerView.Adapter<ArtistHorizont
             List<ArtistID3> filteredList = new ArrayList<>();
 
             if (constraint == null || constraint.length() == 0) {
+                // Cleared, so a list arriving later is not narrowed by what was typed before.
+                currentFilter = "";
                 filteredList.addAll(artistsFull);
             } else {
                 String filterPattern = constraint.toString().toLowerCase().trim();
