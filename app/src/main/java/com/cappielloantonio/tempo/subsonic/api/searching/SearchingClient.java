@@ -28,4 +28,10 @@ public class SearchingClient {
         Log.d(TAG, "search3()");
         return searchingService.search3(subsonic.getParams(), query, songCount, albumCount, artistCount);
     }
+
+    /** Songs only, a page at a time: an artist's name can match more songs than one answer holds. */
+    public Call<ApiResponse> searchSongs(String query, int songCount, int songOffset) {
+        Log.d(TAG, "searchSongs()");
+        return searchingService.search3(subsonic.getParams(), query, songCount, songOffset, 0, 0);
+    }
 }

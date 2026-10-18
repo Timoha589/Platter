@@ -189,6 +189,10 @@ class SubsonicClient(val credentials: Credentials, http: OkHttpClient = defaultH
     suspend fun search(query: String, songs: Int = 20, albums: Int = 20, artists: Int = 20): SearchResult =
         call { it.search3(params, query, songs, albums, artists) }.searchResult3 ?: SearchResult()
 
+    /** Songs matching [query], from [offset] on: a name can match more songs than one answer holds. */
+    suspend fun searchSongs(query: String, count: Int, offset: Int): List<Song> =
+        call { it.searchSongs(params, query, count, offset, 0, 0) }.searchResult3?.songs.orEmpty()
+
     suspend fun playlists(): List<Playlist> = call { it.getPlaylists(params) }.playlists?.playlists.orEmpty()
 
     suspend fun playlist(id: String): Playlist =

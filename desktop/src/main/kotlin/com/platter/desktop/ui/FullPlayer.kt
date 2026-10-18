@@ -428,7 +428,8 @@ private fun Titles(app: AppController, song: Song?, forward: Boolean, align: Ali
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.clip(PlatterShapes.Small).clickable(enabled = shown.artistId != null) {
-                        shown.artistId?.let { app.fullPlayer = false; app.navigate(Screen.Artist(it)) }
+                        // A joint credit offers its artists one by one; the player stays up under the choice.
+                        app.openArtist(shown.artistLine(), shown.artistId) { app.fullPlayer = false }
                     },
                 )
             }

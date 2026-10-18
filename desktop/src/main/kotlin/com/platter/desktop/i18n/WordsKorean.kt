@@ -422,4 +422,6 @@ internal val KOREAN: Map<String, String> = mapOf(
     "Check for updates" to "업데이트 확인",
     "The download is incomplete" to "다운로드가 완전하지 않습니다",
     "The download does not match its checksum" to "다운로드한 파일이 체크섬과 일치하지 않습니다",
+    "Only in collaborations" to "협업 곡에만 참여",
+    "Collaborations" to "협업",
 )

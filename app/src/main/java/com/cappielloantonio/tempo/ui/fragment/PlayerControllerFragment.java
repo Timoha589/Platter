@@ -49,6 +49,7 @@ import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
+import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.ArtistPickerBottomSheetDialog;
 import com.cappielloantonio.tempo.ui.dialog.PlaylistChooserDialog;
 import com.cappielloantonio.tempo.ui.dialog.RatingDialog;
 import com.cappielloantonio.tempo.ui.dialog.TrackInfoDialog;
@@ -778,14 +779,12 @@ public class PlayerControllerFragment extends Fragment {
     }
 
     private void initArtistLabelButton() {
+        // A joint credit offers its artists one by one: the joint one the server keeps has no page worth opening.
         playerArtistNameLabel.setOnClickListener(view -> {
             ArtistID3 artist = playerBottomSheetViewModel.getLiveArtist().getValue();
             if (artist == null) return;
 
-            Bundle bundle = new Bundle();
-            bundle.putParcelable(Constants.ARTIST_OBJECT, artist);
-            NavHostFragment.findNavController(this).navigate(R.id.artistPageFragment, bundle);
-            activity.collapseBottomSheetDelayed();
+            ArtistPickerBottomSheetDialog.openCredit(this, playerArtistNameLabel.getText().toString(), artist, null);
         });
     }
 

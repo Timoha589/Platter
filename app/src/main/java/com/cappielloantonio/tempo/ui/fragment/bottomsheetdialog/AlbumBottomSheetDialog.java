@@ -29,6 +29,8 @@ import com.cappielloantonio.tempo.repository.AlbumRepository;
 import com.cappielloantonio.tempo.service.MediaManager;
 import com.cappielloantonio.tempo.service.MediaService;
 import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
+import com.cappielloantonio.tempo.helper.ArtistCredit;
+import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
 import com.cappielloantonio.tempo.util.Constants;
@@ -186,17 +188,20 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
         initDownloadUI(removeAll);
 
         TextView goToArtist = view.findViewById(R.id.go_to_artist_text_view);
-        goToArtist.setOnClickListener(v -> albumBottomSheetViewModel.getArtist().observe(getViewLifecycleOwner(), artist -> {
-            if (artist != null) {
-                Bundle bundle = new Bundle();
-                bundle.putParcelable(Constants.ARTIST_OBJECT, artist);
-                NavHostFragment.findNavController(this).navigate(R.id.artistPageFragment, bundle);
-            } else {
+        // The page needs only the id and the name, which the album carries; a joint credit offers its artists instead.
+        goToArtist.setOnClickListener(v -> {
+            ArtistID3 artist = null;
+            if (album.getArtistId() != null) {
+                artist = new ArtistID3();
+                artist.setId(album.getArtistId());
+                artist.setName(album.getArtist());
+            } else if (ArtistCredit.split(album.artistLine()).size() < 2) {
                 Toast.makeText(requireContext(), getString(R.string.album_error_retrieving_artist), Toast.LENGTH_SHORT).show();
+                dismissBottomSheet();
+                return;
             }
-
-            dismissBottomSheet();
-        }));
+            ArtistPickerBottomSheetDialog.openCredit(this, album.artistLine(), artist, this::leaveForArtist);
+        });
 
         TextView share = view.findViewById(R.id.share_text_view);
         share.setOnClickListener(v -> albumBottomSheetViewModel.shareAlbum().observe(getViewLifecycleOwner(), sharedAlbum -> {
@@ -218,6 +223,15 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
     @Override
     public void onClick(View v) {
         dismissBottomSheet();
+    }
+
+    /*
+     * Taken off the back stack before the next page goes on it. A dismiss() that
+     * finishes after that navigation finds the sheet no longer on top, and the
+     * navigator then pops everything above it - the page just opened included.
+     */
+    private void leaveForArtist() {
+        NavHostFragment.findNavController(this).popBackStack();
     }
 
     private void dismissBottomSheet() {

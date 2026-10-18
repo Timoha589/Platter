@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.platter.desktop.api.Album
 import com.platter.desktop.api.Artist
+import com.platter.desktop.api.ArtistCredit
 import com.platter.desktop.api.Playlist
 import com.platter.desktop.api.PodcastChannel
 import com.platter.desktop.api.PodcastEpisode
@@ -70,6 +71,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import java.awt.Toolkit
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.nio.file.Files
 import java.nio.file.Path
 import java.awt.datatransfer.StringSelection
@@ -85,6 +88,9 @@ sealed interface Screen {
     data object LikedArtists : Screen
     data class Album(val id: String) : Screen
     data class Artist(val id: String) : Screen
+
+    /** An artist the server has no page for, known only from joint credits: a page of its collaborations. */
+    data class Collaborator(val name: String) : Screen
     data class Playlist(val id: String) : Screen
     data class Genre(val name: String) : Screen
     data class Podcast(val id: String) : Screen
@@ -112,6 +118,7 @@ internal fun Screen.toSaved(): SavedScreen = when (this) {
     Screen.Downloads -> SavedScreen("downloads")
     is Screen.Album -> SavedScreen("album", id = id)
     is Screen.Artist -> SavedScreen("artist", id = id)
+    is Screen.Collaborator -> SavedScreen("collaborator", title = name)
     is Screen.Playlist -> SavedScreen("playlist", id = id)
     is Screen.Genre -> SavedScreen("genre", title = name)
     is Screen.Podcast -> SavedScreen("podcast", id = id)
@@ -130,6 +137,7 @@ internal fun SavedScreen.toScreen(): Screen? = when (kind) {
     "downloads" -> Screen.Downloads
     "album" -> id?.let { Screen.Album(it) }
     "artist" -> id?.let { Screen.Artist(it) }
+    "collaborator" -> title?.let { Screen.Collaborator(it) }
     "playlist" -> id?.let { Screen.Playlist(it) }
     "genre" -> title?.let { Screen.Genre(it) }
     "podcast" -> id?.let { Screen.Podcast(it) }
@@ -157,6 +165,9 @@ sealed interface AppDialog {
     data class RenamePlaylist(val playlist: Playlist) : AppDialog
     data class DeletePlaylist(val playlist: Playlist) : AppDialog
     data class TrackInfo(val song: Song) : AppDialog
+
+    /** The artists of a joint credit, to go to one of them. */
+    data class PickArtist(val artists: List<Artist>) : AppDialog
     data object ArrangeHome : AppDialog
     data object AddPodcast : AppDialog
     data object DeleteAllDownloads : AppDialog
@@ -923,6 +934,7 @@ class AppController(
     }
 
     private fun resetLibraryCaches() {
+        resolvedCredits.clear()
         catalogueJob?.cancel()
         catalogueJob = null
         engine = null
@@ -991,6 +1003,80 @@ class AppController(
     fun forgetSearch(query: String) {
         recentSearches = recentSearches - query
         store.update { recentSearches = this@AppController.recentSearches }
+    }
+
+    // --- joint credits -------------------------------------------------------------
+
+    /* What each credit resolved to, per sign-in: it changes only with a rescan. Empty means "one artist". */
+    private val resolvedCredits = ConcurrentHashMap<String, List<Artist>>()
+
+    /**
+     * Goes to the artist behind [credit]: the page of [id] when the credit names one artist, a choice of them when it
+     * names several - the joint artist the server keeps for them has nothing on its page. [leaving] runs as the page
+     * opens, to put the full player away; not when the choice is offered, so that closing it leaves things as they were.
+     */
+    fun openArtist(credit: String?, id: String?, leaving: () -> Unit = {}) {
+        scope.launch {
+            val artists = resolveCredit(credit)
+            when {
+                artists != null -> dialog = AppDialog.PickArtist(artists)
+                id != null -> {
+                    leaving()
+                    navigate(Screen.Artist(id))
+                }
+            }
+        }
+    }
+
+    /** One artist of a joint credit, picked: its page, or a page of its collaborations where the server has none. */
+    fun openPickedArtist(artist: Artist) {
+        dialog = null
+        fullPlayer = false
+        val id = artist.id
+        navigate(if (id != null) Screen.Artist(id) else Screen.Collaborator(artist.name.orEmpty()))
+    }
+
+    /** The artists in a joint credit (see [ArtistCredit.resolve]), or null when it names one. A failed search counts as unknown. */
+    internal suspend fun resolveCredit(credit: String?): List<Artist>? {
+        val parts = ArtistCredit.split(credit)
+        if (parts.size < 2) return null
+        val c = client ?: return null
+        val key = credit.orEmpty().trim().lowercase()
+        resolvedCredits[key]?.let { return it.ifEmpty { null } }
+
+        val failed = AtomicBoolean(false)
+        val found = coroutineScope {
+            parts.map { part ->
+                async {
+                    try {
+                        c.search(part, songs = 0, albums = 0, artists = CREDIT_SEARCH_ARTISTS).artists
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failed.set(true)
+                        null
+                    }
+                }
+            }.awaitAll()
+        }
+        val artists = ArtistCredit.resolve(credit, found)
+        if (!failed.get()) resolvedCredits[key] = artists.orEmpty()
+        return artists
+    }
+
+    /**
+     * The songs [name] shares a credit on, newest first. The server files a joint credit as an artist of its own, so
+     * these are on no page of the people in it; a search for the name finds them among everything else that mentions it.
+     */
+    suspend fun collaborations(name: String): List<Song> {
+        val c = client ?: return emptyList()
+        val found = mutableListOf<Song>()
+        for (page in 0 until COLLABORATION_PAGES) {
+            val songs = c.searchSongs(name, COLLABORATION_PAGE, page * COLLABORATION_PAGE)
+            found += songs
+            if (songs.size < COLLABORATION_PAGE) break
+        }
+        return ArtistCredit.collaborations(found, name)
     }
 
     // --- radio, queue and sharing ------------------------------------------------
@@ -1985,6 +2071,11 @@ class AppController(
         private const val SHUFFLE_ALL = 100
         private const val DISCOGRAPHY_ALBUMS = 30
         private const val LIBRARY_SONGS_PER_ARTIST = 500
+
+        /** Enough artists per part of a credit to see the part on its own or inside other credits. */
+        private const val CREDIT_SEARCH_ARTISTS = 40
+        private const val COLLABORATION_PAGE = 500
+        private const val COLLABORATION_PAGES = 4
 
         /** Wanted order first; anything newer than what was saved is added at its default place, never lost. */
         fun resolveHomeOrder(saved: List<String>): List<HomeSection> {

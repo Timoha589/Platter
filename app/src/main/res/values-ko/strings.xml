@@ -343,4 +343,8 @@
     <string name="track_info_transcoded_content_type">트랜스코딩된 콘텐츠 유형</string>
     <string name="track_info_transcoded_suffix">트랜스코딩된 접미사</string>
     <string name="track_info_year">년도</string>
+    <string name="artist_picker_title">아티스트</string>
+    <string name="artist_picker_collaborations_only">협업 곡에만 참여</string>
+    <string name="artist_page_title_collaborations_section">협업</string>
+    <string name="song_list_page_collaborations">협업: %1$s</string>
 </resources>

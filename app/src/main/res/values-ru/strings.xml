@@ -606,4 +606,8 @@
     <string name="settings_update_current">Platter %1$s — последняя версия</string>
     <string name="settings_update_available">Доступна версия %1$s</string>
     <string name="settings_update_error">Не удалось проверить: %1$s</string>
+    <string name="artist_picker_title">Исполнители</string>
+    <string name="artist_picker_collaborations_only">Только в коллаборациях</string>
+    <string name="artist_page_title_collaborations_section">Коллаборации</string>
+    <string name="song_list_page_collaborations">Коллаборации: %1$s</string>
 </resources>

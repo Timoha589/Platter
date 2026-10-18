@@ -15,4 +15,7 @@ public interface SearchingService {
 
     @GET("search3")
     Call<ApiResponse> search3(@QueryMap Map<String, String> params, @Query("query") String query, @Query("songCount") int songCount, @Query("albumCount") int albumCount, @Query("artistCount") int artistCount);
+
+    @GET("search3")
+    Call<ApiResponse> search3(@QueryMap Map<String, String> params, @Query("query") String query, @Query("songCount") int songCount, @Query("songOffset") int songOffset, @Query("albumCount") int albumCount, @Query("artistCount") int artistCount);
 }

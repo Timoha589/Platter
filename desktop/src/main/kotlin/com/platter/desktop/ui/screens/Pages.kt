@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -42,6 +44,7 @@ import com.platter.desktop.AppController
 import com.platter.desktop.AppDialog
 import com.platter.desktop.Screen
 import com.platter.desktop.api.Album
+import com.platter.desktop.api.ArtistCredit
 import com.platter.desktop.api.Song
 import com.platter.desktop.ui.AlbumCard
 import com.platter.desktop.ui.ArtistCard
@@ -125,11 +128,12 @@ fun AlbumPage(app: AppController, id: String) {
                     app, album.coverArtId, t("Album"), album.name.orEmpty(),
                     subtitle = {
                         val artistId = album.artistId
+                        val credit = album.artistLine()
                         Row {
                             Text(
-                                album.artistLine().orEmpty(),
+                                credit.orEmpty(),
                                 style = MaterialTheme.typography.titleSmall,
-                                modifier = if (artistId != null) Modifier.clickable { app.navigate(Screen.Artist(artistId)) } else Modifier,
+                                modifier = if (artistId != null || ArtistCredit.split(credit).size > 1) Modifier.clickable { app.openArtist(credit, artistId) } else Modifier,
                             )
                             Text(
                                 listOfNotNull(
@@ -181,7 +185,11 @@ fun ArtistPage(app: AppController, id: String) {
                 ArtistExtras(top.await(), cleanBiography(infoValue?.biography), infoValue?.lastFmUrl, infoValue?.similarArtists.orEmpty())
             }
         }.state.let { (it as? Load.Ready)?.value }
+        // Songs made with others: the server files them under a joint artist of their own, so the albums miss them.
+        val collaborations = rememberLoader(client to "collaborations:$id") { app.collaborations(artist.name.orEmpty()) }
+            .state.let { (it as? Load.Ready)?.value }.orEmpty()
         var showAllTop by remember(id) { mutableStateOf(false) }
+        var showAllCollaborations by remember(id) { mutableStateOf(false) }
         var bioOpen by remember(id) { mutableStateOf(false) }
 
         LazyVerticalGrid(
@@ -229,6 +237,8 @@ fun ArtistPage(app: AppController, id: String) {
             item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(t("Albums"), Modifier.padding(horizontal = PlatterSpacing.Gutter)) }
             cards(albums) { AlbumCard(app, it) }
 
+            collaborationItems(app, collaborations, player.current?.id, showAllCollaborations) { showAllCollaborations = !showAllCollaborations }
+
             val similar = extras?.similar.orEmpty()
             if (similar.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Rail(t("Fans also like"), similar) { ArtistCard(app, it) } }
@@ -260,6 +270,70 @@ fun ArtistPage(app: AppController, id: String) {
 }
 
 private const val TOP_AT_FIRST = 5
+private const val COLLABORATIONS_AT_FIRST = 5
+
+/** The songs an artist shares a credit on, a row each so the grid builds only the ones in view. Each reads who with. */
+private fun LazyGridScope.collaborationItems(app: AppController, songs: List<Song>, currentId: String?, showAll: Boolean, toggle: () -> Unit) {
+    if (songs.isEmpty()) return
+    val more = songs.size > COLLABORATIONS_AT_FIRST
+    item(span = { GridItemSpan(maxLineSpan) }) {
+        SectionHeader(
+            t("Collaborations"),
+            Modifier.padding(horizontal = PlatterSpacing.Gutter),
+            onSeeAll = if (more) toggle else null,
+            actionLabel = if (showAll) t("Show fewer") else t("Show all"),
+        )
+    }
+    val shown = if (showAll) songs else songs.take(COLLABORATIONS_AT_FIRST)
+    gridItemsIndexed(shown, span = { _, _ -> GridItemSpan(maxLineSpan) }) { i, song ->
+        Column(Modifier.padding(horizontal = 12.dp)) {
+            TrackRow(app, song, "${i + 1}", isCurrent = song.id != null && song.id == currentId, onPlay = { app.player.play(songs, i) }, coverArtId = song.coverArtId)
+        }
+    }
+}
+
+/**
+ * An artist the server has no page for: a name that only ever appears in joint credits, picked out of one. All there
+ * is of them is what they made with others.
+ */
+@Composable
+fun CollaboratorPage(app: AppController, name: String) {
+    val client = app.client ?: return
+    val loader = rememberLoader(client to "collaborator:$name") { app.collaborations(name) }
+    val player by app.player.state.collectAsState()
+
+    LoadView(loader) { songs ->
+        LazyColumn(Modifier.fillMaxSize(), state = rememberPageListState()) {
+            item {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.Bottom) {
+                        Cover(app, songs.firstOrNull()?.coverArtId, 192.dp, CircleShape)
+                        Spacer(Modifier.width(24.dp))
+                        Column {
+                            Text(t("Artist"), style = MaterialTheme.typography.labelMedium)
+                            Text(name, style = MaterialTheme.typography.headlineMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 8.dp))
+                            Text(tn(songs.size, "%d song", "%d songs"), style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Mist)
+                        }
+                    }
+                    Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        PlayCircle { app.player.play(songs) }
+                        OutlinedPill(t("Shuffle")) { app.player.play(songs.shuffled()) }
+                    }
+                    SectionHeader(t("Collaborations"), Modifier.padding(horizontal = PlatterSpacing.Gutter))
+                }
+            }
+            if (songs.isEmpty()) {
+                item { Text(t("No songs found for %s", name), style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Mist, modifier = Modifier.padding(horizontal = PlatterSpacing.Gutter)) }
+            }
+            itemsIndexed(songs) { i, song ->
+                Column(Modifier.padding(horizontal = 12.dp)) {
+                    TrackRow(app, song, "${i + 1}", isCurrent = song.id != null && song.id == player.current?.id, onPlay = { app.player.play(songs, i) }, coverArtId = song.coverArtId)
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
 
 /** Last.fm's biography comes with HTML in it, and ends with a "Read more" link of its own. */
 internal fun cleanBiography(raw: String?): String? {

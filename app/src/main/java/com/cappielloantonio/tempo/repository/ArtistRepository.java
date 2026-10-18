@@ -1,9 +1,11 @@
 package com.cappielloantonio.tempo.repository;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.MutableLiveData;
 
 import com.cappielloantonio.tempo.App;
+import com.cappielloantonio.tempo.helper.ArtistCredit;
 import com.cappielloantonio.tempo.subsonic.base.ApiResponse;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.ArtistInfo2;
@@ -14,7 +16,10 @@ import com.cappielloantonio.tempo.subsonic.utils.ResponseUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -247,5 +252,129 @@ public class ArtistRepository {
                 });
 
         return topSongs;
+    }
+
+    /** Songs per search for an artist's collaborations, and how many pages of them at most. */
+    private static final int COLLABORATION_PAGE = 500;
+    private static final int COLLABORATION_PAGES = 4;
+
+    /** Enough artists per part of a credit to see the part on its own or inside other credits. */
+    private static final int CREDIT_SEARCH_ARTISTS = 40;
+
+    /* A credit is asked about once per run: what it resolves to changes only with a rescan. */
+    private static final Map<String, List<ArtistID3>> resolvedCredits = Collections.synchronizedMap(new HashMap<>());
+
+    public interface CreditCallback {
+        /** The artists in the credit, or null when it names just one. */
+        void onResolved(@Nullable List<ArtistID3> artists);
+    }
+
+    /**
+     * The artists in a joint credit, worked out by searching for each of its
+     * names - see {@link ArtistCredit#resolve}. Answers on the main thread,
+     * once; a part whose search failed counts as unknown, so with no network
+     * the credit opens as the one artist it was before.
+     */
+    public void resolveCredit(@Nullable String credit, @NonNull CreditCallback callback) {
+        List<String> parts = ArtistCredit.split(credit);
+        if (parts.size() < 2) {
+            callback.onResolved(null);
+            return;
+        }
+
+        String key = credit.trim().toLowerCase(Locale.ROOT);
+        if (resolvedCredits.containsKey(key)) {
+            callback.onResolved(resolvedCredits.get(key));
+            return;
+        }
+
+        List<List<ArtistID3>> found = new ArrayList<>(Collections.nCopies(parts.size(), null));
+        int[] left = {parts.size()};
+        boolean[] failed = {false};
+
+        for (int i = 0; i < parts.size(); i++) {
+            int index = i;
+            App.getSubsonicClientInstance(false)
+                    .getSearchingClient()
+                    .search3(parts.get(i), 0, 0, CREDIT_SEARCH_ARTISTS)
+                    .enqueue(new Callback<ApiResponse>() {
+                        @Override
+                        public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
+                            SubsonicResponse body = ResponseUtil.body(response);
+                            if (body == null) failed[0] = true;
+                            else if (body.getSearchResult3() != null) found.set(index, body.getSearchResult3().getArtists());
+                            finish();
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
+                            failed[0] = true;
+                            finish();
+                        }
+
+                        private void finish() {
+                            if (--left[0] > 0) return;
+                            List<ArtistID3> artists = ArtistCredit.resolve(credit, found);
+                            if (!failed[0]) resolvedCredits.put(key, artists);
+                            callback.onResolved(artists);
+                        }
+                    });
+        }
+    }
+
+    /**
+     * The songs {@code name} shares a credit on, newest first. No value until the
+     * answer, null on a failure, a list (maybe empty) otherwise.
+     * <p>
+     * The server files a joint credit as an artist of its own, so these are on
+     * no page of the people in it. A search for the name finds them, along
+     * with everything else that mentions it; the credit decides which are
+     * collaborations.
+     */
+    public MutableLiveData<List<Child>> getCollaborations(@Nullable String name) {
+        MutableLiveData<List<Child>> collaborations = new MutableLiveData<>();
+
+        if (name == null || name.trim().isEmpty()) {
+            collaborations.setValue(new ArrayList<>());
+        } else {
+            loadCollaborations(name.trim(), 0, new ArrayList<>(), collaborations);
+        }
+
+        return collaborations;
+    }
+
+    private void loadCollaborations(String name, int page, List<Child> found, MutableLiveData<List<Child>> result) {
+        App.getSubsonicClientInstance(false)
+                .getSearchingClient()
+                .searchSongs(name, COLLABORATION_PAGE, page * COLLABORATION_PAGE)
+                .enqueue(new Callback<ApiResponse>() {
+                    @Override
+                    public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
+                        SubsonicResponse body = ResponseUtil.body(response);
+                        if (body == null) {
+                            done(false);
+                            return;
+                        }
+
+                        List<Child> songs = body.getSearchResult3() != null ? body.getSearchResult3().getSongs() : null;
+                        if (songs != null) found.addAll(songs);
+
+                        if (songs != null && songs.size() >= COLLABORATION_PAGE && page + 1 < COLLABORATION_PAGES) {
+                            loadCollaborations(name, page + 1, found, result);
+                        } else {
+                            done(true);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
+                        done(false);
+                    }
+
+                    // A later page failing still leaves the earlier ones worth showing.
+                    private void done(boolean ok) {
+                        result.setValue(ok || page > 0 ? ArtistCredit.collaborations(found, name) : null);
+                    }
+                });
     }
 }

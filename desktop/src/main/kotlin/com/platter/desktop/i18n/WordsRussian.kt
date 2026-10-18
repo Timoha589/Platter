@@ -422,4 +422,6 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "Check for updates" to "Проверить обновления",
     "The download is incomplete" to "Загрузка не завершена",
     "The download does not match its checksum" to "Загруженный файл не совпал с контрольной суммой",
+    "Only in collaborations" to "Только в коллаборациях",
+    "Collaborations" to "Коллаборации",
 )

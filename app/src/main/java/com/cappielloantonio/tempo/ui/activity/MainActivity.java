@@ -318,6 +318,10 @@ public class MainActivity extends BaseActivity {
         WindowCompat.getInsetsController(getWindow(), decorView).hide(WindowInsetsCompat.Type.ime());
     }
 
+    public boolean isBottomSheetExpanded() {
+        return bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED;
+    }
+
     public boolean isBottomSheetCollapsed() {
         return bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_COLLAPSED;
     }

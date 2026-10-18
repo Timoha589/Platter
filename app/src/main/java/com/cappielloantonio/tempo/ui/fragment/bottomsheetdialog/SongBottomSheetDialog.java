@@ -25,6 +25,7 @@ import com.cappielloantonio.tempo.glide.CustomGlideRequest;
 import com.cappielloantonio.tempo.model.Download;
 import com.cappielloantonio.tempo.service.MediaManager;
 import com.cappielloantonio.tempo.service.MediaService;
+import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.Playlist;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
@@ -229,16 +230,13 @@ public class SongBottomSheetDialog extends BottomSheetDialogFragment implements 
         goToAlbum.setVisibility(songBottomSheetViewModel.getSong().getAlbumId() != null ? View.VISIBLE : View.GONE);
 
         TextView goToArtist = view.findViewById(R.id.go_to_artist_text_view);
-        goToArtist.setOnClickListener(v -> songBottomSheetViewModel.getArtist().observe(getViewLifecycleOwner(), artist -> {
-            if (artist != null) {
-                Bundle bundle = new Bundle();
-                bundle.putParcelable(Constants.ARTIST_OBJECT, artist);
-                NavHostFragment.findNavController(this).navigate(R.id.artistPageFragment, bundle);
-            } else
-                Toast.makeText(requireContext(), getString(R.string.song_bottom_sheet_error_retrieving_artist), Toast.LENGTH_SHORT).show();
-
-            dismissBottomSheet();
-        }));
+        // The page needs only the id and the name, which the song carries; a joint credit offers its artists instead.
+        goToArtist.setOnClickListener(v -> {
+            ArtistID3 artist = new ArtistID3();
+            artist.setId(song.getArtistId());
+            artist.setName(song.getArtist());
+            ArtistPickerBottomSheetDialog.openCredit(this, song.artistLine(), artist, this::leaveForArtist);
+        });
 
         goToArtist.setVisibility(songBottomSheetViewModel.getSong().getArtistId() != null ? View.VISIBLE : View.GONE);
 
@@ -262,6 +260,15 @@ public class SongBottomSheetDialog extends BottomSheetDialogFragment implements 
     @Override
     public void onClick(View v) {
         dismissBottomSheet();
+    }
+
+    /*
+     * Taken off the back stack before the next page goes on it. A dismiss() that
+     * finishes after that navigation finds the sheet no longer on top, and the
+     * navigator then pops everything above it - the page just opened included.
+     */
+    private void leaveForArtist() {
+        NavHostFragment.findNavController(this).popBackStack();
     }
 
     private void dismissBottomSheet() {

@@ -218,6 +218,49 @@
                     app:skeletonItem="@layout/skeleton_item_rail_square" />
             </LinearLayout>
 
+            <!--  Collaborations: songs credited to this artist together with
+                  others. The server files each joint credit as an artist of
+                  its own, so none of these is on the albums above.  -->
+            <LinearLayout
+                android:id="@+id/artist_page_collaborations_sector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/section_bottom"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <LinearLayout style="@style/SectionHeader">
+
+                    <TextView
+                        style="@style/TitleLarge"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/artist_page_title_collaborations_section" />
+
+                    <TextView
+                        android:id="@+id/collaborations_text_view_clickable"
+                        style="@style/SectionAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/artist_page_title_most_streamed_song_see_all_button" />
+                </LinearLayout>
+
+                <com.cappielloantonio.tempo.helper.recyclerview.ContentRecyclerView
+                    android:id="@+id/collaborations_recycler_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false" />
+
+                <com.cappielloantonio.tempo.helper.view.SkeletonView
+                    android:id="@+id/collaborations_skeleton"
+                    style="@style/Widget.Platter.Skeleton.List"
+                    app:skeletonCount="3"
+                    app:skeletonItem="@layout/skeleton_item_row" />
+            </LinearLayout>
+
             <!--  Biography. After the music, as an album's notes are: it is
                   read once, the songs and records above it every visit.  -->
             <LinearLayout

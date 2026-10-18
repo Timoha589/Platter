@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.cappielloantonio.tempo.R;
+import com.cappielloantonio.tempo.helper.ArtistCredit;
 import com.cappielloantonio.tempo.databinding.FragmentAlbumPageBinding;
 import com.cappielloantonio.tempo.glide.CustomGlideRequest;
 import com.cappielloantonio.tempo.helper.view.PageHeaderTitle;
@@ -38,6 +39,7 @@ import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.ItemDate;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
+import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.ArtistPickerBottomSheetDialog;
 import com.cappielloantonio.tempo.ui.adapter.SkeletonAdapter;
 import com.cappielloantonio.tempo.ui.adapter.SongHorizontalAdapter;
 import com.cappielloantonio.tempo.util.Constants;
@@ -211,15 +213,14 @@ public class AlbumPageFragment extends Fragment implements ClickCallback {
         bind.albumArtistLabel.setOnClickListener(v -> {
             AlbumID3 album = albumPageViewModel.getAlbum().getValue();
             ArtistID3 artist = album != null ? albumArtist(album) : null;
+            String credit = album != null ? album.artistLine() : null;
 
-            if (artist == null) {
+            if (artist == null && ArtistCredit.split(credit).size() < 2) {
                 Toast.makeText(requireContext(), getString(R.string.album_error_retrieving_artist), Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            Bundle bundle = new Bundle();
-            bundle.putParcelable(Constants.ARTIST_OBJECT, artist);
-            activity.navController.navigate(R.id.action_albumPageFragment_to_artistPageFragment, bundle);
+            ArtistPickerBottomSheetDialog.openCredit(this, credit, artist, null);
         });
     }
 

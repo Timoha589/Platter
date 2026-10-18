@@ -22,6 +22,14 @@ public class ArtistPageViewModel extends AndroidViewModel {
      */
     public static final int TOP_SONGS_COUNT = 10;
 
+    /**
+     * Collaborations shown on the page; the rest are behind "see all". An
+     * artist the server knows only from joint credits has nothing else on the
+     * page, so it shows more of them.
+     */
+    public static final int COLLABORATIONS_COUNT = 5;
+    public static final int COLLABORATIONS_ONLY_COUNT = 20;
+
     private final AlbumRepository albumRepository;
     private final ArtistRepository artistRepository;
 
@@ -44,6 +52,18 @@ public class ArtistPageViewModel extends AndroidViewModel {
 
     public LiveData<List<Child>> getArtistTopSongList() {
         return artistRepository.getTopSongs(artist.getName(), TOP_SONGS_COUNT);
+    }
+
+    public LiveData<List<Child>> getCollaborations() {
+        return artistRepository.getCollaborations(artist.getName());
+    }
+
+    /**
+     * Whether the artist is one the server has no page for: a name that only
+     * ever appears in joint credits, opened from one of them.
+     */
+    public boolean isCollaborationsOnly() {
+        return artist.getId() == null;
     }
 
     public LiveData<List<Child>> getArtistShuffleList() {

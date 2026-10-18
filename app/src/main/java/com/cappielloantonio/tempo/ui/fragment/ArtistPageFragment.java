@@ -29,6 +29,7 @@ import com.cappielloantonio.tempo.interfaces.ClickCallback;
 import com.cappielloantonio.tempo.service.MediaManager;
 import com.cappielloantonio.tempo.service.MediaService;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
+import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
 import com.cappielloantonio.tempo.ui.adapter.AlbumAdapter;
 import com.cappielloantonio.tempo.ui.adapter.ArtistAdapter;
@@ -50,6 +51,8 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
     private ArtistPageViewModel artistPageViewModel;
 
     private SongHorizontalAdapter songHorizontalAdapter;
+    private SongHorizontalAdapter collaborationsAdapter;
+    private List<Child> collaborations = Collections.emptyList();
     private AlbumAdapter albumAdapter;
     private ArtistAdapter artistAdapter;
 
@@ -71,6 +74,7 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
         initPlayButtons();
         initTopSongsView();
         initAlbumsView();
+        initCollaborationsView();
         initSimilarArtistsView();
 
         return view;
@@ -133,6 +137,9 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
                 .build()
                 .into(bind.artistBackdropImageView);
 
+        // No page on the server, so no portrait and no notes; the cover of a collaboration stands in once they arrive.
+        if (artistPageViewModel.isCollaborationsOnly()) return;
+
         artistPageViewModel.getArtistInfo(artistPageViewModel.getArtist().getId()).observe(getViewLifecycleOwner(), artistInfo -> {
             if (artistInfo == null) {
                 if (bind != null) bind.artistPageBioSector.setVisibility(View.GONE);
@@ -157,6 +164,19 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
     }
 
     private void initPlayButtons() {
+        if (artistPageViewModel.isCollaborationsOnly()) {
+            bind.artistPageShuffleButton.setEnabled(false);
+            bind.artistPageShuffleButton.setOnClickListener(v -> {
+                List<Child> songs = new ArrayList<>(collaborations);
+                Collections.shuffle(songs);
+                MediaManager.startQueue(mediaBrowserListenableFuture, songs, 0);
+                activity.setBottomSheetInPeek(true);
+            });
+            // A radio is seeded by an artist id, which this one has not got.
+            bind.artistPageRadioButton.setVisibility(View.GONE);
+            return;
+        }
+
         bind.artistPageShuffleButton.setOnClickListener(v -> {
             artistPageViewModel.getArtistShuffleList().observe(getViewLifecycleOwner(), songs -> {
                 if (!songs.isEmpty()) {
@@ -194,7 +214,7 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
             SkeletonView.finishLoading(bind.artistPageTopSongsSector, bind.topSongsSkeleton, bind.mostStreamedSongRecyclerView, songs != null && !songs.isEmpty());
 
             if (songs != null) {
-                bind.artistPageShuffleButton.setEnabled(!songs.isEmpty());
+                if (!artistPageViewModel.isCollaborationsOnly()) bind.artistPageShuffleButton.setEnabled(!songs.isEmpty());
                 // Asked of the server as well, but not every server honours the count.
                 songHorizontalAdapter.setItems(songs.size() > ArtistPageViewModel.TOP_SONGS_COUNT
                         ? new ArrayList<>(songs.subList(0, ArtistPageViewModel.TOP_SONGS_COUNT))
@@ -223,6 +243,8 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
      * plain vertical list, which recycles properly.
      */
     private void initAlbumsView() {
+        if (artistPageViewModel.isCollaborationsOnly()) return;
+
         bind.albumsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
         bind.albumsRecyclerView.setHasFixedSize(true);
 
@@ -249,6 +271,8 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
     }
 
     private void initSimilarArtistsView() {
+        if (artistPageViewModel.isCollaborationsOnly()) return;
+
         // Same reason as the album rail above; this one already had the snap
         // helper a rail needs, attached to a grid that could not use it.
         bind.similarArtistsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false));
@@ -272,6 +296,49 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
 
         CustomLinearSnapHelper similarArtistSnapHelper = new CustomLinearSnapHelper();
         similarArtistSnapHelper.attachToRecyclerView(bind.similarArtistsRecyclerView);
+    }
+
+    /*
+     * The songs this artist shares a credit on. Each row reads who with, not
+     * the album: that is what tells the songs apart from the ones above.
+     */
+    private void initCollaborationsView() {
+        bind.collaborationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        collaborationsAdapter = new SongHorizontalAdapter(this, true, false, null);
+        bind.collaborationsRecyclerView.setAdapter(collaborationsAdapter);
+
+        int shown = artistPageViewModel.isCollaborationsOnly()
+                ? ArtistPageViewModel.COLLABORATIONS_ONLY_COUNT
+                : ArtistPageViewModel.COLLABORATIONS_COUNT;
+
+        SkeletonView.startLoading(bind.artistPageCollaborationsSector, bind.collaborationsSkeleton, bind.collaborationsRecyclerView);
+        artistPageViewModel.getCollaborations().observe(getViewLifecycleOwner(), songs -> {
+            if (bind == null) return;
+            SkeletonView.finishLoading(bind.artistPageCollaborationsSector, bind.collaborationsSkeleton, bind.collaborationsRecyclerView, songs != null && !songs.isEmpty());
+            if (songs == null) return;
+
+            collaborations = songs;
+            collaborationsAdapter.setItems(songs.size() > shown ? new ArrayList<>(songs.subList(0, shown)) : songs);
+            bind.collaborationsTextViewClickable.setVisibility(songs.size() > shown ? View.VISIBLE : View.GONE);
+
+            if (artistPageViewModel.isCollaborationsOnly()) {
+                bind.artistPageShuffleButton.setEnabled(!songs.isEmpty());
+                if (!songs.isEmpty()) {
+                    CustomGlideRequest.Builder
+                            .from(requireContext(), songs.get(0).getCoverArtId(), CustomGlideRequest.ResourceType.Song)
+                            .build()
+                            .into(bind.artistBackdropImageView);
+                }
+            }
+        });
+
+        bind.collaborationsTextViewClickable.setOnClickListener(v -> {
+            Bundle bundle = new Bundle();
+            bundle.putString(Constants.MEDIA_COLLABORATIONS, Constants.MEDIA_COLLABORATIONS);
+            bundle.putParcelable(Constants.ARTIST_OBJECT, artistPageViewModel.getArtist());
+            activity.navController.navigate(R.id.action_artistPageFragment_to_songListPageFragment, bundle);
+        });
     }
 
     private void initializeMediaBrowser() {

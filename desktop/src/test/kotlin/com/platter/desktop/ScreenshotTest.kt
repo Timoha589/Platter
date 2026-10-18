@@ -147,6 +147,28 @@ class ScreenshotTest {
     }
 
     @Test
+    fun `a joint credit, the choice of its artists, and their collaborations`() = FakeSubsonic().use { fake ->
+        // Tall enough that the artist page shows its collaborations under the albums.
+        runDesktopComposeUiTest(1280, 1300) {
+            val app = app(fake, "collaborations")
+            stopClock()
+            setContent { PlatterTheme { Box(Modifier.fillMaxSize().background(PlatterColors.Black)) { Shell(app) } } }
+            app.navigate(Screen.Artist("ar0"))
+            app.openArtist("Illenium/Thirty Seconds to Mars", "arj1")
+            settle()
+            assertTrue(app.dialog is AppDialog.PickArtist)
+            shoot("50-pick-artist")
+
+            app.openPickedArtist((app.dialog as AppDialog.PickArtist).artists.first())
+            shoot("51-collaborator-page")
+
+            app.navigate(Screen.Artist("ar30"))
+            shoot("52-artist-collaborations")
+            app.shutdown()
+        }
+    }
+
+    @Test
     fun `home sections, library tabs and the song menu`() = FakeSubsonic().use { fake ->
         // Someone else's playlist, so the sidebar has its "Public playlists" section under the listener's own.
         fake.addPublicPlaylist("p9", "Sunday jazz", owner = "anna")

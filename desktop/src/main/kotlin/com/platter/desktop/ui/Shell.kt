@@ -106,6 +106,7 @@ import com.platter.desktop.SidePanel
 import com.platter.desktop.api.Playlist
 import com.platter.desktop.ui.screens.AlbumPage
 import com.platter.desktop.ui.screens.ArtistPage
+import com.platter.desktop.ui.screens.CollaboratorPage
 import com.platter.desktop.ui.screens.AlbumListPage
 import com.platter.desktop.ui.screens.DeezerScreen
 import com.platter.desktop.ui.screens.DownloadsScreen
@@ -167,6 +168,7 @@ fun Shell(app: AppController) {
                         Screen.Search -> SearchScreen(app)
                         is Screen.Album -> AlbumPage(app, screen.id)
                         is Screen.Artist -> ArtistPage(app, screen.id)
+                        is Screen.Collaborator -> CollaboratorPage(app, screen.name)
                         is Screen.Playlist -> PlaylistPage(app, screen.id)
                         Screen.Settings -> SettingsScreen(app)
                         is Screen.Podcast -> PodcastPage(app, screen.id)

@@ -72,6 +72,9 @@ public class SongListPageViewModel extends AndroidViewModel {
             case Constants.MEDIA_BY_ARTIST:
                 songList = artistRepository.getTopSongs(artist.getName(), 50);
                 break;
+            case Constants.MEDIA_COLLABORATIONS:
+                songList = artistRepository.getCollaborations(artist.getName());
+                break;
             case Constants.MEDIA_BY_GENRES:
                 songList = songRepository.getSongsByGenres(filters);
                 break;
@@ -89,6 +92,7 @@ public class SongListPageViewModel extends AndroidViewModel {
                 if (!genreLoading && genreSource < genre.names().size()) loadGenrePage();
                 break;
             case Constants.MEDIA_BY_ARTIST:
+            case Constants.MEDIA_COLLABORATIONS:
             case Constants.MEDIA_BY_GENRES:
             case Constants.MEDIA_BY_YEAR:
                 break;

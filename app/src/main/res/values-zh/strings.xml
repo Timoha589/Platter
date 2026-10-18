@@ -377,4 +377,8 @@
     <string name="playlist_editor_dialog_action_delete_toast">长按删除</string>
     <string name="server_signup_dialog_action_delete_toast">长按删除</string>
     <string name="server_signup_dialog_hint_local_address">本地 URL</string>
+    <string name="artist_picker_title">艺人</string>
+    <string name="artist_picker_collaborations_only">仅出现在合作曲目中</string>
+    <string name="artist_page_title_collaborations_section">合作曲目</string>
+    <string name="song_list_page_collaborations">合作曲目：%1$s</string>
 </resources>

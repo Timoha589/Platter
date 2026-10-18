@@ -135,6 +135,11 @@ public class SongListPageFragment extends Fragment implements ClickCallback {
             songListPageViewModel.artist = requireArguments().getParcelable(Constants.ARTIST_OBJECT);
             songListPageViewModel.toolbarTitle = getString(R.string.song_list_page_top, songListPageViewModel.artist.getName());
             bind.pageTitleLabel.setText(getString(R.string.song_list_page_top, songListPageViewModel.artist.getName()));
+        } else if (requireArguments().getString(Constants.MEDIA_COLLABORATIONS) != null) {
+            songListPageViewModel.title = Constants.MEDIA_COLLABORATIONS;
+            songListPageViewModel.artist = requireArguments().getParcelable(Constants.ARTIST_OBJECT);
+            songListPageViewModel.toolbarTitle = getString(R.string.song_list_page_collaborations, songListPageViewModel.artist.getName());
+            bind.pageTitleLabel.setText(songListPageViewModel.toolbarTitle);
         } else if (requireArguments().getString(Constants.MEDIA_BY_GENRES) != null) {
             songListPageViewModel.title = Constants.MEDIA_BY_GENRES;
             songListPageViewModel.filters = requireArguments().getStringArrayList("filters_list");
@@ -336,6 +341,7 @@ public class SongListPageFragment extends Fragment implements ClickCallback {
 
         switch (songListPageViewModel.title) {
             case Constants.MEDIA_BY_ARTIST:
+            case Constants.MEDIA_COLLABORATIONS:
             case Constants.MEDIA_BY_GENRES:
                 sortItem.setVisible(true);
                 break;

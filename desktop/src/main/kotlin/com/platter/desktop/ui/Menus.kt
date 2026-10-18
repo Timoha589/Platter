@@ -130,7 +130,7 @@ fun SongMenu(
         if (song.isMusic) MenuEntry(if (app.isDisliked(song)) t("Remove dislike") else t("Dislike"), onDismiss) { app.toggleDislike(song) }
         HorizontalDivider(color = PlatterColors.Iron)
         song.albumId?.let { id -> MenuEntry(t("Go to album"), onDismiss) { app.navigate(Screen.Album(id)) } }
-        song.artistId?.let { id -> MenuEntry(t("Go to artist"), onDismiss) { app.navigate(Screen.Artist(id)) } }
+        song.artistId?.let { id -> MenuEntry(t("Go to artist"), onDismiss) { app.openArtist(song.artistLine(), id) } }
         MenuEntry(t("Share"), onDismiss) { app.share(song.id) }
         MenuEntry(t("Track info"), onDismiss) { app.dialog = AppDialog.TrackInfo(song) }
     }

@@ -327,6 +327,11 @@
         android:label="ArtistBottomSheetDialog"
         tools:layout="@layout/bottom_sheet_artist_dialog" />
     <dialog
+        android:id="@+id/artistPickerBottomSheetDialog"
+        android:name="com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.ArtistPickerBottomSheetDialog"
+        android:label="ArtistPickerBottomSheetDialog"
+        tools:layout="@layout/bottom_sheet_artist_picker" />
+    <dialog
         android:id="@+id/albumBottomSheetDialog"
         android:name="com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.AlbumBottomSheetDialog"
         android:label="AlbumBottomSheetDialog"

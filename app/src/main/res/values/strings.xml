@@ -606,4 +606,8 @@
     <string name="settings_update_current">Platter %1$s is the latest version</string>
     <string name="settings_update_available">Version %1$s is available</string>
     <string name="settings_update_error">Could not check: %1$s</string>
+    <string name="artist_picker_title">Artists</string>
+    <string name="artist_picker_collaborations_only">Only in collaborations</string>
+    <string name="artist_page_title_collaborations_section">Collaborations</string>
+    <string name="song_list_page_collaborations">Collaborations: %1$s</string>
 </resources>

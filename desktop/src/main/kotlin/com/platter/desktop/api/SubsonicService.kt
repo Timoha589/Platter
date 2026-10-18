@@ -52,6 +52,17 @@ interface SubsonicService {
         @Query("artistCount") artistCount: Int,
     ): ApiResponse
 
+    /** search3 for songs alone, a page at a time. */
+    @GET("search3")
+    suspend fun searchSongs(
+        @QueryMap params: Map<String, String>,
+        @Query("query") query: String,
+        @Query("songCount") songCount: Int,
+        @Query("songOffset") songOffset: Int,
+        @Query("albumCount") albumCount: Int,
+        @Query("artistCount") artistCount: Int,
+    ): ApiResponse
+
     @GET("getPlaylists")
     suspend fun getPlaylists(@QueryMap params: Map<String, String>): ApiResponse
 

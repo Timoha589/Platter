@@ -342,4 +342,8 @@
     <string name="track_info_transcoded_content_type">Transcodé type de contenu</string>
     <string name="track_info_transcoded_suffix">Transcodé suffixe</string>
     <string name="track_info_year">Année</string>
+    <string name="artist_picker_title">Artistes</string>
+    <string name="artist_picker_collaborations_only">Uniquement en collaboration</string>
+    <string name="artist_page_title_collaborations_section">Collaborations</string>
+    <string name="song_list_page_collaborations">Collaborations : %1$s</string>
 </resources>

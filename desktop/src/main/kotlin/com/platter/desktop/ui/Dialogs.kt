@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.CheckBox
@@ -80,6 +81,7 @@ import com.platter.desktop.api.RadioStation
 import com.platter.desktop.deemix.DeezerHit
 import com.platter.desktop.player.EqPresets
 import com.platter.desktop.player.EqSettings
+import com.platter.desktop.api.Artist
 import com.platter.desktop.api.Song
 
 // --- a text field --------------------------------------------------------------
@@ -143,6 +145,7 @@ fun DialogHost(app: AppController) {
                     t("Delete playlist?"), t("“%s” will be deleted from your server. Its songs stay in your library.", dialog.playlist.name.orEmpty()), t("Delete"), close,
                 ) { app.deletePlaylist(dialog.playlist); close() }
                 is AppDialog.TrackInfo -> TrackInfoDialog(app, dialog.song, close)
+                is AppDialog.PickArtist -> PickArtistDialog(app, dialog.artists, close)
                 AppDialog.ArrangeHome -> ArrangeHomeDialog(app, close)
                 is AppDialog.ConfirmDeezer -> ConfirmDialog(
                     if (dialog.hit.kind == DeezerHit.Kind.ALBUM) t("Download “%s”?", dialog.hit.title) else t("Download everything by %s?", dialog.hit.title),
@@ -327,6 +330,41 @@ private fun AddToPlaylistDialog(app: AppController, songs: List<Song>, close: ()
             }
         }
         Buttons(cancel = t("Cancel"), ok = t("Done"), onCancel = close, onOk = close)
+    }
+}
+
+/** The artists of a joint credit, one row each. One the server has no page for opens a page of its collaborations. */
+@Composable
+private fun PickArtistDialog(app: AppController, artists: List<Artist>, close: () -> Unit) {
+    DialogCard(t("Artists")) {
+        LazyColumn(Modifier.heightIn(max = 360.dp)) {
+            items(artists) { artist ->
+                Row(
+                    Modifier.fillMaxWidth().height(60.dp).clip(PlatterShapes.Card).clickable { app.openPickedArtist(artist) }.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (artist.coverArtId != null) {
+                        Cover(app, artist.coverArtId, 44.dp, CircleShape)
+                    } else {
+                        // A name with no page of its own has no picture either.
+                        Box(Modifier.size(44.dp).clip(CircleShape).background(PlatterColors.Iron), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Person, null, Modifier.size(24.dp), tint = PlatterColors.Mist)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(artist.name.orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val info = when {
+                            artist.id == null -> t("Only in collaborations")
+                            (artist.albumCount ?: 0) > 0 -> tn(artist.albumCount ?: 0, "%d album", "%d albums")
+                            else -> null
+                        }
+                        if (info != null) Text(info, style = MaterialTheme.typography.bodySmall, color = PlatterColors.Mist)
+                    }
+                }
+            }
+        }
+        Buttons(cancel = "", ok = t("Cancel"), onCancel = close, onOk = close)
     }
 }
 

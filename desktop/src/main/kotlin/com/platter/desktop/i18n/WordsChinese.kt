@@ -422,4 +422,6 @@ internal val CHINESE: Map<String, String> = mapOf(
     "Check for updates" to "检查更新",
     "The download is incomplete" to "下载不完整",
     "The download does not match its checksum" to "下载的文件与校验和不符",
+    "Only in collaborations" to "仅出现在合作曲目中",
+    "Collaborations" to "合作曲目",
 )

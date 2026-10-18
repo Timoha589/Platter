@@ -422,4 +422,6 @@ internal val GERMAN: Map<String, String> = mapOf(
     "Check for updates" to "Nach Updates suchen",
     "The download is incomplete" to "Der Download ist unvollständig",
     "The download does not match its checksum" to "Der Download stimmt nicht mit der Prüfsumme überein",
+    "Only in collaborations" to "Nur in Kollaborationen",
+    "Collaborations" to "Kollaborationen",
 )

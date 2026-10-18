@@ -111,7 +111,7 @@ fun PlayerBar(app: AppController) {
                         color = PlatterColors.Mist,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(enabled = song.artistId != null) { song.artistId?.let { app.navigate(Screen.Artist(it)) } },
+                        modifier = Modifier.clickable(enabled = song.artistId != null) { app.openArtist(song.artistLine(), song.artistId) },
                     )
                 }
                 // Music can be liked, rated and filed; an episode or a station is not a song.

@@ -63,7 +63,11 @@ class FakeSubsonic : AutoCloseable {
                     "getAlbumList2" -> ok(""""albumList2":{"album":[${albumList(url).joinToString(",") { albumJson(it, withSongs = false) }}]}""")
                     "getAlbum" -> ok(""""album":${albumJson(url.queryParameter("id")!!.removePrefix("a").toInt(), withSongs = true)}""")
                     "getArtists" -> ok(""""artists":{"index":[{"name":"D","artist":[${artistJson(6)}]},{"name":"M","artist":[${artistJson(0)}]}]}""")
-                    "getArtist" -> ok(""""artist":{"id":"ar0","name":"Miles Davis","coverArt":"ar-0","albumCount":1,"album":[${albumJson(0, withSongs = false)}]}""")
+                    "getArtist" -> if (url.queryParameter("id") == "ar30") {
+                        ok(""""artist":{"id":"ar30","name":"Thirty Seconds to Mars","coverArt":"ar-1","albumCount":1,"album":[${albumJson(1, withSongs = false)}]}""")
+                    } else {
+                        ok(""""artist":{"id":"ar0","name":"Miles Davis","coverArt":"ar-0","albumCount":1,"album":[${albumJson(0, withSongs = false)}]}""")
+                    }
                     "search3" -> ok(""""searchResult3":${search(url.queryParameter("query").orEmpty())}""")
                     "getStarred2" -> ok(""""starred2":{"song":[${starredSongs.joinToString(",") { songJsonById(it) }}],"album":[${albumJson(3, false)}],"artist":[${artistJson(6)}]}""")
                     "getPlaylists" -> synchronized(playlistsState) {
@@ -256,7 +260,37 @@ class FakeSubsonic : AutoCloseable {
         val albums = albumNames.indices.filter { albumNames[it].lowercase().contains(q) }
         val artists = artistNames.indices.filter { artistNames[it].lowercase().contains(q) }.distinctBy { artistNames[it] }
         val songs = albumNames.indices.flatMap { a -> (1..2).map { n -> a to n } }.filter { (a, n) -> "track $n of ${albumNames[a]}".lowercase().contains(q) }
-        return """{"song":[${songs.joinToString(",") { (a, n) -> songJson(a, n) }}],"album":[${albums.joinToString(",") { albumJson(it, false) }}],"artist":[${artists.joinToString(",") { artistJson(it) }}]}"""
+        // The joint credits answer only a longer query, so the short ones the search tests type see the library as it was.
+        val jointArtists = if (q.length >= 5) JOINT_ARTISTS.filter { (_, name) -> name.lowercase().contains(q) } else emptyList()
+        val jointSongs = if (q.length >= 5) JOINT_SONGS.filter { "${it.title} ${it.artist}".lowercase().contains(q) } else emptyList()
+        val songJsons = songs.map { (a, n) -> songJson(a, n) } + jointSongs.map { it.json() }
+        val artistJsons = artists.map { artistJson(it) } + jointArtists.map { (id, name) -> """{"id":"$id","name":"$name","albumCount":${if ("/" in name) 0 else 1}}""" }
+        return """{"song":[${songJsons.joinToString(",")}],"album":[${albums.joinToString(",") { albumJson(it, false) }}],"artist":[${artistJsons.joinToString(",")}]}"""
+    }
+
+    private class JointSong(val id: String, val title: String, val artist: String, val artistId: String, val year: Int) {
+        fun json() = """{"id":"$id","title":"$title","album":"$title","albumId":"a1","artist":"$artist","displayArtist":"$artist","artistId":"$artistId","year":$year,"duration":180,"coverArt":"al-1","suffix":"wav"}"""
+    }
+
+    /*
+     * Joint credits as Navidrome files them: each credit is an artist of its own - "A/B" on the track, "A, B" on the
+     * album - and only some of the people in them have a page. Illenium has none; Thirty Seconds to Mars has. AC/DC is
+     * a band whose name happens to hold a separator.
+     */
+    private companion object {
+        val JOINT_ARTISTS = listOf(
+            "ar30" to "Thirty Seconds to Mars",
+            "arj1" to "Illenium/Thirty Seconds to Mars",
+            "arj2" to "Illenium, Thirty Seconds to Mars",
+            "arj3" to "Illenium/Teddy Swims",
+            "aracdc" to "AC/DC",
+        )
+        val JOINT_SONGS = listOf(
+            JointSong("sj1", "Wouldn't Change A Thing", "Illenium/Thirty Seconds to Mars", "arj1", 2021),
+            JointSong("sj2", "All That Really Matters", "Illenium/Teddy Swims", "arj3", 2022),
+            JointSong("sj3", "The Kill", "Thirty Seconds to Mars", "ar30", 2005),
+            JointSong("sj4", "Thunderstruck", "AC/DC", "aracdc", 1990),
+        )
     }
 
     /** `getAlbumList2` for the types the client uses: paging, byYear (either direction), byGenre; the rest is everything. */
