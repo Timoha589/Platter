@@ -403,4 +403,9 @@
     <string name="eq_preset_electronic">电子</string>
     <string name="player_disliked">已标记为不喜欢</string>
     <string name="player_dislike_removed">已取消不喜欢</string>
+    <string name="eq_preset_rap">说唱</string>
+    <string name="eq_save_preset">另存为预设</string>
+    <string name="eq_preset_name">预设名称</string>
+    <string name="eq_save">保存</string>
+    <string name="eq_delete_preset">删除预设 %1$s</string>
 </resources>

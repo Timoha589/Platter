@@ -632,4 +632,9 @@
     <string name="eq_preset_electronic">Электроника</string>
     <string name="player_disliked">Дизлайк поставлен</string>
     <string name="player_dislike_removed">Дизлайк убран</string>
+    <string name="eq_preset_rap">Рэп</string>
+    <string name="eq_save_preset">Сохранить как пресет</string>
+    <string name="eq_preset_name">Название пресета</string>
+    <string name="eq_save">Сохранить</string>
+    <string name="eq_delete_preset">Удалить пресет %1$s</string>
 </resources>

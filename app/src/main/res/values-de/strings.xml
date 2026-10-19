@@ -413,4 +413,9 @@
     <string name="eq_preset_electronic">Elektronisch</string>
     <string name="player_disliked">Als „Gefällt mir nicht“ markiert</string>
     <string name="player_dislike_removed">„Gefällt mir nicht“ entfernt</string>
+    <string name="eq_preset_rap">Rap</string>
+    <string name="eq_save_preset">Als Voreinstellung speichern</string>
+    <string name="eq_preset_name">Name der Voreinstellung</string>
+    <string name="eq_save">Speichern</string>
+    <string name="eq_delete_preset">Voreinstellung %1$s löschen</string>
 </resources>

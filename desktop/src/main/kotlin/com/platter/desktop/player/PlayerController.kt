@@ -169,7 +169,11 @@ class PlayerController(
             // whole program - every player in it moves together, and it is the system mixer's slider for Platter - so the two
             // would fight and the fade be heard as stutter. DirectSound gives each player its own volume.
             val output = if (vlcArgs.none { it.startsWith("--aout") }) listOf("--aout=directsound,any") else emptyList()
-            val f = MediaPlayerFactory(listOf("--no-video", "--quiet") + output + AppLog.vlcArguments() + vlcArgs)
+            // libvlc filters sound as it is decoded, ahead of what is heard by its caching (a second for a stream by
+            // default), so the equalizer's sliders were heard a second and more after they moved. Less is plenty for a
+            // music file over HTTP, and the equalizer follows the hand.
+            val caching = listOf("--network-caching=$NETWORK_CACHING_MS", "--file-caching=$FILE_CACHING_MS")
+            val f = MediaPlayerFactory(listOf("--no-video", "--quiet") + output + caching + AppLog.vlcArguments() + vlcArgs)
             val p = f.mediaPlayers().newMediaPlayer()
             p.audio().setVolume(_state.value.volume)
             p.events().addMediaPlayerEventListener(events)
@@ -412,7 +416,9 @@ class PlayerController(
         try {
             if (wantedEq.enabled) {
                 val eq = activeEq ?: f.equalizer().newEqualizer().also { activeEq = it }
-                eq.setPreamp(wantedEq.preamp)
+                // libvlc's equalizer takes 12 dB off whatever passes through it (its own Flat preset sets the preamp to
+                // +12 to make up for it): 0 here would make switching it on a quarter as loud. The listener's 0 is unity.
+                eq.setPreamp((wantedEq.preamp + LIBVLC_UNITY_PREAMP_DB).coerceAtMost(LIBVLC_MAX_PREAMP_DB))
                 eq.setAmps(wantedEq.gains().toFloatArray())
                 players.forEach { it.audio().setEqualizer(eq) }
                 eqAttached = true
@@ -620,5 +626,15 @@ class PlayerController(
     private companion object {
         /** How often the volumes of a fade are set: fine enough that the steps cannot be heard. */
         const val FADE_TICK_MS = 40L
+
+        /** What libvlc's equalizer needs as preamp to leave the level as it was; measured, see EqualizerSoundTest. */
+        const val LIBVLC_UNITY_PREAMP_DB = 12f
+
+        /** The most libvlc takes. */
+        const val LIBVLC_MAX_PREAMP_DB = 20f
+
+        /** How far ahead of what is heard libvlc decodes, and so how late an equalizer change is heard. */
+        const val NETWORK_CACHING_MS = 400
+        const val FILE_CACHING_MS = 300
     }
 }

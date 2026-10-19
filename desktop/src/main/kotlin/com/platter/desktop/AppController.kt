@@ -34,6 +34,7 @@ import com.platter.desktop.deemix.DeezerHits
 import com.platter.desktop.deemix.DeezerPage
 import com.platter.desktop.player.EqPresets
 import com.platter.desktop.player.EqSettings
+import com.platter.desktop.player.SavedEqPreset
 import com.platter.desktop.player.PreviewPlayer
 import com.platter.desktop.update.UpdateInfo
 import com.platter.desktop.update.Updater
@@ -452,6 +453,10 @@ class AppController(
 
     /** The equalizer; the audio engine has the same, and is told whenever it changes. */
     var equalizer by mutableStateOf(EqSettings(saved.eqEnabled, saved.eqPreamp, saved.eqBands))
+        private set
+
+    /** The listener's own presets, beside the built-in ones. */
+    var eqPresets by mutableStateOf(saved.eqPresets.orEmpty().filter { it.name.isNotBlank() })
         private set
 
     /** The songs saved for offline play, and what is being fetched. */
@@ -1642,6 +1647,27 @@ class AppController(
         changeEqualizer(equalizer.copy(enabled = true, bands = gains))
     }
 
+    /** One of the listener's own presets: its preamp and its bands, and the equalizer on. */
+    fun chooseSavedEqPreset(preset: SavedEqPreset) {
+        changeEqualizer(EqSettings(enabled = true, preamp = preset.preamp, bands = EqSettings(bands = preset.bands).gains()))
+    }
+
+    /** Keeps the sound as it is now under [name]; a preset of the same name is replaced, where it was in the list. */
+    fun saveEqPreset(name: String) {
+        val clean = name.trim().take(MAX_PRESET_NAME)
+        if (clean.isEmpty()) return
+        val preset = SavedEqPreset(clean, equalizer.preamp, equalizer.gains())
+        val at = eqPresets.indexOfFirst { it.name.equals(clean, ignoreCase = true) }
+        storeEqPresets(if (at >= 0) eqPresets.toMutableList().also { it[at] = preset } else eqPresets + preset)
+    }
+
+    fun deleteEqPreset(name: String) = storeEqPresets(eqPresets.filterNot { it.name == name })
+
+    private fun storeEqPresets(presets: List<SavedEqPreset>) {
+        eqPresets = presets
+        store.update { eqPresets = presets }
+    }
+
     // --- songs saved for offline play --------------------------------------------------------------
 
     fun downloadRoot(): Path = downloadFolder?.let { Path.of(it) } ?: store.directory.resolve("Downloads")
@@ -2082,6 +2108,9 @@ class AppController(
 
     companion object {
         const val DISLIKE_RATING = 1
+
+        /** A preset's name fits on its chip. */
+        private const val MAX_PRESET_NAME = 32
         private const val DAY_MS = 24 * 60 * 60 * 1000L
         private const val QUIT_AFTER_INSTALL_MS = 600L
         private const val SAVE_QUEUE_AFTER_MS = 2_000L

@@ -195,6 +195,9 @@ public final class DownloadUtil {
                     getHttpDataSourceFactory(),
                     Executors.newFixedThreadPool(6)
             );
+            // One track at a time, in the order asked for: a whole liked list
+            // downloaded at once must not take every connection the server has.
+            downloadManager.setMaxParallelDownloads(1);
 
             /*
              * Smart download keeps its own list, in its own table, over the
@@ -213,6 +216,7 @@ public final class DownloadUtil {
                             Executors.newFixedThreadPool(2)
                     )
             );
+            smartDownloadManager.setMaxParallelDownloads(1);
 
             downloaderManager = new DownloaderManager(context, getHttpDataSourceFactory(), downloadManager, smartDownloadManager);
         }

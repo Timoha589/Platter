@@ -424,4 +424,8 @@ internal val FRENCH: Map<String, String> = mapOf(
     "The download does not match its checksum" to "Le téléchargement ne correspond pas à sa somme de contrôle",
     "Only in collaborations" to "Uniquement en collaboration",
     "Collaborations" to "Collaborations",
+    "Rap" to "Rap",
+    "Save as preset…" to "Enregistrer comme préréglage…",
+    "Preset name" to "Nom du préréglage",
+    "Delete preset %s" to "Supprimer le préréglage %s",
 )

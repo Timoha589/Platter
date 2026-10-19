@@ -368,4 +368,9 @@
     <string name="eq_preset_electronic">Électronique</string>
     <string name="player_disliked">Marqué « Je n\'aime pas »</string>
     <string name="player_dislike_removed">« Je n\'aime pas » retiré</string>
+    <string name="eq_preset_rap">Rap</string>
+    <string name="eq_save_preset">Enregistrer comme préréglage</string>
+    <string name="eq_preset_name">Nom du préréglage</string>
+    <string name="eq_save">Enregistrer</string>
+    <string name="eq_delete_preset">Supprimer le préréglage %1$s</string>
 </resources>

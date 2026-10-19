@@ -12,6 +12,10 @@ import com.cappielloantonio.tempo.R
 import com.cappielloantonio.tempo.audio.EqPresets
 import com.cappielloantonio.tempo.audio.EqSettings
 import com.cappielloantonio.tempo.audio.PlatterEqualizer
+import com.cappielloantonio.tempo.audio.SavedEqPreset
+import android.widget.EditText
+import android.widget.FrameLayout
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -43,6 +47,10 @@ class EqualizerBottomSheetDialog : BottomSheetDialogFragment() {
 
     private val listener = PlatterEqualizer.Listener { show(it) }
 
+    /** The chips of the listener's own presets, after the built-in ones; redrawn when the list changes. */
+    private val savedChips = ArrayList<Chip>()
+    private var savedShown: List<SavedEqPreset>? = null
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.bottom_sheet_equalizer, container, false)
 
@@ -68,6 +76,7 @@ class EqualizerBottomSheetDialog : BottomSheetDialogFragment() {
         EqSettings.LABELS.forEachIndexed { band, label -> addRow(bands, label, band + 1) }
 
         view.findViewById<View>(R.id.eq_reset).setOnClickListener { PlatterEqualizer.reset() }
+        view.findViewById<View>(R.id.eq_save_preset).setOnClickListener { askPresetName() }
 
         return view
     }
@@ -154,12 +163,67 @@ class EqualizerBottomSheetDialog : BottomSheetDialogFragment() {
             }
         }
 
-        val preset = EqPresets.nameOf(settings.gains())
+        val saved = PlatterEqualizer.savedPresets
+        if (saved != savedShown) showSaved(saved)
+        // One of the listener's own first: it may share its bands with a built-in one and differ in the preamp.
+        val chosenSaved = saved.firstOrNull { it.matches(settings) }
+        val preset = if (chosenSaved == null && abs(settings.preamp) < 0.05f) EqPresets.nameOf(settings.gains()) else null
         for (i in 0 until presets.childCount) {
             val chip = presets.getChildAt(i) as Chip
-            chip.isChecked = settings.enabled && chip.tag == preset
+            val tag = chip.tag
+            chip.isChecked = settings.enabled && (if (tag is SavedEqPreset) tag.name == chosenSaved?.name else tag == preset)
         }
         showing = false
+    }
+
+    private fun showSaved(saved: List<SavedEqPreset>) {
+        savedChips.forEach { presets.removeView(it) }
+        savedChips.clear()
+        val inflater = LayoutInflater.from(requireContext())
+        for (preset in saved) {
+            val chip = inflater.inflate(R.layout.item_eq_preset_chip, presets, false) as Chip
+            chip.text = preset.name
+            chip.tag = preset
+            chip.isCloseIconVisible = true
+            // The cross takes the text's colours, so it stays black on the white of a chosen chip.
+            chip.closeIconTint = chip.textColors
+            chip.closeIconContentDescription = getString(R.string.eq_delete_preset, preset.name)
+            chip.setOnClickListener { PlatterEqualizer.chooseSavedPreset(preset) }
+            chip.setOnCloseIconClickListener { PlatterEqualizer.deletePreset(preset.name) }
+            presets.addView(chip)
+            savedChips += chip
+        }
+        savedShown = saved
+    }
+
+    /** Asks a name for the sound as it is now, and keeps it under that name. */
+    private fun askPresetName() {
+        val field = EditText(requireContext()).apply {
+            hint = getString(R.string.eq_preset_name)
+            isSingleLine = true
+        }
+        val frame = FrameLayout(requireContext()).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(field)
+        }
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.eq_save_preset)
+            .setView(frame)
+            .setPositiveButton(R.string.eq_save) { _, _ -> PlatterEqualizer.savePreset(field.text.toString()) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+        // Nothing to keep under no name.
+        val save = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)
+        save.isEnabled = false
+        field.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                save.isEnabled = !s.isNullOrBlank()
+            }
+        })
+        field.requestFocus()
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
     }
 
     private fun decibels(value: Float): String =
@@ -185,6 +249,7 @@ class EqualizerBottomSheetDialog : BottomSheetDialogFragment() {
             "jazz" -> R.string.eq_preset_jazz
             "classical" -> R.string.eq_preset_classical
             "vocal" -> R.string.eq_preset_vocal
+            "rap" -> R.string.eq_preset_rap
             else -> R.string.eq_preset_electronic
         }
     }

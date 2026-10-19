@@ -632,4 +632,9 @@
     <string name="eq_preset_electronic">Electronic</string>
     <string name="player_disliked">Disliked</string>
     <string name="player_dislike_removed">Dislike removed</string>
+    <string name="eq_preset_rap">Rap</string>
+    <string name="eq_save_preset">Save as preset</string>
+    <string name="eq_preset_name">Preset name</string>
+    <string name="eq_save">Save</string>
+    <string name="eq_delete_preset">Delete preset %1$s</string>
 </resources>

@@ -95,6 +95,9 @@ class Settings {
     var eqPreamp: Float = 0f
     var eqBands: List<Float> = emptyList()
 
+    /** The listener's own presets, in the order they were made. */
+    var eqPresets: List<com.platter.desktop.player.SavedEqPreset> = emptyList()
+
     /** The Deemix plus site, written by hand; null to have it looked for beside the music server. */
     var deemixUrl: String? = null
 

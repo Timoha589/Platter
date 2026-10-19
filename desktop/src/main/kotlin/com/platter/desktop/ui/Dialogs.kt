@@ -459,7 +459,11 @@ private fun VerticalSlider(value: Float, range: ClosedFloatingPointRange<Float>,
 private fun EqualizerDialog(app: AppController, close: () -> Unit) {
     val eq = app.equalizer
     val gains = eq.gains()
-    val chosen = EqPresets.nameOf(gains)
+    // One of the listener's own presets first: it may share its bands with a built-in one and differ in the preamp.
+    val chosenSaved = app.eqPresets.firstOrNull { it.matches(eq) }?.name
+    val chosen = if (chosenSaved == null && kotlin.math.abs(eq.preamp) < 0.05f) EqPresets.nameOf(gains) else null
+    // The name being typed for a new preset; null while no preset is being saved.
+    var naming by remember { mutableStateOf<String?>(null) }
     DialogCard(t("Equalizer"), width = 640.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -478,6 +482,9 @@ private fun EqualizerDialog(app: AppController, close: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             EqPresets.all.keys.forEach { name -> Chip(t(name), chosen == name && eq.enabled) { app.chooseEqPreset(name) } }
+            app.eqPresets.forEach { preset ->
+                SavedPresetChip(preset.name, chosenSaved == preset.name && eq.enabled, { app.chooseSavedEqPreset(preset) }, { app.deleteEqPreset(preset.name) })
+            }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -489,7 +496,43 @@ private fun EqualizerDialog(app: AppController, close: () -> Unit) {
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
+        val name = naming
+        if (name == null) {
+            OutlinedPill(t("Save as preset…")) { naming = "" }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val save = { app.saveEqPreset(name); naming = null }
+                TextInput(name, { naming = it }, t("Preset name"), Modifier.weight(1f).testTag("eq-preset-name"), autoFocus = true, onEnter = { if (name.isNotBlank()) save() })
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    t("Cancel"), style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.clip(PlatterShapes.Pill).clickable { naming = null }.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                PrimaryPill(t("Save"), enabled = name.isNotBlank(), onClick = save)
+            }
+        }
         Buttons(cancel = t("Reset"), ok = t("Done"), onCancel = { app.changeEqualizer(EqSettings(enabled = eq.enabled)) }, onOk = close)
+    }
+}
+
+/** A preset of the listener's own: chosen like the built-in ones, and taken away again by its cross. */
+@Composable
+private fun SavedPresetChip(name: String, selected: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        Modifier.height(32.dp).clip(PlatterShapes.Pill)
+            .background(if (selected) PlatterColors.White else PlatterColors.Iron)
+            .clickable(onClick = onClick)
+            .padding(start = 16.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val ink = if (selected) PlatterColors.Black else PlatterColors.White
+        Text(name, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 1)
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            Icons.Outlined.Close, t("Delete preset %s", name), tint = ink,
+            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onDelete).padding(2.dp),
+        )
     }
 }
 

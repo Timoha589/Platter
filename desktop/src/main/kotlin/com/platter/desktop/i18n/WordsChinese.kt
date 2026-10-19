@@ -424,4 +424,8 @@ internal val CHINESE: Map<String, String> = mapOf(
     "The download does not match its checksum" to "下载的文件与校验和不符",
     "Only in collaborations" to "仅出现在合作曲目中",
     "Collaborations" to "合作曲目",
+    "Rap" to "说唱",
+    "Save as preset…" to "另存为预设…",
+    "Preset name" to "预设名称",
+    "Delete preset %s" to "删除预设 %s",
 )

@@ -286,7 +286,8 @@ class Downloader(
     }
 
     companion object {
-        const val PARALLEL = 2
+        /** One song at a time: a whole liked list asked for at once must not take every connection the server has. */
+        const val PARALLEL = 1
         private const val COVER_PX = 600
         private const val MAX_NAME = 100
 

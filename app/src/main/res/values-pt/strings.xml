@@ -370,4 +370,9 @@
     <string name="eq_preset_electronic">Eletrônica</string>
     <string name="player_disliked">Marcada como \"Não gostei\"</string>
     <string name="player_dislike_removed">\"Não gostei\" removido</string>
+    <string name="eq_preset_rap">Rap</string>
+    <string name="eq_save_preset">Salvar como predefinição</string>
+    <string name="eq_preset_name">Nome da predefinição</string>
+    <string name="eq_save">Salvar</string>
+    <string name="eq_delete_preset">Excluir predefinição %1$s</string>
 </resources>

@@ -416,4 +416,9 @@
     <string name="eq_preset_electronic">Elettronica</string>
     <string name="player_disliked">Segnato «Non mi piace»</string>
     <string name="player_dislike_removed">«Non mi piace» rimosso</string>
+    <string name="eq_preset_rap">Rap</string>
+    <string name="eq_save_preset">Salva come preset</string>
+    <string name="eq_preset_name">Nome del preset</string>
+    <string name="eq_save">Salva</string>
+    <string name="eq_delete_preset">Elimina il preset %1$s</string>
 </resources>

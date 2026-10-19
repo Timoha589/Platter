@@ -424,4 +424,8 @@ internal val KOREAN: Map<String, String> = mapOf(
     "The download does not match its checksum" to "다운로드한 파일이 체크섬과 일치하지 않습니다",
     "Only in collaborations" to "협업 곡에만 참여",
     "Collaborations" to "협업",
+    "Rap" to "랩",
+    "Save as preset…" to "프리셋으로 저장…",
+    "Preset name" to "프리셋 이름",
+    "Delete preset %s" to "프리셋 %s 삭제",
 )

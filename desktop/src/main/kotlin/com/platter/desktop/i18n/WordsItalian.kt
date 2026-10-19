@@ -424,4 +424,8 @@ internal val ITALIAN: Map<String, String> = mapOf(
     "The download does not match its checksum" to "Il download non corrisponde al checksum",
     "Only in collaborations" to "Solo in collaborazioni",
     "Collaborations" to "Collaborazioni",
+    "Rap" to "Rap",
+    "Save as preset…" to "Salva come preset…",
+    "Preset name" to "Nome del preset",
+    "Delete preset %s" to "Elimina il preset %s",
 )

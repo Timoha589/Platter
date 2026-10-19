@@ -534,6 +534,48 @@ class InteractionTest {
     }
 
     @Test
+    fun `a sound of one's own is saved as a preset, kept, chosen again and deleted`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val dir = Files.createTempDirectory("platter-presets")
+            val store = SettingsStore(dir.resolve("settings.json"))
+            store.update { withCredentials(Credentials(fake.url, "tim", Auth.token("pw", "salt"), "salt")) }
+            val app = AppController(store, CoroutineScope(SupervisorJob() + Dispatchers.Main), vlcArgs = listOf("--aout=dummy"))
+            open(app)
+            app.changeEqualizer(com.platter.desktop.player.EqSettings(enabled = true, preamp = -3f, bands = listOf(4f, 3f) + List(8) { 0f }))
+            app.dialog = AppDialog.Equalizer
+            step()
+
+            onNodeWithText("Save as preset…").performClick()
+            step()
+            val nameField = hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("eq-preset-name"))
+            onNode(nameField, useUnmergedTree = true).performTextInput("Night drive")
+            step()
+            onNode(nameField, useUnmergedTree = true).performKeyInput { pressKey(Key.Enter) }
+            step()
+            assertEquals(listOf("Night drive"), app.eqPresets.map { it.name })
+            assertEquals(-3f, app.eqPresets[0].preamp)
+            assertEquals(4f, app.eqPresets[0].bands[0])
+
+            // Another sound, then the preset brings its own back.
+            onNodeWithText("Rock").performClick()
+            step()
+            onNodeWithText("Night drive").performClick()
+            step()
+            assertEquals(-3f, app.equalizer.preamp)
+            assertEquals(listOf(4f, 3f) + List(8) { 0f }, app.equalizer.gains())
+            app.shutdown()
+
+            // Kept for next time.
+            val again = AppController(SettingsStore(dir.resolve("settings.json")), CoroutineScope(SupervisorJob() + Dispatchers.Main), vlcArgs = listOf("--aout=dummy"))
+            assertEquals(listOf("Night drive"), again.eqPresets.map { it.name })
+            again.deleteEqPreset("Night drive")
+            assertTrue(again.eqPresets.isEmpty())
+            assertTrue(SettingsStore(dir.resolve("settings.json")).load().eqPresets.isEmpty())
+            again.shutdown()
+        }
+    }
+
+    @Test
     fun `a pasted name with a line break shows in the search field as one line`() = FakeSubsonic().use { fake ->
         runDesktopComposeUiTest(1280, 800) {
             val app = app(fake)

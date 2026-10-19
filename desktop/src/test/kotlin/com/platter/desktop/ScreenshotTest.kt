@@ -354,6 +354,8 @@ class ScreenshotTest {
             shoot("47-dialog-download-artist")
 
             app.dialog = AppDialog.Equalizer
+            app.chooseEqPreset("Rap")
+            app.saveEqPreset("Night drive")
             app.chooseEqPreset("Rock")
             shoot("48-equalizer")
             app.dialog = null

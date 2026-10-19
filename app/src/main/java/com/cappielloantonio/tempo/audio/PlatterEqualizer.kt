@@ -39,6 +39,14 @@ data class EqSettings(
     }
 }
 
+/** A sound the listener shaped and kept under a name of their own: the preamp as well as the ten bands. */
+data class SavedEqPreset(val name: String, val preamp: Float, val bands: List<Float>) {
+    /** Whether [settings] are this preset, so the sheet can show it chosen. */
+    fun matches(settings: EqSettings): Boolean =
+        abs(preamp - settings.preamp) < 0.05f &&
+            EqSettings(bands = bands).gains().zip(settings.gains()).all { (a, b) -> abs(a - b) < 0.05f }
+}
+
 /** Starting points to bend from: ten gains in dB, low to high. Names are keys for strings, see [EqPresets.nameRes]. */
 object EqPresets {
     val all: LinkedHashMap<String, List<Float>> = linkedMapOf(
@@ -51,6 +59,8 @@ object EqPresets {
         "classical" to listOf(5f, 4f, 3f, 2f, -1f, -1f, 0f, 2f, 3f, 4f),
         "vocal" to listOf(-3f, -2f, -1f, 1f, 4f, 4f, 3f, 1f, 0f, -1f),
         "electronic" to listOf(5f, 4f, 1f, 0f, -2f, 2f, 1f, 1f, 4f, 5f),
+        // Deep low end for the beat, a step back in the low mids, the voice and the hats brought forward.
+        "rap" to listOf(6f, 5f, 2f, 0f, -1f, 1f, 2f, 1f, 2f, 2f),
     )
 
     /** The preset these gains are, if they are one - so the sheet can show which is chosen. */
@@ -67,6 +77,10 @@ object PlatterEqualizer {
     private const val ENABLED = "eq_enabled"
     private const val PREAMP = "eq_preamp"
     private const val BANDS = "eq_bands"
+    private const val SAVED = "eq_saved_presets"
+
+    /** A preset's name fits on its chip. */
+    private const val MAX_PRESET_NAME = 32
 
     private val main = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<Listener>()
@@ -118,6 +132,64 @@ object PlatterEqualizer {
     /** Levels the bands and the preamp; on stays on. */
     @JvmStatic
     fun reset() = set(EqSettings(enabled = settings.enabled))
+
+    /** The listener's own presets, in the order they were made. Kept as JSON, which needs no classes R8 could strip. */
+    @JvmStatic
+    val savedPresets: List<SavedEqPreset>
+        get() = saved ?: loadSaved().also { saved = it }
+
+    @Volatile
+    private var saved: List<SavedEqPreset>? = null
+
+    /** Keeps the sound as it is now under [name]; a preset of the same name is replaced, where it was in the list. */
+    @JvmStatic
+    fun savePreset(name: String) {
+        val clean = name.trim().take(MAX_PRESET_NAME)
+        if (clean.isEmpty()) return
+        val now = settings
+        val preset = SavedEqPreset(clean, now.preamp, now.gains())
+        val list = savedPresets.toMutableList()
+        val at = list.indexOfFirst { it.name.equals(clean, ignoreCase = true) }
+        if (at >= 0) list[at] = preset else list += preset
+        storeSaved(list)
+    }
+
+    @JvmStatic
+    fun deletePreset(name: String) = storeSaved(savedPresets.filterNot { it.name == name })
+
+    /** One of the listener's own presets: its preamp and its bands, and the equalizer on. */
+    @JvmStatic
+    fun chooseSavedPreset(preset: SavedEqPreset) =
+        set(EqSettings(enabled = true, preamp = preset.preamp, bands = EqSettings(bands = preset.bands).gains()))
+
+    private fun storeSaved(list: List<SavedEqPreset>) {
+        saved = list
+        val json = org.json.JSONArray()
+        list.forEach { preset ->
+            json.put(
+                org.json.JSONObject()
+                    .put("name", preset.name)
+                    .put("preamp", preset.preamp.toDouble())
+                    .put("bands", org.json.JSONArray(preset.bands.map { it.toDouble() }))
+            )
+        }
+        App.getInstance().preferences.edit().putString(SAVED, json.toString()).apply()
+        // The sheet redraws its chips from the same call as for any other change.
+        val now = settings
+        main.post { listeners.forEach { it.onChanged(now) } }
+    }
+
+    private fun loadSaved(): List<SavedEqPreset> = try {
+        val json = org.json.JSONArray(App.getInstance().preferences.getString(SAVED, null) ?: "[]")
+        (0 until json.length()).mapNotNull { i ->
+            val item = json.optJSONObject(i) ?: return@mapNotNull null
+            val name = item.optString("name").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val bands = item.optJSONArray("bands")?.let { array -> (0 until array.length()).map { array.optDouble(it, 0.0).toFloat() } }.orEmpty()
+            SavedEqPreset(name, item.optDouble("preamp", 0.0).toFloat(), bands)
+        }
+    } catch (e: org.json.JSONException) {
+        emptyList()
+    }
 
     @JvmStatic
     fun addListener(listener: Listener) {

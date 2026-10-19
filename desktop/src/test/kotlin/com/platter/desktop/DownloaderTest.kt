@@ -182,7 +182,7 @@ class DownloaderTest {
     }
 
     @Test
-    fun `no more than two are fetched at once, and the rest wait their turn`() = FakeSubsonic().use { fake ->
+    fun `songs are fetched one at a time, and the rest wait their turn`() = FakeSubsonic().use { fake ->
         downloader.enqueue(client(fake), server, (1..5).map { song("slow$it", track = it) }, Source.MANUAL)
         var mostAtOnce = 0
         val end = System.currentTimeMillis() + 3_000
@@ -190,7 +190,7 @@ class DownloaderTest {
             mostAtOnce = maxOf(mostAtOnce, downloader.transfers.values.count { it is Transfer.Active })
             Thread.sleep(20)
         }
-        assertTrue(mostAtOnce in 1..Downloader.PARALLEL, "saw $mostAtOnce at once")
+        assertEquals(1, mostAtOnce, "saw $mostAtOnce at once")
         assertTrue(downloader.transfers.values.any { it is Transfer.Queued })
     }
 

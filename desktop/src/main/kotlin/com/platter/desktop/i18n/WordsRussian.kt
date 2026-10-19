@@ -424,4 +424,8 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "The download does not match its checksum" to "Загруженный файл не совпал с контрольной суммой",
     "Only in collaborations" to "Только в коллаборациях",
     "Collaborations" to "Коллаборации",
+    "Rap" to "Рэп",
+    "Save as preset…" to "Сохранить как пресет…",
+    "Preset name" to "Название пресета",
+    "Delete preset %s" to "Удалить пресет %s",
 )

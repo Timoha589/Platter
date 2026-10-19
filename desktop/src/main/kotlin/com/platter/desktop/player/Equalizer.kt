@@ -23,6 +23,14 @@ data class EqSettings(
     }
 }
 
+/** A sound the listener shaped and kept under a name of their own: the preamp as well as the ten bands. */
+data class SavedEqPreset(val name: String = "", val preamp: Float = 0f, val bands: List<Float> = emptyList()) {
+    /** Whether [settings] are this preset, so the dialog can show it chosen. */
+    fun matches(settings: EqSettings): Boolean =
+        kotlin.math.abs(preamp - settings.preamp) < 0.05f &&
+            EqSettings(bands = bands).gains().zip(settings.gains()).all { (a, b) -> kotlin.math.abs(a - b) < 0.05f }
+}
+
 /** Starting points to bend from: ten gains in dB, low to high. */
 object EqPresets {
     val all: LinkedHashMap<String, List<Float>> = linkedMapOf(
@@ -35,6 +43,8 @@ object EqPresets {
         "Classical" to listOf(5f, 4f, 3f, 2f, -1f, -1f, 0f, 2f, 3f, 4f),
         "Vocal" to listOf(-3f, -2f, -1f, 1f, 4f, 4f, 3f, 1f, 0f, -1f),
         "Electronic" to listOf(5f, 4f, 1f, 0f, -2f, 2f, 1f, 1f, 4f, 5f),
+        // Deep low end for the beat, a step back in the low mids, the voice and the hats brought forward.
+        "Rap" to listOf(6f, 5f, 2f, 0f, -1f, 1f, 2f, 1f, 2f, 2f),
     )
 
     /** The preset these gains are, if they are one - so the dialog can show which is chosen. */
