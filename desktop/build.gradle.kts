@@ -7,7 +7,7 @@ plugins {
 }
 
 /** The one place the version is written: the installer, the running app (`-Dplatter.version`) and the updater all read it. */
-val platterVersion = "1.0.4"
+val platterVersion = "1.0.5"
 
 group = "com.platter"
 version = platterVersion
@@ -121,8 +121,9 @@ compose.desktop {
             appResourcesRootDir.set(layout.dir(prepareVlc.map { it.destinationDir }))
             // Only the MSI: the app updates itself by running the next one over it.
             targetFormats(TargetFormat.Msi)
-            // jlink keeps only what it can see: TLS curves, OkHttp's hostname check and JNA (libvlc) need these by name.
-            modules("java.naming", "java.sql", "jdk.crypto.ec", "jdk.unsupported")
+            // jlink keeps only what it can see: TLS curves, OkHttp's hostname check, JNA (libvlc) and the remote control's
+            // HTTP server (remote/RemoteControl.kt) need these by name.
+            modules("java.naming", "java.sql", "jdk.crypto.ec", "jdk.unsupported", "jdk.httpserver")
             packageName = "Platter"
             packageVersion = platterVersion
             vendor = "Timoha589"

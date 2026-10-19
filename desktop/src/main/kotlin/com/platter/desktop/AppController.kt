@@ -43,7 +43,9 @@ import com.platter.desktop.offline.Downloader
 import com.platter.desktop.offline.Source
 import com.platter.desktop.data.Secrets
 import com.platter.desktop.data.SettingsStore
+import com.platter.desktop.log.AppLog
 import com.platter.desktop.player.PlayerController
+import com.platter.desktop.remote.RemoteControl
 import com.platter.desktop.search.FuzzyIndex
 import com.platter.desktop.search.LibrarySignals
 import com.platter.desktop.search.RankedResults
@@ -1097,16 +1099,21 @@ class AppController(
      */
     fun playArtist(name: String, albums: List<Album>, shuffle: Boolean = false) {
         act(t("Could not play the artist")) {
-            val c = client ?: return@act
-            val top = runCatching { c.topSongs(name, 20) }.getOrDefault(emptyList())
-            val songs = top.ifEmpty {
-                coroutineScope {
-                    albums.take(DISCOGRAPHY_ALBUMS).mapNotNull { it.id }
-                        .map { id -> async { runCatching { c.album(id).songs.orEmpty() }.getOrDefault(emptyList()) } }
-                        .awaitAll().flatten()
-                }
-            }
+            val songs = artistSongs(name, albums)
             if (songs.isEmpty()) showToast(t("No songs found for %s", name)) else player.play(if (shuffle) songs.shuffled() else songs)
+        }
+    }
+
+    /** What playing an artist plays: see [playArtist]. Empty when signed out or nothing was found. */
+    suspend fun artistSongs(name: String, albums: List<Album>): List<Song> {
+        val c = client ?: return emptyList()
+        val top = runCatching { c.topSongs(name, 20) }.getOrDefault(emptyList())
+        return top.ifEmpty {
+            coroutineScope {
+                albums.take(DISCOGRAPHY_ALBUMS).mapNotNull { it.id }
+                    .map { id -> async { runCatching { c.album(id).songs.orEmpty() }.getOrDefault(emptyList()) } }
+                    .awaitAll().flatten()
+            }
         }
     }
 
@@ -1320,8 +1327,25 @@ class AppController(
         }
     }
 
+    // --- control from other programs ------------------------------------------------
+
+    private var remote: RemoteControl? = null
+
+    /** Lets Jarvis and the like drive the player (see [RemoteControl]); the window starts it, tests leave it off. */
+    fun startRemoteControl() {
+        if (remote != null || !saved.remoteControl) return
+        // Whatever goes wrong here (a runtime built without jdk.httpserver) must not keep the player from opening.
+        try {
+            remote = RemoteControl(this, store.directory.resolve("remote.json")).also { it.start() }
+        } catch (e: Throwable) {
+            AppLog.error("Remote control could not start", e)
+        }
+    }
+
     /** Leaves the queue on the server, if asked to, and lets go of the audio engine. */
     fun shutdown() {
+        remote?.stop()
+        remote = null
         background.forEach { it.cancel() }
         downloader.cancelAll()
         stopPreviewIfAny()

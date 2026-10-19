@@ -26,6 +26,9 @@ interface SubsonicService {
     @GET("getAlbum")
     suspend fun getAlbum(@QueryMap params: Map<String, String>, @Query("id") id: String): ApiResponse
 
+    @GET("getSong")
+    suspend fun getSong(@QueryMap params: Map<String, String>, @Query("id") id: String): ApiResponse
+
     @GET("getAlbumList2")
     suspend fun getAlbumList2(
         @QueryMap params: Map<String, String>,

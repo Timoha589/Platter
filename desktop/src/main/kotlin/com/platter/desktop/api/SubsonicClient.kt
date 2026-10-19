@@ -99,6 +99,10 @@ class SubsonicClient(val credentials: Credentials, http: OkHttpClient = defaultH
     suspend fun album(id: String): Album =
         call { it.getAlbum(params, id) }.album ?: throw SubsonicException(SubsonicException.GENERIC, t("No such album"))
 
+    /** One song by its id - what another program on this machine names when it asks Platter to play something. */
+    suspend fun song(id: String): Song =
+        call { it.getSong(params, id) }.song ?: throw SubsonicException(SubsonicException.GENERIC, "No such song")
+
     /** [type] is `newest`, `recent`, `frequent`, `random`, `starred`, `alphabeticalByName`, ... */
     suspend fun albumList(type: String, size: Int = 20, offset: Int = 0, genre: String? = null, fromYear: Int? = null, toYear: Int? = null): List<Album> =
         call { it.getAlbumList2(params, type, size, offset, genre, fromYear, toYear) }.albumList2?.albums.orEmpty()

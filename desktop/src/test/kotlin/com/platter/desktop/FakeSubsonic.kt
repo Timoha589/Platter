@@ -61,6 +61,7 @@ class FakeSubsonic : AutoCloseable {
                     "getLyrics" -> ok(""""lyrics":{"value":"${if (url.queryParameter("artist") == "Fleetwood Mac") "First plain line\\nSecond plain line" else ""}"}""")
                     "ping" -> ok("")
                     "getAlbumList2" -> ok(""""albumList2":{"album":[${albumList(url).joinToString(",") { albumJson(it, withSongs = false) }}]}""")
+                    "getSong" -> ok(""""song":${songJsonById(url.queryParameter("id")!!)}""")
                     "getAlbum" -> ok(""""album":${albumJson(url.queryParameter("id")!!.removePrefix("a").toInt(), withSongs = true)}""")
                     "getArtists" -> ok(""""artists":{"index":[{"name":"D","artist":[${artistJson(6)}]},{"name":"M","artist":[${artistJson(0)}]}]}""")
                     "getArtist" -> if (url.queryParameter("id") == "ar30") {

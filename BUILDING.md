@@ -138,6 +138,19 @@ Install anyway.
 
 ## 3b. Publishing a release: phone, Windows, or both
 
+**The short way:** `release.ps1` in the project root does everything below - takes the next number from GitHub (last
+release + 1), writes it into the build files, builds the APK and/or MSI, shows `notes.md` and what will be committed, and
+after a `y` commits, pushes and creates the release. Write `notes.md` first, then:
+
+```
+powershell -ExecutionPolicy Bypass -File release.ps1            # phone and Windows
+powershell -ExecutionPolicy Bypass -File release.ps1 -PhoneOnly # phone only
+powershell -ExecutionPolicy Bypass -File release.ps1 -PcOnly    # Windows only (adds --latest=false)
+powershell -ExecutionPolicy Bypass -File release.ps1 -DryRun    # just print the number it would use
+```
+
+The rest of this section is what it does, step by step.
+
 There is one counter of versions for the whole project (1.0.1, 1.0.2, ...) and one GitHub release per number, tagged
 `v` + the number. A release carries the file of each app that changed in it:
 

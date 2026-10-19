@@ -84,6 +84,9 @@ class Settings {
     /** The end of a track overlaps with the start of the next. On, as on the phone. */
     var crossfade: Boolean = true
 
+    /** Other programs on this computer (Jarvis) may drive the player through [com.platter.desktop.remote.RemoteControl]. No switch on screen yet: false here turns it off. */
+    var remoteControl: Boolean = true
+
     /** The equalizer's button in the player bar; off, it is reached from Settings only. */
     var equalizerButton: Boolean = false
 

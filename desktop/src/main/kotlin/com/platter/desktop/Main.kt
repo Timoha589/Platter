@@ -54,7 +54,7 @@ fun main() {
 
 @OptIn(FlowPreview::class)
 private fun runApp() = application {
-    val app = remember { AppController(SettingsStore(), CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+    val app = remember { AppController(SettingsStore(), CoroutineScope(SupervisorJob() + Dispatchers.Main)).also { it.startRemoteControl() } }
     val window = remember {
         // The window opens where and as big as it was left; a place that is no longer on any screen (a monitor unplugged) is dropped.
         val saved = app.savedWindow
