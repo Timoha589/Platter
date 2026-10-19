@@ -324,7 +324,7 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "Show more" to "Ещё",
     "Show public playlists" to "Показать общие плейлисты",
     "Shown" to "Показано",
-    "Shows a button for the equalizer in the player bar, next to the lyrics and the queue." to "Показывает в панели плеера кнопку эквалайзера рядом с кнопками текста и очереди.",
+    "While the equalizer is on, its button is in the player bar next to the lyrics and the queue. This keeps it there when the equalizer is off too." to "Пока эквалайзер включён, его кнопка стоит в панели плеера рядом с текстом и очередью. Этот переключатель оставляет её там, даже когда эквалайзер выключен.",
     "Shuffle" to "Перемешать",
     "Shuffle all" to "Перемешать все",
     "Sign in" to "Войти",

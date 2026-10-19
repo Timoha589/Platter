@@ -508,10 +508,18 @@ class InteractionTest {
     }
 
     @Test
-    fun `the equalizer button is in the player bar only once settings ask for it`() = FakeSubsonic().use { fake ->
+    fun `the equalizer button is in the player bar while the equalizer is on, or settings keep it there`() = FakeSubsonic().use { fake ->
         runDesktopComposeUiTest(1280, 800) {
             val app = deemixApp(fake)
             open(app)
+            onAllNodesWithContentDescription("Equalizer").assertCountEquals(0)
+
+            app.changeEqualizer(app.equalizer.copy(enabled = true))
+            step()
+            onNodeWithContentDescription("Equalizer").assertExists()
+
+            app.changeEqualizer(app.equalizer.copy(enabled = false))
+            step()
             onAllNodesWithContentDescription("Equalizer").assertCountEquals(0)
 
             app.changeEqualizerButton(true)
@@ -521,6 +529,39 @@ class InteractionTest {
             app.changeEqualizerButton(false)
             step()
             onAllNodesWithContentDescription("Equalizer").assertCountEquals(0)
+            app.shutdown()
+        }
+    }
+
+    @Test
+    fun `a pasted name with a line break shows in the search field as one line`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            open(app)
+            onNode(hasSetTextAction()).performTextInput("abbey\r\n")
+            step(16)
+            assertEquals("abbey ", app.searchQuery)
+            onNodeWithText("Top result").assertIsDisplayed()
+            app.shutdown()
+        }
+    }
+
+    @Test
+    fun `a home rail is asked again from the button by its title, and keeps its cards meanwhile`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            app.saveHomeLayout(listOf(HomeSection.RecentlyAdded) + HomeSection.entries.filter { it != HomeSection.RecentlyAdded }, hidden = HomeSection.entries.filter { it != HomeSection.RecentlyAdded }.toSet())
+            open(app)
+            step()
+            fun newest() = fake.requestsTo("getAlbumList2").count { it.queryParameter("type") == "newest" }
+            val before = newest()
+            assertTrue(before >= 1)
+            onNodeWithText("Recently added").assertIsDisplayed()
+
+            onNodeWithContentDescription("Refresh").performClick()
+            step()
+            assertEquals(before + 1, newest())
+            onNodeWithText("Recently added").assertIsDisplayed()
             app.shutdown()
         }
     }

@@ -381,4 +381,26 @@
     <string name="artist_picker_collaborations_only">仅出现在合作曲目中</string>
     <string name="artist_page_title_collaborations_section">合作曲目</string>
     <string name="song_list_page_collaborations">合作曲目：%1$s</string>
+    <string name="player_more_button">更多</string>
+    <string name="player_more_add_to_playlist">添加到播放列表</string>
+    <string name="player_more_download">下载</string>
+    <string name="player_more_remove_download">删除下载</string>
+    <string name="player_more_dislike">不喜欢</string>
+    <string name="player_more_remove_dislike">取消不喜欢</string>
+    <string name="player_more_equalizer">均衡器</string>
+    <string name="player_more_track_info">曲目信息</string>
+    <string name="eq_title">均衡器</string>
+    <string name="eq_preamp">前级增益</string>
+    <string name="eq_reset">重置</string>
+    <string name="eq_preset_flat">平直</string>
+    <string name="eq_preset_bass_boost">低音增强</string>
+    <string name="eq_preset_treble_boost">高音增强</string>
+    <string name="eq_preset_rock">摇滚</string>
+    <string name="eq_preset_pop">流行</string>
+    <string name="eq_preset_jazz">爵士</string>
+    <string name="eq_preset_classical">古典</string>
+    <string name="eq_preset_vocal">人声</string>
+    <string name="eq_preset_electronic">电子</string>
+    <string name="player_disliked">已标记为不喜欢</string>
+    <string name="player_dislike_removed">已取消不喜欢</string>
 </resources>

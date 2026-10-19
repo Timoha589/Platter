@@ -22,6 +22,7 @@ import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession.ControllerInfo
 import com.cappielloantonio.tempo.App
+import com.cappielloantonio.tempo.audio.EqualizerProcessor
 import com.cappielloantonio.tempo.repository.AutomotiveRepository
 import com.cappielloantonio.tempo.repository.SongRepository
 import com.cappielloantonio.tempo.subsonic.api.mediaannotation.MediaAnnotationClient.PlaybackState
@@ -129,7 +130,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
      * the shifter it is lined up with.
      */
     private fun newHelperPlayer(shifter: SampleShifter): ExoPlayer = ExoPlayer.Builder(this)
-            .setRenderersFactory(DownloadUtil.buildRenderersFactory(this, false, shifter))
+            .setRenderersFactory(DownloadUtil.buildRenderersFactory(this, false, shifter, EqualizerProcessor()))
             .setMediaSourceFactory(getMediaSourceFactory())
             .setAudioAttributes(AudioAttributes.DEFAULT, false)
             .build()
@@ -362,7 +363,8 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         clearListener()
     }
 
-    private fun getRenderersFactory() = DownloadUtil.buildRenderersFactory(this, false)
+    // The app's equalizer is in the sound of every player, the crossfade's helper as well.
+    private fun getRenderersFactory() = DownloadUtil.buildRenderersFactory(this, false, EqualizerProcessor())
 
     private fun getMediaSourceFactory() =
             DefaultMediaSourceFactory(this).setDataSourceFactory(DownloadUtil.getDataSourceFactory(this))

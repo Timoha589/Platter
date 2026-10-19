@@ -54,21 +54,6 @@
         app:layout_constraintStart_toEndOf="@+id/controls_start_guideline"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ImageButton
-            android:id="@+id/player_download_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="11dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_download_button"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_download"
-            app:tint="?attr/colorOnPrimaryContainer" />
-
         <com.google.android.material.chip.Chip
             android:id="@+id/player_media_extension"
             style="@style/Widget.Material3.Chip.Suggestion"
@@ -81,7 +66,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/player_media_bitrate"
-            app:layout_constraintStart_toEndOf="@+id/player_download_button"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintHorizontal_chainStyle="packed"/>
 
         <TextView
@@ -92,21 +77,7 @@
             app:layout_constraintTop_toTopOf="@id/player_media_extension"
             app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
             app:layout_constraintStart_toEndOf="@id/player_media_extension"
-            app:layout_constraintEnd_toStartOf="@+id/player_dislike_button"/>
-
-        <ImageButton
-            android:id="@+id/player_dislike_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_dislike_button"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
-            app:layout_constraintEnd_toStartOf="@+id/player_instant_mix_button"
-            app:layout_constraintTop_toTopOf="@id/player_media_extension"
-            app:srcCompat="@drawable/ic_thumb_down_outlined"
-            app:tint="?attr/colorOnPrimaryContainer" />
+            app:layout_constraintEnd_toStartOf="@+id/player_instant_mix_button"/>
 
         <ImageButton
             android:id="@+id/player_instant_mix_button"
@@ -131,37 +102,24 @@
             android:padding="8dp"
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
-            app:layout_constraintEnd_toStartOf="@+id/player_info_track"
+            app:layout_constraintEnd_toStartOf="@+id/player_more_button"
             app:layout_constraintTop_toTopOf="@id/player_media_extension"
             app:srcCompat="@drawable/ic_lyrics_text"
             app:tint="?attr/colorOnPrimaryContainer" />
 
         <ImageButton
-            android:id="@+id/player_info_track"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:scaleType="fitCenter"
-            app:layout_constraintEnd_toStartOf="@+id/player_add_to_playlist_button"
-            app:layout_constraintTop_toTopOf="@id/player_media_extension"
-            app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
-            app:srcCompat="@drawable/ic_info_stream"
-            app:tint="?attr/colorOnPrimaryContainer" />
-
-        <ImageButton
-            android:id="@+id/player_add_to_playlist_button"
+            android:id="@+id/player_more_button"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginEnd="11dp"
             android:padding="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_add_to_playlist_button"
+            android:contentDescription="@string/player_more_button"
             android:scaleType="fitCenter"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@id/player_media_extension"
             app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
-            app:srcCompat="@drawable/ic_add"
+            app:srcCompat="@drawable/ic_more_vert"
             app:tint="?attr/colorOnPrimaryContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>

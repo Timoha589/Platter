@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,21 +76,39 @@ fun HomeScreen(app: AppController) {
     }
 }
 
-/** Runs [fetch] for one section; a section with nothing to show, or that failed, is simply not there. */
+/** Asks a section again: [run] starts it, [busy] says the answer is not back yet. */
+private class Reload(val run: () -> Unit, val busy: Boolean)
+
+/**
+ * Runs [fetch] for one section; a section with nothing to show, or that failed, is simply not there. While a refresh
+ * is on its way the cards already shown stay, so the page does not jump; [beforeRefresh] drops a cached copy first.
+ */
 @Composable
-private fun <T> Section(client: SubsonicClient, key: Any, fetch: suspend (SubsonicClient) -> List<T>, content: @Composable (List<T>) -> Unit) {
+private fun <T> Section(
+    client: SubsonicClient,
+    key: Any,
+    fetch: suspend (SubsonicClient) -> List<T>,
+    beforeRefresh: () -> Unit = {},
+    content: @Composable (List<T>, Reload) -> Unit,
+) {
     val loader = rememberLoader(client to key) { fetch(client) }
+    // Not state: it only changes with the loader's own state, which already recomposes.
+    val shown = remember(client, key) { arrayOfNulls<List<T>>(1) }
     val state = loader.state
-    if (state is Load.Ready && state.value.isNotEmpty()) content(state.value)
+    if (state is Load.Ready) shown[0] = state.value
+    if (state is Load.Failed) shown[0] = null
+    val items = shown[0]
+    if (!items.isNullOrEmpty()) content(items, Reload({ beforeRefresh(); loader.retry() }, state is Load.Loading))
 }
 
 @Composable
 private fun HomeSectionView(app: AppController, client: SubsonicClient, section: HomeSection) {
     when (section) {
-        HomeSection.Discovery -> Section(client, section, { it.randomSongs(10) }) { songs ->
+        HomeSection.Discovery -> Section(client, section, { it.randomSongs(10) }) { songs, reload ->
             Rail(
                 t("Discovery"), songs,
                 onSeeAll = { app.shuffleAll() }, actionLabel = t("Shuffle all"),
+                onRefresh = reload.run, refreshing = reload.busy,
             ) { song -> SongCard(app, song, onPlay = { app.player.play(songs, songs.indexOf(song)) }) }
         }
 
@@ -99,26 +118,26 @@ private fun HomeSectionView(app: AppController, client: SubsonicClient, section:
             Rail(t("Playlists"), pinned) { PlaylistCard(app, it) }
         }
 
-        HomeSection.MadeForYou -> Section(client, section, { app.liked().songs.orEmpty().shuffled().take(10) }) { songs ->
-            // Each liked song is a seed: pressing one plays it and songs like it.
-            Rail(t("Made for you"), songs) { song -> SongCard(app, song, onPlay = { app.startRadio(song) }) }
+        HomeSection.MadeForYou -> Section(client, section, { app.liked().songs.orEmpty().shuffled().take(10) }) { songs, reload ->
+            // Each liked song is a seed: pressing one plays it and songs like it. A refresh draws another ten.
+            Rail(t("Made for you"), songs, onRefresh = reload.run, refreshing = reload.busy) { song -> SongCard(app, song, onPlay = { app.startRadio(song) }) }
         }
 
-        HomeSection.StarredTracks -> Section(client, section, { app.liked().songs.orEmpty().take(RAIL) }) { songs ->
-            Rail(t("Liked songs"), songs, onSeeAll = { app.navigate(Screen.Liked) }) { song ->
+        HomeSection.StarredTracks -> Section(client, section, { app.liked().songs.orEmpty().take(RAIL) }, app::forgetLiked) { songs, reload ->
+            Rail(t("Liked songs"), songs, onSeeAll = { app.navigate(Screen.Liked) }, onRefresh = reload.run, refreshing = reload.busy) { song ->
                 SongCard(app, song, onPlay = { app.player.play(songs, songs.indexOf(song)) })
             }
         }
 
-        HomeSection.StarredAlbums -> Section(client, section, { app.liked().albums.orEmpty().take(RAIL) }) { albums ->
-            Rail(t("Liked albums"), albums, onSeeAll = { app.navigate(Screen.AlbumList("Liked albums", "starred")) }) { AlbumCard(app, it) }
+        HomeSection.StarredAlbums -> Section(client, section, { app.liked().albums.orEmpty().take(RAIL) }, app::forgetLiked) { albums, reload ->
+            Rail(t("Liked albums"), albums, onSeeAll = { app.navigate(Screen.AlbumList("Liked albums", "starred")) }, onRefresh = reload.run, refreshing = reload.busy) { AlbumCard(app, it) }
         }
 
-        HomeSection.StarredArtists -> Section(client, section, { app.liked().artists.orEmpty().take(RAIL) }) { artists ->
-            Rail(t("Liked artists"), artists, onSeeAll = { app.navigate(Screen.LikedArtists) }) { ArtistCard(app, it) }
+        HomeSection.StarredArtists -> Section(client, section, { app.liked().artists.orEmpty().take(RAIL) }, app::forgetLiked) { artists, reload ->
+            Rail(t("Liked artists"), artists, onSeeAll = { app.navigate(Screen.LikedArtists) }, onRefresh = reload.run, refreshing = reload.busy) { ArtistCard(app, it) }
         }
 
-        HomeSection.Flashback -> Section(client, section, { decades(it) }) { decades ->
+        HomeSection.Flashback -> Section(client, section, { decades(it) }) { decades, _ ->
             Rail(t("Flashback"), decades) { decade -> DecadeTile(decade) { app.navigate(Screen.AlbumList("${decade}s", "byYear", decade, decade + 9)) } }
         }
 
@@ -126,16 +145,16 @@ private fun HomeSectionView(app: AppController, client: SubsonicClient, section:
         HomeSection.LastPlayed -> AlbumsRail(app, client, section, "Last played", "recent")
         HomeSection.RecentlyAdded -> AlbumsRail(app, client, section, "Recently added", "newest")
 
-        HomeSection.NewestPodcasts -> Section(client, Pair(section, app.podcastVersion), { runCatching { it.newestEpisodes(RAIL) }.getOrDefault(emptyList()) }) { episodes ->
+        HomeSection.NewestPodcasts -> Section(client, Pair(section, app.podcastVersion), { runCatching { it.newestEpisodes(RAIL) }.getOrDefault(emptyList()) }) { episodes, reload ->
             // Only what the server has downloaded can be played, so only that is offered.
             val ready = episodes.filter { it.isDownloaded }
-            Rail(t("New episodes"), ready) { episode ->
+            Rail(t("New episodes"), ready, onRefresh = reload.run, refreshing = reload.busy) { episode ->
                 SongCard(app, app.songOf(episode), onPlay = { app.playEpisodes(ready, ready.indexOf(episode)) })
             }
         }
 
-        HomeSection.NewReleases -> Section(client, section, { newReleases(it) }) { albums ->
-            Rail(t("New releases"), albums) { AlbumCard(app, it) }
+        HomeSection.NewReleases -> Section(client, section, { newReleases(it) }) { albums, reload ->
+            Rail(t("New releases"), albums, onRefresh = reload.run, refreshing = reload.busy) { AlbumCard(app, it) }
         }
     }
 }
@@ -143,8 +162,8 @@ private fun HomeSectionView(app: AppController, client: SubsonicClient, section:
 /** A rail of albums of one `getAlbumList2` kind, with its full list one press away. */
 @Composable
 private fun AlbumsRail(app: AppController, client: SubsonicClient, section: HomeSection, title: String, type: String) {
-    Section(client, section, { it.albumList(type, RAIL) }) { albums ->
-        Rail(t(title), albums, onSeeAll = { app.navigate(Screen.AlbumList(title, type)) }) { AlbumCard(app, it) }
+    Section(client, section, { it.albumList(type, RAIL) }) { albums, reload ->
+        Rail(t(title), albums, onSeeAll = { app.navigate(Screen.AlbumList(title, type)) }, onRefresh = reload.run, refreshing = reload.busy) { AlbumCard(app, it) }
     }
 }
 

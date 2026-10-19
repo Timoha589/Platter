@@ -185,7 +185,8 @@ fun PlayerBar(app: AppController) {
 
         // Right: the panels, then the volume.
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            if (app.equalizerButton) {
+            // Switched on, the equalizer is something being listened through, so its button is at hand; the setting keeps it there when off.
+            if (app.equalizer.enabled || app.equalizerButton) {
                 IconAction(Icons.Outlined.Tune, t("Equalizer"), if (app.equalizer.enabled) PlatterColors.Green else PlatterColors.Mist) { app.dialog = AppDialog.Equalizer }
                 Spacer(Modifier.width(16.dp))
             }

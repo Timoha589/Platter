@@ -348,4 +348,26 @@
     <string name="artist_picker_collaborations_only">Apenas em colaborações</string>
     <string name="artist_page_title_collaborations_section">Colaborações</string>
     <string name="song_list_page_collaborations">Colaborações: %1$s</string>
+    <string name="player_more_button">Mais</string>
+    <string name="player_more_add_to_playlist">Adicionar à playlist</string>
+    <string name="player_more_download">Baixar</string>
+    <string name="player_more_remove_download">Remover download</string>
+    <string name="player_more_dislike">Não gostei</string>
+    <string name="player_more_remove_dislike">Remover \"Não gostei\"</string>
+    <string name="player_more_equalizer">Equalizador</string>
+    <string name="player_more_track_info">Informações da faixa</string>
+    <string name="eq_title">Equalizador</string>
+    <string name="eq_preamp">Pré-amplificador</string>
+    <string name="eq_reset">Redefinir</string>
+    <string name="eq_preset_flat">Plano</string>
+    <string name="eq_preset_bass_boost">Reforço de graves</string>
+    <string name="eq_preset_treble_boost">Reforço de agudos</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_pop">Pop</string>
+    <string name="eq_preset_jazz">Jazz</string>
+    <string name="eq_preset_classical">Clássica</string>
+    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_preset_electronic">Eletrônica</string>
+    <string name="player_disliked">Marcada como \"Não gostei\"</string>
+    <string name="player_dislike_removed">\"Não gostei\" removido</string>
 </resources>

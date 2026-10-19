@@ -50,6 +50,8 @@ import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.ui.activity.MainActivity;
 import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.ArtistPickerBottomSheetDialog;
+import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.EqualizerBottomSheetDialog;
+import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.PlayerMoreBottomSheetDialog;
 import com.cappielloantonio.tempo.ui.dialog.PlaylistChooserDialog;
 import com.cappielloantonio.tempo.ui.dialog.RatingDialog;
 import com.cappielloantonio.tempo.ui.dialog.TrackInfoDialog;
@@ -72,7 +74,7 @@ import java.util.List;
 import java.util.Objects;
 
 @UnstableApi
-public class PlayerControllerFragment extends Fragment {
+public class PlayerControllerFragment extends Fragment implements PlayerMoreBottomSheetDialog.Host {
     private static final String TAG = "PlayerCoverFragment";
 
     private static final long FADE_OUT_DURATION = 160;
@@ -90,17 +92,17 @@ public class PlayerControllerFragment extends Fragment {
     private TextView playerMediaBitrate;
     private ConstraintLayout playerQuickActionView;
     private ImageButton playerOpenQueueButton;
-    private ImageButton playerTrackInfo;
-    private ImageButton playerDislikeButton;
+    private ImageButton playerMoreButton;
     private ImageButton playerInstantMixButton;
-    private ImageButton playerAddToPlaylistButton;
-    private ImageButton playerDownloadButton;
     private ImageButton playerLyricsToggleButton;
     private ImageButton playerPlayPauseButton;
 
     private MainActivity activity;
     private PlayerBottomSheetViewModel playerBottomSheetViewModel;
     private ListenableFuture<MediaBrowser> mediaBrowserListenableFuture;
+
+    /** What is playing, as the player knows it: the more sheet reads the title, the kind and the track info from it. */
+    private MediaMetadata currentMetadata = MediaMetadata.EMPTY;
 
     /*
      * The player is painted with a slope between the two strongest colours of
@@ -175,9 +177,6 @@ public class PlayerControllerFragment extends Fragment {
         super.onStart();
         initializeBrowser();
         bindMediaController();
-
-        Child media = playerBottomSheetViewModel.getLiveMedia().getValue();
-        if (media != null) setDownloadButtonState(media);
     }
 
     @Override
@@ -216,11 +215,8 @@ public class PlayerControllerFragment extends Fragment {
         playerMediaBitrate = bind.getRoot().findViewById(R.id.player_media_bitrate);
         playerQuickActionView = bind.getRoot().findViewById(R.id.player_quick_action_view);
         playerOpenQueueButton = bind.getRoot().findViewById(R.id.player_open_queue_button);
-        playerTrackInfo = bind.getRoot().findViewById(R.id.player_info_track);
-        playerDislikeButton = bind.getRoot().findViewById(R.id.player_dislike_button);
+        playerMoreButton = bind.getRoot().findViewById(R.id.player_more_button);
         playerInstantMixButton = bind.getRoot().findViewById(R.id.player_instant_mix_button);
-        playerAddToPlaylistButton = bind.getRoot().findViewById(R.id.player_add_to_playlist_button);
-        playerDownloadButton = bind.getRoot().findViewById(R.id.player_download_button);
         playerLyricsToggleButton = bind.getRoot().findViewById(R.id.player_lyrics_toggle_button);
         playerPlayPauseButton = bind.getRoot().findViewById(R.id.exo_play_pause);
     }
@@ -242,6 +238,7 @@ public class PlayerControllerFragment extends Fragment {
         });
 
         playerLyricsToggleButton.setOnClickListener(view -> fadeToPage(isShowingLyrics() ? 0 : 1));
+        playerMoreButton.setOnClickListener(view -> PlayerMoreBottomSheetDialog.show(this));
     }
 
     /**
@@ -424,6 +421,8 @@ public class PlayerControllerFragment extends Fragment {
     }
 
     private void setMetadata(MediaMetadata mediaMetadata) {
+        currentMetadata = mediaMetadata;
+
         playerMediaTitleLabel.setText(String.valueOf(mediaMetadata.title));
         playerArtistNameLabel.setText(String.valueOf(mediaMetadata.artist));
 
@@ -459,11 +458,6 @@ public class PlayerControllerFragment extends Fragment {
             playerMediaBitrate.setVisibility(View.VISIBLE);
             playerMediaBitrate.setText(R.string.player_media_transcoding_requested);
         }
-
-        playerTrackInfo.setOnClickListener(view -> {
-            TrackInfoDialog dialog = TrackInfoDialog.newInstance(mediaMetadata);
-            dialog.show(activity.getSupportFragmentManager(), null);
-        });
     }
 
     private void setMediaControllerUI(MediaBrowser mediaBrowser) {
@@ -481,10 +475,7 @@ public class PlayerControllerFragment extends Fragment {
                     bind.getRoot().findViewById(R.id.player_playback_speed_button).setVisibility(View.VISIBLE);
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.VISIBLE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.GONE);
-                    playerDislikeButton.setVisibility(View.GONE);
                     playerInstantMixButton.setVisibility(View.GONE);
-                    playerAddToPlaylistButton.setVisibility(View.GONE);
-                    playerDownloadButton.setVisibility(View.GONE);
                     setPlaybackParameters(mediaBrowser);
                     break;
                 case Constants.MEDIA_TYPE_RADIO:
@@ -497,10 +488,7 @@ public class PlayerControllerFragment extends Fragment {
                     bind.getRoot().findViewById(R.id.player_playback_speed_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.GONE);
-                    playerDislikeButton.setVisibility(View.GONE);
                     playerInstantMixButton.setVisibility(View.GONE);
-                    playerAddToPlaylistButton.setVisibility(View.GONE);
-                    playerDownloadButton.setVisibility(View.GONE);
                     setPlaybackParameters(mediaBrowser);
                     break;
                 case Constants.MEDIA_TYPE_MUSIC:
@@ -514,10 +502,7 @@ public class PlayerControllerFragment extends Fragment {
                     bind.getRoot().findViewById(R.id.player_playback_speed_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.VISIBLE);
-                    playerDislikeButton.setVisibility(View.VISIBLE);
                     playerInstantMixButton.setVisibility(View.VISIBLE);
-                    playerAddToPlaylistButton.setVisibility(View.VISIBLE);
-                    playerDownloadButton.setVisibility(View.VISIBLE);
                     resetPlaybackParameters(mediaBrowser);
                     break;
             }
@@ -662,23 +647,9 @@ public class PlayerControllerFragment extends Fragment {
                     setRatingButtonsState(media);
                     LikeAnimation.play(buttonFavorite, media.getStarred() != null);
                 });
-                playerDislikeButton.setOnClickListener(v -> {
-                    playerBottomSheetViewModel.setDislike(media);
-                    setRatingButtonsState(media);
-                });
                 playerInstantMixButton.setOnClickListener(v -> playerBottomSheetViewModel
                         .getMediaInstantMix(media)
                         .observe(getViewLifecycleOwner(), this::answerInstantMix));
-                playerAddToPlaylistButton.setOnClickListener(v -> {
-                    Bundle bundle = new Bundle();
-                    bundle.putParcelable(Constants.TRACK_OBJECT, media);
-
-                    PlaylistChooserDialog dialog = new PlaylistChooserDialog();
-                    dialog.setArguments(bundle);
-                    dialog.show(requireActivity().getSupportFragmentManager(), null);
-                });
-                setDownloadButtonState(media);
-                playerDownloadButton.setOnClickListener(v -> toggleDownload(media));
                 buttonFavorite.setOnLongClickListener(v -> {
                     Bundle bundle = new Bundle();
                     bundle.putParcelable(Constants.TRACK_OBJECT, media);
@@ -698,28 +669,75 @@ public class PlayerControllerFragment extends Fragment {
     }
 
     /**
-     * Liking and disliking are mutually exclusive, so both buttons are redrawn
-     * from the track whenever either of them is used.
+     * Liking and disliking are mutually exclusive: a dislike takes the heart
+     * away, so the heart is redrawn from the track whenever either is used.
      */
     private void setRatingButtonsState(Child media) {
         buttonFavorite.setChecked(media.getStarred() != null);
-        playerDislikeButton.setImageResource(PlayerBottomSheetViewModel.isDisliked(media)
-                ? R.drawable.ic_thumb_down
-                : R.drawable.ic_thumb_down_outlined);
     }
 
-    /**
-     * The button carries both halves of the action: an arrow while the track is
-     * only on the server, a tick once it is on the device and tapping it would
-     * give the copy back.
-     */
-    private void setDownloadButtonState(Child media) {
-        boolean downloaded = DownloadUtil.getDownloadTracker(requireContext()).isDownloaded(media.getId());
+    // --- the more sheet ----------------------------------------------------------------------
 
-        playerDownloadButton.setImageResource(downloaded ? R.drawable.ic_download_done : R.drawable.ic_download);
-        playerDownloadButton.setContentDescription(getString(downloaded
-                ? R.string.player_download_button_downloaded
-                : R.string.player_download_button));
+    @Override
+    public CharSequence moreTitle() {
+        return currentMetadata.title;
+    }
+
+    @Override
+    public CharSequence moreArtist() {
+        return currentMetadata.artist;
+    }
+
+    @Override
+    public boolean moreIsMusic() {
+        String type = currentMetadata.extras != null ? currentMetadata.extras.getString("type", Constants.MEDIA_TYPE_MUSIC) : Constants.MEDIA_TYPE_MUSIC;
+        return Constants.MEDIA_TYPE_MUSIC.equals(type) && playerBottomSheetViewModel.getLiveMedia().getValue() != null;
+    }
+
+    @Override
+    public boolean moreIsDownloaded() {
+        Child media = playerBottomSheetViewModel.getLiveMedia().getValue();
+        return media != null && DownloadUtil.getDownloadTracker(requireContext()).isDownloaded(media.getId());
+    }
+
+    @Override
+    public boolean moreIsDisliked() {
+        return PlayerBottomSheetViewModel.isDisliked(playerBottomSheetViewModel.getLiveMedia().getValue());
+    }
+
+    @Override
+    public void onMoreAction(@NonNull PlayerMoreBottomSheetDialog.Action action) {
+        Child media = playerBottomSheetViewModel.getLiveMedia().getValue();
+
+        switch (action) {
+            case ADD_TO_PLAYLIST: {
+                if (media == null) return;
+                Bundle bundle = new Bundle();
+                bundle.putParcelable(Constants.TRACK_OBJECT, media);
+
+                PlaylistChooserDialog dialog = new PlaylistChooserDialog();
+                dialog.setArguments(bundle);
+                dialog.show(requireActivity().getSupportFragmentManager(), null);
+                break;
+            }
+            case DOWNLOAD:
+                if (media != null) toggleDownload(media);
+                break;
+            case DISLIKE:
+                if (media == null) return;
+                playerBottomSheetViewModel.setDislike(media);
+                setRatingButtonsState(media);
+                Snackbar.make(requireView(), PlayerBottomSheetViewModel.isDisliked(media)
+                        ? R.string.player_disliked
+                        : R.string.player_dislike_removed, Snackbar.LENGTH_SHORT).show();
+                break;
+            case EQUALIZER:
+                EqualizerBottomSheetDialog.show(requireActivity().getSupportFragmentManager());
+                break;
+            case TRACK_INFO:
+                TrackInfoDialog.newInstance(currentMetadata).show(activity.getSupportFragmentManager(), null);
+                break;
+        }
     }
 
     /**
@@ -747,16 +765,10 @@ public class PlayerControllerFragment extends Fragment {
             DownloadUtil.getDownloadTracker(requireContext()).remove(MappingUtil.mapDownload(media), new Download(media));
             Snackbar.make(requireView(), R.string.player_download_removed, Snackbar.LENGTH_SHORT).show();
         } else {
-            /*
-             * The tick only follows once the download reaches a terminal state
-             * and DownloaderService writes it back, so the snackbar is what
-             * answers the tap; the icon catches up on the next track change.
-             */
+            // The download takes a while; the snackbar is what answers the tap.
             DownloadUtil.getDownloadTracker(requireContext()).download(MappingUtil.mapDownload(media), new Download(media));
             Snackbar.make(requireView(), R.string.player_download_started, Snackbar.LENGTH_SHORT).show();
         }
-
-        setDownloadButtonState(media);
     }
 
     /*

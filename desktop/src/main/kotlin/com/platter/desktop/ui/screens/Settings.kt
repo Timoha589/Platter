@@ -126,7 +126,7 @@ fun SettingsScreen(app: AppController) {
             Setting(t("Equalizer"), t("Shape the sound with ten bands.")) {
                 OutlinedPill(if (app.equalizer.enabled) t("Equalizer: on…") else t("Equalizer…")) { app.dialog = AppDialog.Equalizer }
             }
-            Setting(t("Equalizer button in the player"), t("Shows a button for the equalizer in the player bar, next to the lyrics and the queue.")) {
+            Setting(t("Equalizer button in the player"), t("While the equalizer is on, its button is in the player bar next to the lyrics and the queue. This keeps it there when the equalizer is off too.")) {
                 Toggle(app.equalizerButton) { app.changeEqualizerButton(it) }
             }
             Setting(

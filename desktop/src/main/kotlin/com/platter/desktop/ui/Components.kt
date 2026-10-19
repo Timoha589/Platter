@@ -39,6 +39,14 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -263,19 +271,51 @@ fun LikedCover(size: Dp, modifier: Modifier = Modifier) {
 // --- sections --------------------------------------------------------------
 
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier, onSeeAll: (() -> Unit)? = null, actionLabel: String = t("Show all")) {
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    onSeeAll: (() -> Unit)? = null,
+    actionLabel: String = t("Show all"),
+    onRefresh: (() -> Unit)? = null,
+    refreshing: Boolean = false,
+) {
     Row(modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            if (onRefresh != null) {
+                Spacer(Modifier.width(12.dp))
+                RefreshButton(refreshing, onRefresh)
+            }
+        }
         // The pill reaches out past the gutter, as every hover surface does, so the words end on it.
         if (onSeeAll != null) GhostText(actionLabel, Modifier.offset(x = PlatterSpacing.Bleed), onClick = onSeeAll)
     }
 }
 
+/** Asks a section again; turns while the answer is on its way, so a press that changes nothing still shows it was heard. */
 @Composable
-fun <T> Rail(title: String, items: List<T>, onSeeAll: (() -> Unit)? = null, actionLabel: String = t("Show all"),itemContent: @Composable (T) -> Unit) {
+fun RefreshButton(refreshing: Boolean, onClick: () -> Unit) {
+    val angle = if (refreshing) {
+        rememberInfiniteTransition().animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing))).value
+    } else {
+        0f
+    }
+    IconAction(Icons.Outlined.Refresh, t("Refresh"), modifier = Modifier.rotate(angle).testTag("refresh")) { if (!refreshing) onClick() }
+}
+
+@Composable
+fun <T> Rail(
+    title: String,
+    items: List<T>,
+    onSeeAll: (() -> Unit)? = null,
+    actionLabel: String = t("Show all"),
+    onRefresh: (() -> Unit)? = null,
+    refreshing: Boolean = false,
+    itemContent: @Composable (T) -> Unit,
+) {
     if (items.isEmpty()) return
     Column {
-        SectionHeader(title, Modifier.padding(horizontal = PlatterSpacing.Gutter), onSeeAll, actionLabel)
+        SectionHeader(title, Modifier.padding(horizontal = PlatterSpacing.Gutter), onSeeAll, actionLabel, onRefresh, refreshing)
         LazyRow(contentPadding = PaddingValues(horizontal = PlatterSpacing.Bleed), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
             items(items) { itemContent(it) }
         }

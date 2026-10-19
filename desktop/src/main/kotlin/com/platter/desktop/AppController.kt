@@ -835,6 +835,11 @@ class AppController(
         return c.starred().also { likedCache = it; likedAt = System.currentTimeMillis() }
     }
 
+    /** A refresh pressed by hand goes to the server, however fresh the copy in hand is. */
+    fun forgetLiked() {
+        likedCache = null
+    }
+
     private fun likesChanged() {
         signalsStale = true
         likedCache = null

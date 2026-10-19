@@ -347,4 +347,26 @@
     <string name="artist_picker_collaborations_only">협업 곡에만 참여</string>
     <string name="artist_page_title_collaborations_section">협업</string>
     <string name="song_list_page_collaborations">협업: %1$s</string>
+    <string name="player_more_button">더 보기</string>
+    <string name="player_more_add_to_playlist">플레이리스트에 추가</string>
+    <string name="player_more_download">다운로드</string>
+    <string name="player_more_remove_download">다운로드 삭제</string>
+    <string name="player_more_dislike">싫어요</string>
+    <string name="player_more_remove_dislike">싫어요 취소</string>
+    <string name="player_more_equalizer">이퀄라이저</string>
+    <string name="player_more_track_info">트랙 정보</string>
+    <string name="eq_title">이퀄라이저</string>
+    <string name="eq_preamp">프리앰프</string>
+    <string name="eq_reset">초기화</string>
+    <string name="eq_preset_flat">플랫</string>
+    <string name="eq_preset_bass_boost">저음 강화</string>
+    <string name="eq_preset_treble_boost">고음 강화</string>
+    <string name="eq_preset_rock">록</string>
+    <string name="eq_preset_pop">팝</string>
+    <string name="eq_preset_jazz">재즈</string>
+    <string name="eq_preset_classical">클래식</string>
+    <string name="eq_preset_vocal">보컬</string>
+    <string name="eq_preset_electronic">일렉트로닉</string>
+    <string name="player_disliked">싫어요 표시함</string>
+    <string name="player_dislike_removed">싫어요 취소됨</string>
 </resources>

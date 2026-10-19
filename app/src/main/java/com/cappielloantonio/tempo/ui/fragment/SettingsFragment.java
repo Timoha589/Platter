@@ -1,7 +1,5 @@
 package com.cappielloantonio.tempo.ui.fragment;
 
-import android.content.Intent;
-import android.media.audiofx.AudioEffect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,8 +10,6 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -31,6 +27,7 @@ import androidx.preference.SeekBarPreference;
 
 import com.cappielloantonio.tempo.BuildConfig;
 import com.cappielloantonio.tempo.R;
+import com.cappielloantonio.tempo.ui.fragment.bottomsheetdialog.EqualizerBottomSheetDialog;
 import com.cappielloantonio.tempo.databinding.FragmentSettingsBinding;
 import com.cappielloantonio.tempo.deemix.DeemixClient;
 import com.cappielloantonio.tempo.deemix.DeemixQuota;
@@ -65,8 +62,6 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     private SettingViewModel settingViewModel;
     private FragmentSettingsBinding bind;
 
-    private ActivityResultLauncher<Intent> someActivityResultLauncher;
-
     // Asks how a library scan is getting on, a second apart, while this screen is there to show it.
     private static final long SCAN_POLL_MS = 1_000;
     private final Handler scanPoll = new Handler(Looper.getMainLooper());
@@ -74,11 +69,6 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        someActivityResultLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                });
     }
 
     @Override
@@ -262,16 +252,11 @@ public class SettingsFragment extends PreferenceFragmentCompat {
 
         if (equalizer == null) return;
 
-        Intent intent = new Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL);
-
-        if ((intent.resolveActivity(requireActivity().getPackageManager()) != null)) {
-            equalizer.setOnPreferenceClickListener(preference -> {
-                someActivityResultLauncher.launch(intent);
-                return true;
-            });
-        } else {
-            equalizer.setVisible(false);
-        }
+        // The app's own, the desktop's ten bands; the system's panel differed on every phone and was missing on many.
+        equalizer.setOnPreferenceClickListener(preference -> {
+            EqualizerBottomSheetDialog.show(getParentFragmentManager());
+            return true;
+        });
     }
 
     private void checkCacheStorage() {

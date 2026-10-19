@@ -440,6 +440,9 @@ private fun RoundButton(icon: ImageVector, description: String, enabled: Boolean
     }
 }
 
+/** Line breaks with the spaces around them; a search is one line. */
+private val LINE_BREAKS = Regex("[ \t]*[\r\n]+[ \t]*")
+
 /** The black strip across the top: the name over the sidebar, the arrows and search over the page, the account at the far end. */
 @Composable
 private fun TopBar(app: AppController) {
@@ -464,7 +467,10 @@ private fun TopBar(app: AppController) {
                 if (app.searchQuery.isEmpty()) Text(t("What do you want to play?"), style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Bone)
                 BasicTextField(
                     value = app.searchQuery,
-                    onValueChange = {
+                    onValueChange = { typed ->
+                        // A name copied from a page or a file often brings a line break with it. The field is one line, so it
+                        // would show only what follows the break - nothing - and each paste would add to text that cannot be seen.
+                        val it = typed.replace(LINE_BREAKS, " ")
                         app.searchQuery = it
                         if (it.isNotBlank() && app.screen != Screen.Search) app.navigate(Screen.Search)
                     },

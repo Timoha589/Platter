@@ -324,7 +324,7 @@ internal val PORTUGUESE: Map<String, String> = mapOf(
     "Show more" to "Mostrar mais",
     "Show public playlists" to "Mostrar playlists públicas",
     "Shown" to "Visível",
-    "Shows a button for the equalizer in the player bar, next to the lyrics and the queue." to "Mostra na barra do player um botão para o equalizador, ao lado da letra e da fila.",
+    "While the equalizer is on, its button is in the player bar next to the lyrics and the queue. This keeps it there when the equalizer is off too." to "Com o equalizador ligado, o botão dele fica na barra do player ao lado da letra e da fila. Esta opção o mantém lá também com o equalizador desligado.",
     "Shuffle" to "Aleatório",
     "Shuffle all" to "Tudo aleatório",
     "Sign in" to "Entrar",

@@ -324,7 +324,7 @@ internal val CHINESE: Map<String, String> = mapOf(
     "Show more" to "展开",
     "Show public playlists" to "显示公开播放列表",
     "Shown" to "已显示",
-    "Shows a button for the equalizer in the player bar, next to the lyrics and the queue." to "在播放栏的歌词和队列按钮旁显示均衡器按钮。",
+    "While the equalizer is on, its button is in the player bar next to the lyrics and the queue. This keeps it there when the equalizer is off too." to "均衡器开启时，其按钮显示在播放栏的歌词和队列按钮旁。开启此项后，均衡器关闭时按钮也会保留。",
     "Shuffle" to "随机播放",
     "Shuffle all" to "全部随机播放",
     "Sign in" to "登录",

@@ -17,21 +17,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ImageButton
-            android:id="@+id/player_download_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="16dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_download_button"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_download"
-            app:tint="?attr/colorOnPrimaryContainer" />
-
         <com.google.android.material.chip.Chip
             android:id="@+id/player_media_extension"
             style="@style/Widget.Material3.Chip.Suggestion"
@@ -56,26 +41,6 @@
             app:layout_constraintBottom_toBottomOf="@id/player_media_extension"
             app:layout_constraintStart_toEndOf="@id/player_media_extension"
             app:layout_constraintEnd_toEndOf="parent"/>
-
-        <!--
-            Outside the chip's chain, like the download button opposite it, so
-            the format chip stays centred on the screen rather than on whatever
-            room the two buttons leave it.
-        -->
-        <ImageButton
-            android:id="@+id/player_add_to_playlist_button"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="16dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_add_to_playlist_button"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_add"
-            app:tint="?attr/colorOnPrimaryContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -381,33 +346,18 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <ImageButton
-            android:id="@+id/player_dislike_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="16dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/player_dislike_button"
-            android:padding="12dp"
-            android:scaleType="fitCenter"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/player_instant_mix_button"
-            app:layout_constraintHorizontal_chainStyle="spread"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_thumb_down_outlined"
-            app:tint="?attr/colorOnPrimaryContainer" />
-
-        <ImageButton
             android:id="@+id/player_instant_mix_button"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:layout_marginStart="16dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/player_instant_mix_button"
             android:padding="12dp"
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/player_open_queue_button"
-            app:layout_constraintStart_toEndOf="@+id/player_dislike_button"
+            app:layout_constraintHorizontal_chainStyle="spread"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/ic_music_note"
             app:tint="?attr/colorOnPrimaryContainer" />
@@ -435,25 +385,30 @@
             android:padding="12dp"
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/player_info_track"
+            app:layout_constraintEnd_toStartOf="@+id/player_more_button"
             app:layout_constraintStart_toEndOf="@+id/player_open_queue_button"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/ic_lyrics_text"
             app:tint="?attr/colorOnPrimaryContainer" />
 
+        <!--
+            Everything that can be done with the track that has no button of
+            its own: playlist, download, dislike, equalizer, track info.
+        -->
         <ImageButton
-            android:id="@+id/player_info_track"
+            android:id="@+id/player_more_button"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginEnd="16dp"
             android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/player_more_button"
             android:padding="12dp"
             android:scaleType="fitCenter"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/player_lyrics_toggle_button"
             app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_info_stream"
+            app:srcCompat="@drawable/ic_more_vert"
             app:tint="?attr/colorOnPrimaryContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>

@@ -324,7 +324,7 @@ internal val KOREAN: Map<String, String> = mapOf(
     "Show more" to "더 보기",
     "Show public playlists" to "공개 플레이리스트 보기",
     "Shown" to "표시됨",
-    "Shows a button for the equalizer in the player bar, next to the lyrics and the queue." to "플레이어 바의 가사·대기열 버튼 옆에 이퀄라이저 버튼을 표시합니다.",
+    "While the equalizer is on, its button is in the player bar next to the lyrics and the queue. This keeps it there when the equalizer is off too." to "이퀄라이저가 켜져 있으면 플레이어 바의 가사·대기열 버튼 옆에 버튼이 표시됩니다. 이 옵션을 켜면 이퀄라이저가 꺼져 있어도 버튼이 남습니다.",
     "Shuffle" to "셔플",
     "Shuffle all" to "모두 셔플",
     "Sign in" to "로그인",

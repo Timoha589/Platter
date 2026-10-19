@@ -346,4 +346,26 @@
     <string name="artist_picker_collaborations_only">Uniquement en collaboration</string>
     <string name="artist_page_title_collaborations_section">Collaborations</string>
     <string name="song_list_page_collaborations">Collaborations : %1$s</string>
+    <string name="player_more_button">Plus</string>
+    <string name="player_more_add_to_playlist">Ajouter à une playlist</string>
+    <string name="player_more_download">Télécharger</string>
+    <string name="player_more_remove_download">Supprimer le téléchargement</string>
+    <string name="player_more_dislike">Je n\'aime pas</string>
+    <string name="player_more_remove_dislike">Retirer « Je n\'aime pas »</string>
+    <string name="player_more_equalizer">Égaliseur</string>
+    <string name="player_more_track_info">Infos sur le titre</string>
+    <string name="eq_title">Égaliseur</string>
+    <string name="eq_preamp">Préampli</string>
+    <string name="eq_reset">Réinitialiser</string>
+    <string name="eq_preset_flat">Neutre</string>
+    <string name="eq_preset_bass_boost">Renfort des basses</string>
+    <string name="eq_preset_treble_boost">Renfort des aigus</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_pop">Pop</string>
+    <string name="eq_preset_jazz">Jazz</string>
+    <string name="eq_preset_classical">Classique</string>
+    <string name="eq_preset_vocal">Voix</string>
+    <string name="eq_preset_electronic">Électronique</string>
+    <string name="player_disliked">Marqué « Je n\'aime pas »</string>
+    <string name="player_dislike_removed">« Je n\'aime pas » retiré</string>
 </resources>

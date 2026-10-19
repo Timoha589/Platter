@@ -87,7 +87,7 @@ class Settings {
     /** Other programs on this computer (Jarvis) may drive the player through [com.platter.desktop.remote.RemoteControl]. No switch on screen yet: false here turns it off. */
     var remoteControl: Boolean = true
 
-    /** The equalizer's button in the player bar; off, it is reached from Settings only. */
+    /** Keeps the equalizer's button in the player bar while the equalizer is off; while it is on, the button is there anyway. */
     var equalizerButton: Boolean = false
 
     /** The equalizer: on or off, the preamp in dB, and ten band gains in dB (empty is flat). */
