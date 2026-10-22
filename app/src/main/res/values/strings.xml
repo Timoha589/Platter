@@ -419,6 +419,8 @@
     <string name="settings_title_replay_gain">Replay Gain</string>
     <string name="settings_crossfade_title">Crossfade</string>
     <string name="settings_crossfade_summary">The end of a track overlaps with the start of the next. Not applied between consecutive tracks of the same album.</string>
+    <string name="settings_bluetooth_resume_title">Resume on Bluetooth reconnect</string>
+    <string name="settings_bluetooth_resume_summary">When the Bluetooth device playback was paused by disconnecting comes back, such as a car stereo, playback continues - even with the screen off.</string>
     <string name="settings_title_scrobble">Scrobble</string>
     <string name="settings_title_skip_min_star_rating_dialog">Songs with a rating of:</string>
     <string name="settings_title_share">Share</string>

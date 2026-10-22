@@ -23,6 +23,10 @@ object Preferences {
     private const val NEXT_SERVER_SWITCH = "next_server_switch"
     private const val PLAYBACK_SPEED = "playback_speed"
     private const val SKIP_SILENCE = "skip_silence"
+    private const val SHUFFLE_MODE = "shuffle_mode"
+    private const val REPEAT_MODE = "repeat_mode"
+    const val BLUETOOTH_RESUME = "bluetooth_resume"
+    private const val BLUETOOTH_RESUME_DEVICE = "bluetooth_resume_device"
     const val CROSSFADE = "crossfade"
     private const val IMAGE_CACHE_SIZE = "image_cache_size"
     private const val STREAMING_CACHE_SIZE = "streaming_cache_size"
@@ -211,6 +215,43 @@ object Preferences {
     @JvmStatic
     fun setPlaybackSpeed(playbackSpeed: Float) {
         App.getInstance().preferences.edit().putFloat(PLAYBACK_SPEED, playbackSpeed).apply()
+    }
+
+    @JvmStatic
+    fun isShuffleMode(): Boolean {
+        return App.getInstance().preferences.getBoolean(SHUFFLE_MODE, false)
+    }
+
+    @JvmStatic
+    fun setShuffleMode(isShuffleMode: Boolean) {
+        App.getInstance().preferences.edit().putBoolean(SHUFFLE_MODE, isShuffleMode).apply()
+    }
+
+    // One of Player.REPEAT_MODE_OFF, _ONE or _ALL.
+    @JvmStatic
+    fun getRepeatMode(): Int {
+        return App.getInstance().preferences.getInt(REPEAT_MODE, 0)
+    }
+
+    @JvmStatic
+    fun setRepeatMode(repeatMode: Int) {
+        App.getInstance().preferences.edit().putInt(REPEAT_MODE, repeatMode).apply()
+    }
+
+    @JvmStatic
+    fun isBluetoothResume(): Boolean {
+        return App.getInstance().preferences.getBoolean(BLUETOOTH_RESUME, true)
+    }
+
+    // The Bluetooth device playback was paused by losing, while it waits to come back.
+    @JvmStatic
+    fun getBluetoothResumeDevice(): String? {
+        return App.getInstance().preferences.getString(BLUETOOTH_RESUME_DEVICE, null)
+    }
+
+    @JvmStatic
+    fun setBluetoothResumeDevice(device: String?) {
+        App.getInstance().preferences.edit().putString(BLUETOOTH_RESUME_DEVICE, device).apply()
     }
 
     @JvmStatic

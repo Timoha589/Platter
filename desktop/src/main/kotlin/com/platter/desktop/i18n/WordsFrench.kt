@@ -50,6 +50,8 @@ internal val FRENCH: Map<String, String> = mapOf(
     "Asking the server" to "Demande au serveur",
     "Audio is played by VLC." to "La lecture est assurée par VLC.",
     "Back" to "Retour",
+    "Scroll left" to "Défiler vers la gauche",
+    "Scroll right" to "Défiler vers la droite",
     "Bass boost" to "Renfort des basses",
     "Cancel" to "Annuler",
     "Cancel all" to "Tout annuler",

@@ -50,6 +50,8 @@ internal val CHINESE: Map<String, String> = mapOf(
     "Asking the server" to "正在询问服务器",
     "Audio is played by VLC." to "音频由 VLC 播放。",
     "Back" to "后退",
+    "Scroll left" to "向左滚动",
+    "Scroll right" to "向右滚动",
     "Bass boost" to "低音增强",
     "Cancel" to "取消",
     "Cancel all" to "全部取消",

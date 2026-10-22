@@ -26,6 +26,9 @@ import com.cappielloantonio.tempo.util.Flavors;
 import com.cappielloantonio.tempo.util.Preferences;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @UnstableApi
 public class BaseActivity extends AppCompatActivity {
     private static final String TAG = "BaseActivity";
@@ -62,10 +65,23 @@ public class BaseActivity extends AppCompatActivity {
     }
 
     private void checkPermission() {
+        List<String> missing = new ArrayList<>();
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+                missing.add(Manifest.permission.POST_NOTIFICATIONS);
             }
+        }
+
+        // Without it, music picks up on a Bluetooth reconnect only while the app happens to be running.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Preferences.isBluetoothResume()) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(Manifest.permission.BLUETOOTH_CONNECT);
+            }
+        }
+
+        if (!missing.isEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toArray(new String[0]), 101);
         }
     }
 

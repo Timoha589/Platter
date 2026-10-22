@@ -31,7 +31,7 @@ class PreviewPlayer(private val vlcArgs: List<String>, private val onEnd: (finis
             onEnd(false)
             return@execute
         }
-        p.media().play(file.toString())
+        p.media().play(mediaLocation(file))
     }
 
     fun stop() {

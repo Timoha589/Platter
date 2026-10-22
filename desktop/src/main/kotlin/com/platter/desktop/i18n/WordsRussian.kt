@@ -50,6 +50,8 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "Asking the server" to "Спрашиваю сервер",
     "Audio is played by VLC." to "Звук воспроизводит VLC.",
     "Back" to "Назад",
+    "Scroll left" to "Листать влево",
+    "Scroll right" to "Листать вправо",
     "Bass boost" to "Усиление басов",
     "Cancel" to "Отмена",
     "Cancel all" to "Отменить все",

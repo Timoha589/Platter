@@ -416,6 +416,8 @@
     <string name="settings_title_replay_gain">Усиление воспроизведения</string>
     <string name="settings_crossfade_title">Кроссфейд</string>
     <string name="settings_crossfade_summary">Конец трека накладывается на начало следующего. Между подряд идущими треками одного альбома не применяется.</string>
+    <string name="settings_bluetooth_resume_title">Продолжать при подключении Bluetooth</string>
+    <string name="settings_bluetooth_resume_summary">Если отключившееся Bluetooth-устройство, например магнитола в машине, поставило музыку на паузу, при его повторном подключении воспроизведение продолжится, даже с выключенным экраном.</string>
     <string name="settings_title_scrobble">Скробблинг</string>
     <string name="settings_title_skip_min_star_rating_dialog">Треки с рейтингом:</string>
     <string name="settings_title_share">Поделиться</string>

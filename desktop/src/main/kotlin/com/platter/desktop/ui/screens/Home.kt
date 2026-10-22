@@ -30,6 +30,7 @@ import com.platter.desktop.AppDialog
 import com.platter.desktop.HomeSection
 import com.platter.desktop.Screen
 import com.platter.desktop.api.Album
+import com.platter.desktop.api.Song
 import com.platter.desktop.api.SubsonicClient
 import com.platter.desktop.ui.AlbumCard
 import com.platter.desktop.ui.ArtistCard
@@ -142,7 +143,17 @@ private fun HomeSectionView(app: AppController, client: SubsonicClient, section:
         }
 
         HomeSection.MostPlayed -> AlbumsRail(app, client, section, "Most played", "frequent")
-        HomeSection.LastPlayed -> AlbumsRail(app, client, section, "Last played", "recent")
+        HomeSection.LastPlayed -> Section(client, section, { c -> app.recentlyPlayedSongs(0, RAIL) ?: c.albumList("recent", RAIL) }) { items, reload ->
+            // Songs where the server keeps their history (Navidrome), else the albums, which is all Subsonic knows.
+            val songs = items.filterIsInstance<Song>()
+            Rail(t("Last played"), items, onSeeAll = { app.navigate(Screen.AlbumList("Last played", "recent")) }, onRefresh = reload.run, refreshing = reload.busy) { item ->
+                when (item) {
+                    is Song -> SongCard(app, item, onPlay = { app.player.play(songs, songs.indexOf(item)) })
+                    is Album -> AlbumCard(app, item)
+                    else -> {}
+                }
+            }
+        }
         HomeSection.RecentlyAdded -> AlbumsRail(app, client, section, "Recently added", "newest")
 
         HomeSection.NewestPodcasts -> Section(client, Pair(section, app.podcastVersion), { runCatching { it.newestEpisodes(RAIL) }.getOrDefault(emptyList()) }) { episodes, reload ->

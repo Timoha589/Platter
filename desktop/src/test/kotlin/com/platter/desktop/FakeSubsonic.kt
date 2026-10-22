@@ -51,6 +51,7 @@ class FakeSubsonic : AutoCloseable {
                 // Only the REST api: the wave service reads its own bodies.
                 val form = if (request.method == "POST" && url.pathSegments.firstOrNull() == "rest") request.body.readUtf8().also { formBodies += url.pathSegments.last() to it }.let { "http://form.invalid/?$it".toHttpUrl() } else url
                 if (url.pathSegments.firstOrNull() == "wave") return wave(request, url)
+                if (url.encodedPath == "/auth/login" || (url.encodedPath == "/api/song" && request.getHeader("X-ND-Authorization") != null)) return navidrome(request, url)
                 if (url.pathSegments.firstOrNull() == "api") return deemix(request, url)
                 if (url.pathSegments.firstOrNull() == "deezer") return deezerCatalog(url)
                 if (url.pathSegments.firstOrNull() == "radio") return MockResponse().setHeader("Content-Type", "audio/wav").setBody(Buffer().write(wav(seconds = 30)))
@@ -306,6 +307,56 @@ class FakeSubsonic : AutoCloseable {
         }
         if (url.queryParameter("type") == "byGenre") all = all.take(3)
         return all.drop(offset).take(size)
+    }
+
+    // --- Navidrome's own API -------------------------------------------------------------------------
+
+    /**
+     * The song ids played last, newest first, as Navidrome's own API tells them; null makes this a plain Subsonic server
+     * whose `auth/login` is not there. A few never-played songs follow the history, as they do on the real server.
+     */
+    @Volatile
+    var navidromeHistory: List<String>? = null
+
+    /** The password the native login takes. */
+    @Volatile
+    var navidromePassword = "pw"
+
+    /** Each native login, as the password tried, and each `api/song` query. */
+    val navidromeLogins = CopyOnWriteArrayList<String>()
+    val navidromeQueries = CopyOnWriteArrayList<HttpUrl>()
+
+    /** Makes the session handed out so far stale, as when it has run out: the next call with it is refused. */
+    fun expireNavidromeSession() {
+        navidromeSession++
+    }
+
+    @Volatile
+    private var navidromeSession = 0
+
+    private fun navidrome(request: RecordedRequest, url: HttpUrl): MockResponse {
+        val history = navidromeHistory ?: return MockResponse().setResponseCode(404)
+        if (url.encodedPath == "/auth/login") {
+            val body = request.body.readUtf8()
+            val password = Regex("\"password\"\\s*:\\s*\"([^\"]*)\"").find(body)?.groupValues?.get(1).orEmpty()
+            navidromeLogins += password
+            return if (password == navidromePassword) json(200, """{"id":"u1","name":"Tim","username":"tim","token":"nd$navidromeSession"}""")
+            else json(401, """{"error":"Invalid username or password"}""")
+        }
+        navidromeQueries += url
+        if (request.getHeader("X-ND-Authorization") != "Bearer nd$navidromeSession") return json(401, """{"error":"Not authenticated"}""")
+        val start = url.queryParameter("_start")!!.toInt()
+        val end = url.queryParameter("_end")!!.toInt()
+        val played = history.mapIndexed { i, id -> nativeSongJson(id, "2026-10-22T${"%02d".format(20 - i % 20)}:00:00Z", plays = 3) }
+        val never = listOf("s7-4", "s7-5").map { nativeSongJson(it, null, plays = 0) }
+        val rows = (played + never).drop(start).take(end - start)
+        return json(200, "[${rows.joinToString(",")}]")
+    }
+
+    private fun nativeSongJson(id: String, playDate: String?, plays: Int): String {
+        val (album, n) = id.removePrefix("s").split("-").map { it.toInt() }
+        val date = playDate?.let { ""","playDate":"$it"""" }.orEmpty()
+        return """{"id":"$id","title":"Track $n of ${albumNames[album]}","album":"${albumNames[album]}","albumId":"a$album","artist":"${artistNames[album]}","artistId":"ar$album","albumArtist":"${artistNames[album]}","trackNumber":$n,"discNumber":1,"year":${1959 + album * 7},"duration":${180 + n * 7}.5,"suffix":"wav","bitRate":1411,"playCount":$plays,"starred":false$date}"""
     }
 
     private fun songJsonById(id: String): String {

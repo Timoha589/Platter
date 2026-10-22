@@ -13,6 +13,7 @@ import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.base.State
+import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -30,6 +31,12 @@ data class PlayerState(
 ) {
     val current: Song? get() = queue.current
 }
+
+/**
+ * What libvlc is given to open a file on this machine. Only ASCII, with the rest percent-encoded as UTF-8: JNA hands
+ * strings to libvlc in the Windows code page, so a raw "Музыка" in the path reached it as bytes it could not open.
+ */
+fun mediaLocation(file: Path): String = file.toUri().toASCIIString()
 
 /** How a track was left behind: it ran out, the listener moved on, or went back to an earlier one. */
 enum class Leave { Auto, Forward, Back }

@@ -1,5 +1,8 @@
 package com.cappielloantonio.tempo.ui.fragment;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.core.os.LocaleListCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.util.UnstableApi;
@@ -154,6 +158,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         actionChangeDownloadStorage();
         actionDeleteDownloadStorage();
         actionKeepScreenOn();
+        actionBluetoothResume();
         actionDeemix();
         actionCheckUpdate();
     }
@@ -598,6 +603,17 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                 } else {
                     activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 }
+            }
+            return true;
+        });
+    }
+
+    // Turned back on: the permission that lets it work with the app closed may have been refused before.
+    private void actionBluetoothResume() {
+        findPreference(Preferences.BLUETOOTH_RESUME).setOnPreferenceChangeListener((preference, newValue) -> {
+            if (Boolean.TRUE.equals(newValue) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 102);
             }
             return true;
         });

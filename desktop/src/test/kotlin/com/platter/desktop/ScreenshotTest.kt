@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.platter.desktop.api.Auth
 import com.platter.desktop.api.Credentials
@@ -105,6 +107,51 @@ class ScreenshotTest {
             app.navigate(Screen.Search)
             app.sidePanel = null
             shoot("11-search-in-lyrics")
+            app.shutdown()
+        }
+    }
+
+    @Test
+    fun `home rails turn with the arrows, and last played opens as a list`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 1000) {
+            val app = app(fake, "rails")
+            stopClock()
+            setContent { PlatterTheme { Box(Modifier.fillMaxSize().background(PlatterColors.Black)) { Shell(app) } } }
+            settle()
+            assertEquals(0, onAllNodesWithContentDescription("Scroll right").fetchSemanticsNodes().size, "no arrows until the pointer is over a rail")
+
+            // The first rails hold two cards and need no arrows; "Last played" runs past the edge. With the pointer over
+            // it, at its start, only the way forward is offered.
+            onRoot().performMouseInput { moveTo(Offset(560f, 260f)) }
+            settle()
+            assertEquals(0, onAllNodesWithContentDescription("Scroll right").fetchSemanticsNodes().size, "a rail that fits has no arrows")
+            onRoot().performMouseInput { moveTo(Offset(800f, 780f)) }
+            shoot("44-home-rail-hover")
+            assertEquals(0, onAllNodesWithContentDescription("Scroll left").fetchSemanticsNodes().size, "nothing to the left at the start")
+            onAllNodesWithContentDescription("Scroll right")[0].performClick()
+            repeat(30) { mainClock.advanceTimeByFrame() }
+            shoot("45-home-rail-turned")
+            assertTrue(onAllNodesWithContentDescription("Scroll left").fetchSemanticsNodes().isNotEmpty(), "after a turn the way back is offered")
+
+            app.navigate(Screen.AlbumList("Last played", "recent"))
+            shoot("46-last-played-list")
+            app.shutdown()
+        }
+    }
+
+    @Test
+    fun `last played as songs on a Navidrome server`() = FakeSubsonic().use { fake ->
+        fake.navidromeHistory = listOf("s2-3", "s4-1", "s1-2", "s6-5", "s2-1", "s5-2", "s3-4", "s0-1")
+        runDesktopComposeUiTest(1280, 1000) {
+            val app = app(fake, "history") { sealedPassword = com.platter.desktop.data.Secrets.seal("pw") }
+            stopClock()
+            setContent { PlatterTheme { Box(Modifier.fillMaxSize().background(PlatterColors.Black)) { Shell(app) } } }
+            shoot("47-home-last-played-songs")
+            assertTrue(onAllNodesWithText("Track 3 of Abbey Road").fetchSemanticsNodes().isNotEmpty(), "the rail holds the songs played last")
+
+            app.navigate(Screen.AlbumList("Last played", "recent"))
+            shoot("48-last-played-songs-list")
+            assertTrue(onAllNodesWithText("Track 1 of Kind of Blue").fetchSemanticsNodes().isNotEmpty(), "the page lists the songs, oldest play last")
             app.shutdown()
         }
     }

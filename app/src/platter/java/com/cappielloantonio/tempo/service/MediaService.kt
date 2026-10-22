@@ -48,6 +48,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
     private lateinit var librarySessionCallback: MediaLibrarySessionCallback
     private lateinit var scrobbleTracker: ScrobbleTracker
     private lateinit var crossfader: Crossfader
+    private lateinit var bluetoothResume: BluetoothResume
 
     /*
      * The gain is only worked out when the tracks change, so without this a
@@ -121,6 +122,10 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
                 .setWakeMode(C.WAKE_MODE_NETWORK)
                 .setLoadControl(initializeLoadControl())
                 .build()
+
+        // Shuffle and repeat are the listener's choice, not the session's: they outlive a restart.
+        player.shuffleModeEnabled = Preferences.isShuffleMode()
+        player.repeatMode = Preferences.getRepeatMode()
     }
 
     /*
@@ -193,9 +198,17 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
             !(this::castPlayer.isInitialized && castPlayer.isCastSessionAvailable)
         }
 
+        // Plays again when the Bluetooth device that was walked away from comes back.
+        bluetoothResume = BluetoothResume(this, player) {
+            !(this::castPlayer.isInitialized && castPlayer.isCastSessionAvailable)
+        }
+
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (mediaItem == null) return
+
+                // Back to music after a podcast or a radio, repeat is as the listener left it.
+                if (isMusicPlaying()) player.repeatMode = Preferences.getRepeatMode()
 
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK || reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                     MediaManager.setLastPlayedTimestamp(mediaItem)
@@ -220,6 +233,24 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
                 if (id != null && extras.getString("type") == Constants.MEDIA_TYPE_MUSIC && !NetworkUtil.isOffline()) {
                     songRepository.refreshFavorite(id)
                 }
+            }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                if (isMusicPlaying()) Preferences.setShuffleMode(shuffleModeEnabled)
+            }
+
+            /*
+             * The player screen turns repeat off by itself for a podcast or a
+             * radio, which have no use for it; that is not the listener's
+             * choice, so only a change made over music is kept.
+             */
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                if (isMusicPlaying()) Preferences.setRepeatMode(repeatMode)
+            }
+
+            private fun isMusicPlaying(): Boolean {
+                val type = player.currentMediaItem?.mediaMetadata?.extras?.getString("type")
+                return type == null || type == Constants.MEDIA_TYPE_MUSIC
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -352,6 +383,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         MediaManager.reportPlayback(player.currentMediaItem, PlaybackState.STOPPED, player.currentPosition)
         scrobbleTracker.release()
         crossfader.release()
+        bluetoothResume.release()
         App.getInstance().preferences.unregisterOnSharedPreferenceChangeListener(replayGainModeListener)
         FavoriteState.changes().removeObserver(favoriteObserver)
 

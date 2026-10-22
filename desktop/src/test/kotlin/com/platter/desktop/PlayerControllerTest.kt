@@ -4,6 +4,7 @@ import com.platter.desktop.api.Auth
 import com.platter.desktop.api.Credentials
 import com.platter.desktop.api.SubsonicClient
 import com.platter.desktop.player.PlayerController
+import com.platter.desktop.player.mediaLocation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -98,6 +99,22 @@ class PlayerControllerTest {
             while (!player.state.value.isPlaying && System.currentTimeMillis() < end) Thread.sleep(25)
             dump("after next")
             assertTrue(player.state.value.isPlaying, log.toString())
+        } finally {
+            player.release()
+        }
+    }
+
+    @Test
+    fun `a downloaded file in a folder named in Cyrillic plays`() = FakeSubsonic().use { fake ->
+        val folder = java.nio.file.Files.createTempDirectory("platter").resolve("Музыка").resolve("Ado — 歌")
+        java.nio.file.Files.createDirectories(folder)
+        val file = folder.resolve("01 - Усеева #1.wav").also { java.nio.file.Files.write(it, fake.audioBytes("s0-1")) }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val player = PlayerController(scope, { mediaLocation(file) }, { _, _, _ -> }, vlcArgs = listOf("--aout=dummy"))
+        try {
+            val song = com.platter.desktop.api.Song().apply { id = "local"; title = "Усеева"; artist = "Ado"; duration = 4 }
+            player.play(listOf(song))
+            waitFor(what = "the local file to play (state: ${player.state.value.error})") { player.state.value.let { it.isPlaying && it.positionMs > 0 } }
         } finally {
             player.release()
         }

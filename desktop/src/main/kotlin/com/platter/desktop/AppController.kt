@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import com.platter.desktop.api.Album
 import com.platter.desktop.api.Artist
 import com.platter.desktop.api.ArtistCredit
+import com.platter.desktop.api.NavidromeClient
 import com.platter.desktop.api.Playlist
 import com.platter.desktop.api.PodcastChannel
 import com.platter.desktop.api.PodcastEpisode
@@ -46,6 +47,7 @@ import com.platter.desktop.data.Secrets
 import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.log.AppLog
 import com.platter.desktop.player.PlayerController
+import com.platter.desktop.player.mediaLocation
 import com.platter.desktop.remote.RemoteControl
 import com.platter.desktop.search.FuzzyIndex
 import com.platter.desktop.search.LibrarySignals
@@ -491,7 +493,7 @@ class AppController(
 
     val player = PlayerController(
         scope = scope,
-        urlFor = { song -> localFile(song)?.toUri()?.toString() ?: song.streamUrl ?: song.id?.let { client?.streamUrl(it, maxBitrate.takeIf { b -> b > 0 }, streamFormat) } },
+        urlFor = { song -> localFile(song)?.let(::mediaLocation) ?: song.streamUrl ?: song.id?.let { client?.streamUrl(it, maxBitrate.takeIf { b -> b > 0 }, streamFormat) } },
         scrobble = { id, submission, time ->
             if (scrobbling) {
                 // "Now playing" is best effort; a counted play is written down first and sent when the server answers.
@@ -681,6 +683,25 @@ class AppController(
 
     /** The library searched by its embedded lyrics; null when the service could not be asked. */
     suspend fun searchLyrics(query: String): WaveLyrics? = wave()?.searchLyrics(query, 10)
+
+    // --- Navidrome's own API ----------------------------------------------------------
+
+    /** Built for one Subsonic client: a sign-in or a move between home and away addresses makes the next one. */
+    private var navidrome: Pair<SubsonicClient, NavidromeClient>? = null
+
+    private fun navidrome(): NavidromeClient? {
+        val c = client ?: return null
+        navidrome?.takeIf { it.first === c }?.let { return it.second }
+        val n = runCatching { NavidromeClient(c.credentials.serverUrl, c.credentials.username, password = { password }) }.getOrNull() ?: return null
+        navidrome = c to n
+        return n
+    }
+
+    /**
+     * The songs played last, newest first, from the server's own history - every device's plays, not just this one's.
+     * Null where the server cannot tell (not Navidrome, or no password to log in with): then the albums stand in.
+     */
+    suspend fun recentlyPlayedSongs(offset: Int, size: Int): List<Song>? = navidrome()?.recentlyPlayed(offset, size)
 
     // --- navigation and sign-in -------------------------------------------------
 

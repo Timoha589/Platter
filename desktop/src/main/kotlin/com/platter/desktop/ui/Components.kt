@@ -29,8 +29,16 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.vector.ImageVector
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -40,10 +48,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
@@ -292,16 +298,36 @@ fun SectionHeader(
     }
 }
 
-/** Asks a section again; turns while the answer is on its way, so a press that changes nothing still shows it was heard. */
+/**
+ * Asks a section again, and turns so a press that changes nothing still shows it was heard. A press gives at least one
+ * whole turn - an answer back within milliseconds used to stop the turn before a frame of it was drawn - and more
+ * whole turns while the answer is still on its way, ending where it started rather than snapping back mid-turn.
+ */
 @Composable
 fun RefreshButton(refreshing: Boolean, onClick: () -> Unit) {
-    val angle = if (refreshing) {
-        rememberInfiniteTransition().animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing))).value
-    } else {
-        0f
+    val angle = remember { Animatable(0f) }
+    var turning by remember { mutableStateOf(false) }
+    val busy by rememberUpdatedState(refreshing)
+    val scope = rememberCoroutineScope()
+    IconAction(Icons.Outlined.Refresh, t("Refresh"), modifier = Modifier.rotate(angle.value).testTag("refresh")) {
+        if (turning || refreshing) return@IconAction
+        turning = true
+        onClick()
+        scope.launch {
+            try {
+                do {
+                    angle.animateTo(angle.value + 360f, tween(REFRESH_TURN_MS, easing = LinearEasing))
+                } while (busy)
+            } finally {
+                angle.snapTo(0f)
+                turning = false
+            }
+        }
     }
-    IconAction(Icons.Outlined.Refresh, t("Refresh"), modifier = Modifier.rotate(angle).testTag("refresh")) { if (!refreshing) onClick() }
 }
+
+/** One turn of the refresh arrows. */
+private const val REFRESH_TURN_MS = 800
 
 @Composable
 fun <T> Rail(
@@ -314,11 +340,58 @@ fun <T> Rail(
     itemContent: @Composable (T) -> Unit,
 ) {
     if (items.isEmpty()) return
+    val row = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
     Column {
         SectionHeader(title, Modifier.padding(horizontal = PlatterSpacing.Gutter), onSeeAll, actionLabel, onRefresh, refreshing)
-        LazyRow(contentPadding = PaddingValues(horizontal = PlatterSpacing.Bleed), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            items(items) { itemContent(it) }
+        Box(Modifier.hoverable(hover)) {
+            LazyRow(state = row, contentPadding = PaddingValues(horizontal = PlatterSpacing.Bleed), horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                items(items) { itemContent(it) }
+            }
+            // A mouse has no sideways wheel: the arrows turn the rail a page at a time. They are there only under the
+            // pointer, and only toward cards still out of sight.
+            if (hovered && row.canScrollBackward) {
+                RailArrow(Icons.Filled.ChevronLeft, t("Scroll left"), Modifier.align(Alignment.CenterStart).padding(start = PlatterSpacing.Bleed)) {
+                    scope.launch { row.animateScrollToItem(pageBack(row)) }
+                }
+            }
+            if (hovered && row.canScrollForward) {
+                RailArrow(Icons.Filled.ChevronRight, t("Scroll right"), Modifier.align(Alignment.CenterEnd).padding(end = PlatterSpacing.Bleed)) {
+                    scope.launch { row.animateScrollToItem(pageForward(row)) }
+                }
+            }
         }
+    }
+}
+
+/** The card cut off at the right edge becomes the first one: nothing is skipped, and nothing seen is shown again whole. */
+private fun pageForward(row: LazyListState): Int {
+    val info = row.layoutInfo
+    val end = info.viewportEndOffset - info.afterContentPadding
+    val cut = info.visibleItemsInfo.firstOrNull { it.offset + it.size > end } ?: info.visibleItemsInfo.lastOrNull()
+    return (cut?.index ?: row.firstVisibleItemIndex).coerceAtLeast(row.firstVisibleItemIndex + 1)
+}
+
+/** The card cut off at the left edge becomes the last one whole, a page back. */
+private fun pageBack(row: LazyListState): Int {
+    val info = row.layoutInfo
+    val start = info.viewportStartOffset + info.beforeContentPadding
+    val end = info.viewportEndOffset - info.afterContentPadding
+    val whole = info.visibleItemsInfo.count { it.offset >= start && it.offset + it.size <= end }.coerceAtLeast(1)
+    val first = row.firstVisibleItemIndex + if (row.firstVisibleItemScrollOffset > 0) 1 else 0
+    return (first - whole).coerceAtLeast(0)
+}
+
+/** The design's navigation arrow - a 32px circle with a white chevron - on a surface of its own, since it sits over covers. */
+@Composable
+private fun RailArrow(icon: ImageVector, description: String, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.size(32.dp).clip(CircleShape).hoverFill(rest = PlatterColors.Graphite, hover = PlatterColors.Smoke).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, description, tint = PlatterColors.White, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -391,6 +464,8 @@ fun TrackRow(
     showNumber: Boolean = false,
     /** Where the album's name goes in a table; null leaves the column out. */
     album: String? = null,
+    /** How wide the number is; a list that mixes numbered rows with covered ones gives it the cover's room, so titles line up. */
+    numberWidth: Dp = 32.dp,
 ) {
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
@@ -411,7 +486,7 @@ fun TrackRow(
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (showNumber || coverArtId == null) Box(Modifier.width(32.dp), contentAlignment = Alignment.CenterStart) {
+            if (showNumber || coverArtId == null) Box(Modifier.width(numberWidth), contentAlignment = Alignment.CenterStart) {
                 if (hovered) {
                     Icon(Icons.Filled.PlayArrow, t("Play"), Modifier.size(20.dp).clickable(onClick = onPlay))
                 } else {

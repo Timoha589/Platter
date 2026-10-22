@@ -50,6 +50,8 @@ internal val KOREAN: Map<String, String> = mapOf(
     "Asking the server" to "서버에 요청 중",
     "Audio is played by VLC." to "오디오는 VLC가 재생합니다.",
     "Back" to "뒤로",
+    "Scroll left" to "왼쪽으로 스크롤",
+    "Scroll right" to "오른쪽으로 스크롤",
     "Bass boost" to "저음 강화",
     "Cancel" to "취소",
     "Cancel all" to "모두 취소",

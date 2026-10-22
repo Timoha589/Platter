@@ -12,6 +12,12 @@
             android:summary="@string/settings_crossfade_summary"
             android:defaultValue="true" />
 
+        <SwitchPreferenceCompat
+            android:key="bluetooth_resume"
+            android:title="@string/settings_bluetooth_resume_title"
+            android:summary="@string/settings_bluetooth_resume_summary"
+            android:defaultValue="true" />
+
         <Preference
             android:key="scan_library"
             android:title="@string/settings_scan_title" />

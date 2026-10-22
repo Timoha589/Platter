@@ -295,6 +295,8 @@
     <string name="settings_title_replay_gain">播放增益</string>
     <string name="settings_crossfade_title">淡入淡出</string>
     <string name="settings_crossfade_summary">一首歌的结尾与下一首的开头重叠。同一专辑中相邻的曲目之间不适用。</string>
+    <string name="settings_bluetooth_resume_title">蓝牙重新连接时继续播放</string>
+    <string name="settings_bluetooth_resume_summary">如果蓝牙设备（例如车载音响）断开导致播放暂停，该设备重新连接后将继续播放，即使屏幕已关闭。</string>
     <string name="settings_title_scrobble">音乐记录</string>
     <string name="settings_title_share">分享</string>
     <string name="settings_title_syncing">同步</string>

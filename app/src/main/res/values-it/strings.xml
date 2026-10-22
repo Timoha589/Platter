@@ -319,6 +319,8 @@
 	<string name="settings_title_replay_gain">Guadagno di riproduzione</string>
 	<string name="settings_crossfade_title">Crossfade</string>
 	<string name="settings_crossfade_summary">La fine di un brano si sovrappone all\'inizio del successivo. Non si applica tra brani consecutivi dello stesso album.</string>
+	<string name="settings_bluetooth_resume_title">Riprendi alla riconnessione Bluetooth</string>
+	<string name="settings_bluetooth_resume_summary">Se la disconnessione di un dispositivo Bluetooth, come l\'autoradio, ha messo in pausa la riproduzione, questa riprende quando si riconnette, anche a schermo spento.</string>
 	<string name="settings_title_scrobble">Scrobble</string>
 	<string name="settings_title_skip_min_star_rating_dialog">Brani con una valutazione di:</string>
 	<string name="settings_title_share">Condividi</string>

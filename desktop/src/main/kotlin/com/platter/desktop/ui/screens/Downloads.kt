@@ -131,6 +131,8 @@ fun DownloadsScreen(app: AppController) {
                             onPlay = { app.player.play(songs, i) },
                             detail = if (indices.size == 1) listOfNotNull(songs[i].artistLine(), record.album).joinToString(" · ") else null,
                             coverArtId = record.coverArtId.takeIf { indices.size == 1 },
+                            // The number takes the room of a lone song's cover, so every title in the list starts at one edge.
+                            numberWidth = PlatterSpacing.TrackCover + 12.dp,
                         )
                     }
                 }
@@ -145,8 +147,9 @@ private fun AlbumHeader(app: AppController, group: List<DownloadedSong>) {
     val first = group.first()
     val songs = group.sortedWith(compareBy({ it.discNumber ?: 1 }, { it.track ?: 0 })).map { it.toSong() }
     Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Cover(app, first.coverArtId, 56.dp)
-        Spacer(Modifier.width(16.dp))
+        // Sized and spaced like a song's cover, so the album's name starts where the titles below it do.
+        Cover(app, first.coverArtId, PlatterSpacing.TrackCover, PlatterShapes.Card)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(first.album ?: t("Unknown album"), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -159,6 +162,8 @@ private fun AlbumHeader(app: AppController, group: List<DownloadedSong>) {
             MenuEntry(t("Play album"), dismiss) { app.player.play(songs) }
             MenuEntry(t("Remove from downloads"), dismiss) { app.removeDownloads(songs) }
         }
+        // The dots stand over the songs' own dots, not out in the column of their lengths.
+        Spacer(Modifier.width(46.dp))
     }
 }
 
