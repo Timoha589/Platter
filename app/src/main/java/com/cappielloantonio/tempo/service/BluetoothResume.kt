@@ -34,6 +34,7 @@ class BluetoothResume(
 ) : Player.Listener {
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private var noisyAt = Long.MIN_VALUE / 2
+    private var resumedAt = Long.MIN_VALUE / 2
 
     // The device came back before the queue did: play as soon as there is something to play.
     private var waitingForQueue = false
@@ -67,6 +68,9 @@ class BluetoothResume(
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
         if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY) {
             noisyAt = SystemClock.elapsedRealtime()
+        } else if (!playWhenReady && SystemClock.elapsedRealtime() - resumedAt < SETTLE_MS) {
+            // Many head units send a pause of their own as they switch over to Bluetooth, right after the music came back.
+            player.play()
         } else if (playWhenReady || reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
             // Played again some other way, or paused on purpose: nothing is left to pick up.
             Preferences.setBluetoothResumeDevice(null)
@@ -83,6 +87,7 @@ class BluetoothResume(
 
     private fun resume() {
         if (player.playbackState == Player.STATE_IDLE) player.prepare()
+        resumedAt = SystemClock.elapsedRealtime()
         player.play()
     }
 
@@ -94,6 +99,9 @@ class BluetoothResume(
     companion object {
         // How long after the player is told the output went away that a lost device still counts as the cause.
         private const val NOISY_WINDOW_MS = 3_000L
+
+        // How long after playing again a pause is taken for the device's, not the listener's.
+        private const val SETTLE_MS = 10_000L
 
         private fun isBluetoothSink(device: AudioDeviceInfo): Boolean {
             if (!device.isSink) return false

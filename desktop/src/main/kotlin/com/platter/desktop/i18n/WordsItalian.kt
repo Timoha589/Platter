@@ -216,6 +216,7 @@ internal val ITALIAN: Map<String, String> = mapOf(
     "My Wave" to "La mia Wave",
     "My Wave could not start" to "La mia Wave non è partita",
     "My Wave could not start: %s" to "La mia Wave non è partita: %s",
+    "My Wave is built from your likes. Like a few tracks and try again" to "La mia Wave nasce dai tuoi Mi piace. Metti Mi piace a qualche brano e riprova",
     "My Wave is not set up on your server" to "La mia Wave non è configurata sul tuo server",
     "My Wave needs your password, which is only sent over HTTPS or on your home network" to "La mia Wave ha bisogno della tua password, che viene inviata solo via HTTPS o sulla rete domestica",
     "Name" to "Nome",

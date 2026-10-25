@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
@@ -76,6 +78,31 @@ class InteractionTest {
         mainClock.autoAdvance = false
         setContent { PlatterTheme { Box(Modifier.fillMaxSize().background(PlatterColors.Black)) { Shell(app) } } }
         step()
+    }
+
+    @Test
+    fun `a space typed in the search does not reach the window, where it plays and pauses`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            var reachedWindow = 0
+            mainClock.autoAdvance = false
+            // Stands in for the window's own key handler in Main.kt.
+            setContent {
+                PlatterTheme {
+                    Box(Modifier.fillMaxSize().background(PlatterColors.Black).onKeyEvent {
+                        if (it.key == Key.Spacebar) reachedWindow++
+                        false
+                    }) { Shell(app) }
+                }
+            }
+            step()
+
+            onNode(hasSetTextAction()).performTextInput("abbey")
+            onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Spacebar) }
+            step()
+            assertEquals(0, reachedWindow)
+            app.shutdown()
+        }
     }
 
     @Test

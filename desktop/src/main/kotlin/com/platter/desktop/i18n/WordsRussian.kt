@@ -216,6 +216,7 @@ internal val RUSSIAN: Map<String, String> = mapOf(
     "My Wave" to "Моя волна",
     "My Wave could not start" to "Волна не запустилась",
     "My Wave could not start: %s" to "Волна не запустилась: %s",
+    "My Wave is built from your likes. Like a few tracks and try again" to "Моя волна строится по вашим лайкам. Поставьте лайк нескольким трекам и попробуйте снова",
     "My Wave is not set up on your server" to "На сервере не настроена Моя волна",
     "My Wave needs your password, which is only sent over HTTPS or on your home network" to "Моей волне нужен ваш пароль, а он отправляется только по HTTPS или в домашней сети",
     "Name" to "Название",

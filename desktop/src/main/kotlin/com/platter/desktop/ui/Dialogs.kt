@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
@@ -119,7 +120,9 @@ fun TextInput(
                 } else {
                     false
                 }
-            },
+            }
+                // The space typed here is the field's: kept from reaching the window, where it would play or pause.
+                .onKeyEvent { it.key == Key.Spacebar },
         )
     }
 }

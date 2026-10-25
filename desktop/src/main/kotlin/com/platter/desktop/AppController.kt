@@ -672,7 +672,12 @@ class AppController(
                     is WaveResult.Failed -> waveError = when (result.reason) {
                         WaveResult.Reason.UNREACHABLE -> t("My Wave is not set up on your server")
                         WaveResult.Reason.NOT_CONFIGURED -> t("My Wave needs your password, which is only sent over HTTPS or on your home network")
-                        WaveResult.Reason.UNAVAILABLE -> result.detail?.let { t("My Wave could not start: %s", it) } ?: t("My Wave could not start")
+                        // The server's words for a listener with nothing liked yet, said in the app's language instead.
+                        WaveResult.Reason.UNAVAILABLE -> if (result.detail?.startsWith("no likes") == true) {
+                            t("My Wave is built from your likes. Like a few tracks and try again")
+                        } else {
+                            result.detail?.let { t("My Wave could not start: %s", it) } ?: t("My Wave could not start")
+                        }
                     }
                 }
             } finally {

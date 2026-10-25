@@ -216,6 +216,7 @@ internal val CHINESE: Map<String, String> = mapOf(
     "My Wave" to "我的 Wave",
     "My Wave could not start" to "“我的 Wave”无法启动",
     "My Wave could not start: %s" to "“我的 Wave”无法启动：%s",
+    "My Wave is built from your likes. Like a few tracks and try again" to "“我的 Wave”根据你喜欢的歌曲生成。请先喜欢几首歌曲，然后重试",
     "My Wave is not set up on your server" to "你的服务器未设置“我的 Wave”",
     "My Wave needs your password, which is only sent over HTTPS or on your home network" to "“我的 Wave”需要你的密码，而密码只会通过 HTTPS 或家庭网络发送",
     "Name" to "名称",

@@ -518,6 +518,7 @@
     <string name="wave_error_unreachable">На сервере не настроена Моя волна</string>
     <string name="wave_error_not_configured">Моей волне нужен ваш пароль, а он отправляется только по HTTPS или в домашней сети. Подключитесь по HTTPS или добавьте пользователя в user_passwords.conf на сервере</string>
     <string name="wave_error_unavailable">Волна не запустилась: %1$s</string>
+    <string name="wave_error_no_likes">Моя волна строится по вашим лайкам. Поставьте лайк нескольким трекам и попробуйте снова</string>
     <string name="settings_wave_url_title">Адрес сервиса «Моя волна»</string>
     <string name="settings_wave_url_summary">Оставьте пустым, чтобы использовать адрес сервера с /wave/</string>
 

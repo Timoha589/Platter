@@ -216,6 +216,7 @@ internal val KOREAN: Map<String, String> = mapOf(
     "My Wave" to "마이 웨이브",
     "My Wave could not start" to "마이 웨이브를 시작하지 못했습니다",
     "My Wave could not start: %s" to "마이 웨이브를 시작하지 못했습니다: %s",
+    "My Wave is built from your likes. Like a few tracks and try again" to "마이 웨이브는 좋아요한 곡으로 만들어집니다. 몇 곡에 좋아요를 누르고 다시 시도하세요",
     "My Wave is not set up on your server" to "서버에 마이 웨이브가 설정되어 있지 않습니다",
     "My Wave needs your password, which is only sent over HTTPS or on your home network" to "마이 웨이브에는 암호가 필요하며, 암호는 HTTPS나 집 네트워크에서만 전송됩니다",
     "Name" to "이름",

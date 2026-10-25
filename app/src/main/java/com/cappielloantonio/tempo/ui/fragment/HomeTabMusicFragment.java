@@ -437,6 +437,11 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                 message = getString(R.string.wave_error_not_configured);
                 break;
             case UNAVAILABLE:
+                // The server's words for a listener with nothing liked yet, said in the app's language instead.
+                if (failure.getDetail() != null && failure.getDetail().startsWith("no likes")) {
+                    message = getString(R.string.wave_error_no_likes);
+                    break;
+                }
                 message = getString(R.string.wave_error_unavailable,
                         failure.getDetail() != null ? failure.getDetail() : "");
                 break;
