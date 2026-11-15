@@ -1,5 +1,6 @@
 package com.platter.desktop.search
 
+import com.platter.search.TrackSearch
 import java.text.Normalizer
 
 /**
@@ -86,6 +87,7 @@ object QueryVariants {
 
         val variants = ArrayList<Variant>(5)
         variants += Variant.typed(trimmed)
+        if (TrackSearch(trimmed).isSingleCharacter) return variants
 
         val lowered = trimmed.lowercase()
 

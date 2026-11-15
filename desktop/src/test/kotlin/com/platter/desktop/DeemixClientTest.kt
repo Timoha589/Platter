@@ -37,7 +37,19 @@ class DeemixClientTest {
         now = clock,
     )
 
-    private fun libSong(title: String, artist: String) = Song().apply { this.title = title; this.artist = artist }
+    private fun libSong(
+        id: String,
+        title: String = "Come Together",
+        artist: String = "Beatles",
+        album: String = "Abbey Road",
+        duration: Int = 181,
+    ) = Song().apply {
+        this.id = id
+        this.title = title
+        this.artist = artist
+        this.album = album
+        this.duration = duration
+    }
 
     // --- where the site is --------------------------------------------------------------------------
 
@@ -59,6 +71,16 @@ class DeemixClientTest {
         )
         servers = listOf("https://deemix.example.com")
         assertEquals(listOf("https://deemix.example.com:8088/"), client().candidates(), "already the site's own name")
+    }
+
+    @Test
+    fun `no name of its own is guessed outside the server's domain, where someone else would get the password`() {
+        servers = listOf("https://home.duckdns.org")
+        assertEquals(listOf("https://home.duckdns.org:8088/"), client().candidates())
+        servers = listOf("https://example.co.uk")
+        assertEquals(listOf("https://example.co.uk:8088/"), client().candidates())
+        servers = listOf("https://music.example.co.uk")
+        assertEquals(listOf("https://deemix.example.co.uk/", "https://music.example.co.uk:8088/"), client().candidates())
     }
 
     @Test
@@ -197,17 +219,25 @@ class DeemixClientTest {
     // --- search -----------------------------------------------------------------------------------------------
 
     @Test
-    fun `a search is Deezer's answer with what the library already holds marked`() = FakeSubsonic().use { fake ->
+    fun `search resolves the studio ID even when a concert release with the same title comes first`() = FakeSubsonic().use { fake ->
         custom = fake.url
         own = "deemixpw"
+        library = listOf(libSong("live", album = "Live in Paris"), libSong("studio"))
         val results = runBlocking { client(fake).search("beatles") }.value!!
         assertEquals(listOf(2L, 1L), results.search.artists!!.map { it.id })
         assertEquals(3, results.search.tracks!!.size)
-        val (come, sun, octopus) = results.search.tracks!!
-        assertTrue(results.isInLibrary(come), "the site marked Come Together")
-        assertFalse(results.isInLibrary(sun))
-        assertFalse(results.isInLibrary(octopus))
-        assertEquals("beatles", fake.deemixCalls.first { it.second == "api/search-all" }.let { "beatles" })
+        assertEquals(mapOf(101L to "studio"), results.libraryTracks.mapValues { it.value.id })
+        assertTrue(fake.deemixCalls.any { it.second == "api/search-all" })
+    }
+
+    @Test
+    fun `a site boolean cannot mark a track when the local library only holds a different recording`() = FakeSubsonic().use { fake ->
+        custom = fake.url
+        own = "deemixpw"
+        library = listOf(libSong("live", album = "Live in Paris"))
+        val results = runBlocking { client(fake).search("beatles") }.value!!
+        assertNull(results.libraryTracks[101L])
+        assertFalse(fake.deemixCalls.any { it.second == "api/navidrome/check-bulk" })
     }
 
     @Test
@@ -215,11 +245,9 @@ class DeemixClientTest {
         custom = fake.url
         own = "deemixpw"
         // Deezer says "Beatles"; the library tags the song with every performer, and drops the "(feat.)".
-        library = listOf(libSong("Here Comes The Sun", "Beatles/George Harrison"))
+        library = listOf(libSong("joint", title = "Here Comes The Sun", artist = "Beatles/George Harrison", duration = 182))
         val results = runBlocking { client(fake).search("beatles") }.value!!
-        val (_, sun, octopus) = results.search.tracks!!
-        assertTrue(results.isInLibrary(sun), "same title once the featuring is ignored, and Beatles is one of the credits")
-        assertFalse(results.isInLibrary(octopus))
+        assertEquals(mapOf(102L to "joint"), results.libraryTracks.mapValues { it.value.id })
         assertEquals(listOf("Beatles"), searchedLibraryFor.distinct(), "one library search per artist, not per track")
     }
 
@@ -229,7 +257,7 @@ class DeemixClientTest {
         own = "deemixpw"
         val results = runBlocking { client(fake).search("zzzz") }.value!!
         assertTrue(results.search.tracks!!.isEmpty() && results.search.artists!!.isEmpty())
-        assertTrue(results.inLibrary.isEmpty())
+        assertTrue(results.libraryTracks.isEmpty())
     }
 
     // --- artist and album pages -------------------------------------------------------------------------------------
@@ -238,22 +266,25 @@ class DeemixClientTest {
     fun `an artist page has the artist, the popular tracks marked, and every release`() = FakeSubsonic().use { fake ->
         custom = fake.url
         own = "deemixpw"
+        library = listOf(libSong("studio"))
         val page = runBlocking { client(fake).artistPage(1) }.value!!
         assertEquals("Beatles", page.artist.name)
         assertEquals(900_000L, page.artist.fanCount)
         assertEquals(listOf("Come Together", "Here Comes the Sun (feat. Someone)", "Octopus's Garden"), page.top.map { it.title })
         assertEquals(listOf("Abbey Road", "Hey Jude"), page.albums.map { it.title })
-        assertEquals(true, page.inLibrary["101"])
+        assertEquals("studio", page.libraryTracks[101L]?.id)
     }
 
     @Test
     fun `an album page has the record and its tracklist, marked`() = FakeSubsonic().use { fake ->
         custom = fake.url
         own = "deemixpw"
+        library = listOf(libSong("live", album = "Live in Paris"), libSong("studio"))
         val page = runBlocking { client(fake).albumPage(201) }.value!!
         assertEquals("Abbey Road", page.album.title)
         assertEquals(3, page.tracks.size)
-        assertEquals(true, page.inLibrary["101"])
+        assertNull(page.tracks.first().album)
+        assertEquals("studio", page.libraryTracks[101L]?.id)
     }
 
     @Test

@@ -11,21 +11,34 @@ import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.media3.common.util.UnstableApi;
 
+import com.cappielloantonio.tempo.App;
 import com.cappielloantonio.tempo.helper.search.FuzzyIndex;
 import com.cappielloantonio.tempo.helper.search.LibrarySignals;
 import com.cappielloantonio.tempo.helper.search.QueryVariants;
 import com.cappielloantonio.tempo.helper.search.RankedResults;
 import com.cappielloantonio.tempo.helper.search.SearchRanker;
+import com.cappielloantonio.tempo.helper.search.TrackCatalogue;
 import com.cappielloantonio.tempo.model.RecentSearch;
 import com.cappielloantonio.tempo.repository.CatalogueIndexRepository;
 import com.cappielloantonio.tempo.repository.SearchingRepository;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.SearchResult3;
+import com.cappielloantonio.tempo.util.NetworkUtil;
+import com.cappielloantonio.tempo.util.Preferences;
+import com.platter.search.TrackIndex;
+import com.platter.search.TrackSearch;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 @UnstableApi
 public class SearchViewModel extends AndroidViewModel {
@@ -76,9 +89,12 @@ public class SearchViewModel extends AndroidViewModel {
      * has already typed past must not reach the screen, and neither must its
      * results.
      */
-    private int searchGeneration = 0;
+    private volatile int searchGeneration = 0;
 
     private String query = "";
+    private TrackCatalogue trackCatalogue;
+    private String trackServer;
+    private String trackUser;
 
     public SearchViewModel(@NonNull Application application) {
         super(application);
@@ -138,49 +154,71 @@ public class SearchViewModel extends AndroidViewModel {
      */
     public void search(String query) {
         setQuery(query);
-
-        runRound(query, QueryVariants.of(query), ++searchGeneration, true);
+        int generation = ++searchGeneration;
+        String typed = this.query;
+        TrackCatalogue tracks = refreshTrackCatalogue();
+        List<QueryVariants.Variant> variants = QueryVariants.of(typed);
+        runSearch(typed, variants, generation, tracks);
     }
 
-    /**
-     * One round of requests, ranked when they all report.
-     *
-     * @param mayFallBack whether an empty result should be retried with guessed
-     *                    spellings rather than shown as nothing found
-     */
-    private void runRound(String query, List<QueryVariants.Variant> variants, int generation, boolean mayFallBack) {
-        if (currentSource != null) results.removeSource(currentSource);
+    private void runSearch(String query, List<QueryVariants.Variant> variants, int generation, TrackCatalogue tracks) {
+        TrackSearch trackSearch = new TrackSearch(query);
+        // Both tasks run on the ranking executor. Local candidates can reach the UI while Retrofit is still fetching.
+        List<TrackIndex.Match<Child>> local = new ArrayList<>();
+        rankingExecutor.execute(() -> {
+            if (tracks == null) return;
+            for (int i = 0; i < variants.size(); i++) {
+                if (generation != searchGeneration) return;
+                local.addAll(tracks.find(variants.get(i).text(), i == 0 && trackSearch.allowsCorrections()));
+            }
+            if (!local.isEmpty()) {
+                publish(SearchRanker.rank(variants, Collections.emptyList(), librarySignals(), null, local), generation);
+            }
+        });
 
-        currentSource = searchingRepository.search3(variants);
-        results.addSource(currentSource, raw -> rankingExecutor.execute(() -> {
-            /*
-             * A round of guesses hands the ranker the query as typed as well.
-             * The spellings that fetched these results are approximations, so
-             * they cannot tell which result is nearest to what was actually
-             * meant - only the original can.
-             */
-            RankedResults ranked = SearchRanker.rank(variants, raw, librarySignals(), mayFallBack ? null : query);
-
-            if (ranked.isEmpty() && mayFallBack) {
+        fetch(variants, true, raw -> {
+            if (generation != searchGeneration) return;
+            RankedResults ranked = SearchRanker.rank(variants, raw, librarySignals(), null, local);
+            if (!ranked.hasStrongMatch() && trackSearch.allowsCorrections()
+                    && raw.stream().anyMatch(Objects::nonNull)) {
+                Set<String> tried = new HashSet<>();
+                for (QueryVariants.Variant variant : variants) tried.add(variant.text().toLowerCase(Locale.ROOT));
                 List<QueryVariants.Variant> guesses = guessesFor(query);
-
+                guesses.removeIf(variant -> !tried.add(variant.text().toLowerCase(Locale.ROOT)));
                 if (!guesses.isEmpty()) {
-                    /*
-                     * Deliberately nothing is published here. Posting the empty
-                     * result first would put "nothing found" on screen for as
-                     * long as the second round takes, and then take it back -
-                     * the screen would be reporting a failure that has not
-                     * happened yet.
-                     */
+                    List<QueryVariants.Variant> allVariants = new ArrayList<>(variants);
+                    allVariants.addAll(guesses);
                     mainHandler.post(() -> {
-                        if (generation == searchGeneration) runRound(query, guesses, generation, false);
+                        if (generation != searchGeneration) return;
+                        fetch(guesses, false, retry -> {
+                            if (generation != searchGeneration) return;
+                            if (retry.stream().allMatch(Objects::isNull)) {
+                                publish(ranked, generation);
+                                return;
+                            }
+                            List<SearchResult3> allResults = new ArrayList<>(raw);
+                            allResults.addAll(retry);
+                            publish(SearchRanker.rank(allVariants, allResults, librarySignals(), query, local), generation);
+                        });
                     });
                     return;
                 }
             }
 
-            results.postValue(ranked);
-        }));
+            publish(ranked, generation);
+        });
+    }
+
+    private void fetch(List<QueryVariants.Variant> variants, boolean expandTracks, Consumer<List<SearchResult3>> onResults) {
+        if (currentSource != null) results.removeSource(currentSource);
+        currentSource = searchingRepository.search3(variants, expandTracks);
+        results.addSource(currentSource, raw -> rankingExecutor.execute(() -> onResults.accept(raw)));
+    }
+
+    private void publish(RankedResults ranked, int generation) {
+        mainHandler.post(() -> {
+            if (generation == searchGeneration) results.setValue(ranked);
+        });
     }
 
     /**
@@ -247,7 +285,32 @@ public class SearchViewModel extends AndroidViewModel {
     public void refreshSearchInputs() {
         librarySignalsStale = true;
 
+        refreshTrackCatalogue();
+
         catalogueIndexRepository.syncIfStale(() -> fuzzyIndexStale = true);
+    }
+
+    private TrackCatalogue refreshTrackCatalogue() {
+        String server = Preferences.getServer();
+        String user = Preferences.getUser();
+        if (!Objects.equals(server, trackServer) || !Objects.equals(user, trackUser)) {
+            if (trackCatalogue != null) trackCatalogue.close();
+            trackServer = server;
+            trackUser = user;
+            trackCatalogue = server == null || user == null ? null : new TrackCatalogue(
+                    new File(getApplication().getNoBackupFilesDir(), "search"), server, user);
+        }
+        TrackCatalogue tracks = trackCatalogue;
+        if (tracks != null) {
+            tracks.refresh(App.getSubsonicClientInstance(false).getSearchingClient(),
+                    () -> !NetworkUtil.isOffline() && !Preferences.isDataSavingMode(), discarded -> {
+                        if (trackCatalogue != tracks || !Objects.equals(server, Preferences.getServer())
+                                || !Objects.equals(user, Preferences.getUser())) return;
+                        if (discarded) results.setValue(RankedResults.empty());
+                        if (currentSource != null && !query.trim().isEmpty()) search(query);
+                    });
+        }
+        return tracks;
     }
 
     /** Runs on {@link #rankingExecutor} only, which is what makes this safe. */
@@ -270,10 +333,6 @@ public class SearchViewModel extends AndroidViewModel {
         return fuzzyIndex;
     }
 
-    public LiveData<List<Child>> findSongs(String query) {
-        return searchingRepository.findSongs(query);
-    }
-
     public void deleteRecentSearch(String search) {
         searchingRepository.delete(new RecentSearch(search, 0));
     }
@@ -286,7 +345,9 @@ public class SearchViewModel extends AndroidViewModel {
     protected void onCleared() {
         super.onCleared();
 
+        searchGeneration++;
         searchingRepository.cancelPendingSearch();
+        if (trackCatalogue != null) trackCatalogue.close();
         rankingExecutor.shutdown();
     }
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.platter.desktop.api.Auth
@@ -126,6 +127,33 @@ class InteractionTest {
             step()
             assertEquals(Screen.Album("a2"), app.screen)
             app.shutdown()
+        }
+    }
+
+    @Test
+    fun `the search field finds U2 and a single-character title on the next page`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            try {
+                open(app)
+                val field = onNode(hasSetTextAction())
+                field.performTextInput("U2")
+                step(16)
+                onNodeWithText("Top result").assertIsDisplayed()
+                onAllNodesWithText("Artist").onFirst().assertIsDisplayed()
+                assertTrue(fake.requestsTo("search3").any { it.queryParameter("query") == "U2" })
+
+                field.performTextReplacement("7")
+                step(16)
+                onNodeWithText("Top result").assertIsDisplayed()
+                onAllNodesWithText("Short Title Artist", substring = true).onFirst().assertIsDisplayed()
+                onAllNodesWithText("7 Days", substring = true).assertCountEquals(0)
+                assertTrue(fake.requestsTo("search3").any {
+                    it.queryParameter("query") == "7" && it.queryParameter("songOffset") == "20"
+                })
+            } finally {
+                app.shutdown()
+            }
         }
     }
 

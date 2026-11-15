@@ -64,7 +64,7 @@ class DeezerPageViewModel(application: Application) : AndroidViewModel(applicati
 
         // By an artist's own page, the artist is a given: a track is placed by its record.
         val tracks = loaded.top.mapNotNull {
-            DeezerHit.track(it, loaded.inLibrary[it.id.toString()] == true, caption = it.album?.title.orEmpty())
+            DeezerHit.track(it, loaded.libraryTracks[it.id], caption = it.album?.title.orEmpty())
         }
         val albums = loaded.albums.mapNotNull { DeezerHit.album(it, caption = releaseCaption(it)) }
 
@@ -87,7 +87,7 @@ class DeezerPageViewModel(application: Application) : AndroidViewModel(applicati
 
         // An album's tracklist comes without the album: the rows borrow its cover.
         val tracks = loaded.tracks.mapNotNull {
-            DeezerHit.track(it, loaded.inLibrary[it.id.toString()] == true,
+            DeezerHit.track(it, loaded.libraryTracks[it.id],
                     caption = trackCaption(it.artist?.name, it.duration), cover = album.coverMedium)
         }
 

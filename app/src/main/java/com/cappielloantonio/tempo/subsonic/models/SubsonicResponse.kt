@@ -1,6 +1,7 @@
 package com.cappielloantonio.tempo.subsonic.models
 
 import androidx.annotation.Keep
+import com.platter.search.TrackChanges
 
 @Keep
 class SubsonicResponse {
@@ -37,6 +38,7 @@ class SubsonicResponse {
     var playlist: PlaylistWithSongs? = null
     var playlists: Playlists? = null
     var searchResult3: SearchResult3? = null
+    var platterTrackChanges: TrackChanges? = null
     var searchResult2: SearchResult2? = null
     var searchResult: SearchResult? = null
     var nowPlaying: NowPlaying? = null

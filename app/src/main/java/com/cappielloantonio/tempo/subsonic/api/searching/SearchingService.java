@@ -10,6 +10,9 @@ import retrofit2.http.Query;
 import retrofit2.http.QueryMap;
 
 public interface SearchingService {
+    @GET("platterTrackChanges")
+    Call<ApiResponse> trackChanges(@QueryMap Map<String, String> params, @Query("cursor") String cursor);
+
     @GET("search2")
     Call<ApiResponse> search2(@QueryMap Map<String, String> params, @Query("query") String query, @Query("songCount") int songCount, @Query("albumCount") int albumCount, @Query("artistCount") int artistCount);
 

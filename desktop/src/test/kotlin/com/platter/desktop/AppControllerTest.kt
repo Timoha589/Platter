@@ -85,7 +85,7 @@ class AppControllerTest {
     fun `recent searches keep what was acted on, newest first, without repeats`() = FakeSubsonic().use { fake ->
         val store = store()
         val app = app(fake, store)
-        app.commitSearch("ab") // too short to be about anything
+        app.commitSearch("  ")
         app.commitSearch("Abbey")
         app.commitSearch("Nirvana")
         app.commitSearch("abbey") // the same search again, in another case
@@ -105,6 +105,16 @@ class AppControllerTest {
         (1..20).forEach { app.commitSearch("query $it") }
         assertEquals(12, app.recentSearches.size)
         assertEquals("query 20", app.recentSearches.first())
+    }
+
+    @Test
+    fun `short searches can be committed and recalled`() = FakeSubsonic().use { fake ->
+        val store = store()
+        val app = app(fake, store)
+        app.commitSearch("U2")
+        app.commitSearch(" 7 ")
+        assertEquals(listOf("7", "U2"), app.recentSearches)
+        assertEquals(listOf("7", "U2"), app(fake, store).recentSearches)
     }
 
     // --- playlists -----------------------------------------------------------------------

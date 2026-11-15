@@ -70,7 +70,7 @@ class FakeSubsonic : AutoCloseable {
                     } else {
                         ok(""""artist":{"id":"ar0","name":"Miles Davis","coverArt":"ar-0","albumCount":1,"album":[${albumJson(0, withSongs = false)}]}""")
                     }
-                    "search3" -> ok(""""searchResult3":${search(url.queryParameter("query").orEmpty())}""")
+                    "search3" -> ok(""""searchResult3":${searchResult(url)}""")
                     "getStarred2" -> ok(""""starred2":{"song":[${starredSongs.joinToString(",") { songJsonById(it) }}],"album":[${albumJson(3, false)}],"artist":[${artistJson(6)}]}""")
                     "getPlaylists" -> synchronized(playlistsState) {
                         ok(""""playlists":{"playlist":[${playlistsState.entries.joinToString(",") { playlistJson(it.key, withSongs = false) }}]}""")
@@ -376,6 +376,28 @@ class FakeSubsonic : AutoCloseable {
     val deemixCalls = CopyOnWriteArrayList<Triple<String, String, String>>()
 
     @Volatile
+    var deezerLibraryTracks = listOf(
+        """{"id":"deezer-live","title":"Come Together","artist":"Beatles","album":"Live in Paris","duration":181,"suffix":"wav"}""",
+        """{"id":"deezer-studio","title":"Come Together","artist":"Beatles","album":"Abbey Road","duration":181,"track":1,"suffix":"wav"}""",
+    )
+
+    private fun searchResult(url: HttpUrl): String {
+        val query = url.queryParameter("query").orEmpty()
+        if (query.equals("U2", ignoreCase = true)) return """{"artist":[{"id":"artist-u2","name":"U2"}]}"""
+
+        val tracks = when {
+            query == "7" -> (1..20).map { """{"id":"seven-prefix-$it","title":"7 Days $it","artist":"Other Artist"}""" } +
+                """{"id":"title-seven","title":"7","artist":"Short Title Artist"}"""
+            query.equals("Beatles", ignoreCase = true) && url.queryParameter("artistCount") == "0" &&
+                url.queryParameter("albumCount") == "0" -> deezerLibraryTracks
+            else -> return search(query)
+        }
+        val offset = url.queryParameter("songOffset")?.toIntOrNull() ?: 0
+        val count = url.queryParameter("songCount")?.toIntOrNull() ?: 20
+        return """{"song":[${tracks.drop(offset).take(count).joinToString(",")}]}"""
+    }
+
+    @Volatile
     var deemixTokenGeneration = 1
 
     /** When set, `download*` answers 429 with the site's own words, the way an exhausted quota does. */
@@ -430,7 +452,7 @@ class FakeSubsonic : AutoCloseable {
 
     private fun deezerSearchJson(query: String): String {
         if (!query.lowercase().contains("beatles")) return """{"success":true,"tracks":[],"artists":[],"albums":[]}"""
-        fun track(id: Int, title: String) = """{"id":$id,"title":"$title","link":"https://www.deezer.com/track/$id","duration":200,"rank":1000,"artist":{"id":1,"name":"Beatles"},"album":{"id":201,"title":"Abbey Road","cover_medium":"https://img.test/abbey.jpg"}}"""
+        fun track(id: Int, title: String) = """{"id":$id,"title":"$title","link":"https://www.deezer.com/track/$id","duration":${id + 80},"rank":1000,"artist":{"id":1,"name":"Beatles"},"album":{"id":201,"title":"Abbey Road","cover_medium":"https://img.test/abbey.jpg"}}"""
         return """{"success":true,
             "artists":[{"id":2,"name":"Beatles Tribute","picture_medium":"https://img.test/t.jpg","nb_fan":5},{"id":1,"name":"Beatles","picture_medium":"https://img.test/b.jpg","picture_xl":"https://img.test/bx.jpg","nb_fan":900000}],
             "tracks":[${track(101, "Come Together")},${track(102, "Here Comes the Sun (feat. Someone)")},${track(103, "Octopus's Garden")}],
@@ -439,13 +461,16 @@ class FakeSubsonic : AutoCloseable {
 
     private fun deezerCatalog(url: HttpUrl): MockResponse {
         val path = url.encodedPath.removePrefix("/deezer/")
-        fun track(id: Int, title: String, pos: Int) = """{"id":$id,"title":"$title","link":"https://www.deezer.com/track/$id","duration":${180 + pos},"track_position":$pos,"artist":{"id":1,"name":"Beatles"},"album":{"id":201,"title":"Abbey Road"}}"""
+        fun track(id: Int, title: String, pos: Int, withAlbum: Boolean = true): String {
+            val album = if (withAlbum) ""","album":{"id":201,"title":"Abbey Road"}""" else ""
+            return """{"id":$id,"title":"$title","link":"https://www.deezer.com/track/$id","duration":${180 + pos},"track_position":$pos,"artist":{"id":1,"name":"Beatles"}$album}"""
+        }
         return when (path) {
             "artist/1" -> json(200, """{"id":1,"name":"Beatles","picture_medium":"https://img.test/b.jpg","picture_xl":"https://img.test/bx.jpg","nb_album":12,"nb_fan":900000}""")
             "artist/1/top" -> json(200, """{"data":[${track(101, "Come Together", 1)},${track(102, "Here Comes the Sun (feat. Someone)", 2)},${track(103, "Octopus's Garden", 3)}]}""")
             "artist/1/albums" -> json(200, """{"data":[{"id":201,"title":"Abbey Road","cover_medium":"https://img.test/abbey.jpg","record_type":"album","release_date":"1969-09-26"},{"id":202,"title":"Hey Jude","record_type":"single","release_date":"1968-08-30"}]}""")
             "album/201" -> json(200, """{"id":201,"title":"Abbey Road","cover_medium":"https://img.test/abbey.jpg","cover_xl":"https://img.test/abbeyx.jpg","record_type":"album","release_date":"1969-09-26","nb_tracks":3,"artist":{"id":1,"name":"Beatles"}}""")
-            "album/201/tracks" -> json(200, """{"data":[${track(101, "Come Together", 1)},${track(102, "Here Comes the Sun (feat. Someone)", 2)},${track(103, "Octopus's Garden", 3)}]}""")
+            "album/201/tracks" -> json(200, """{"data":[${track(101, "Come Together", 1, withAlbum = false)},${track(102, "Here Comes the Sun (feat. Someone)", 2, withAlbum = false)},${track(103, "Octopus's Garden", 3, withAlbum = false)}]}""")
             else -> json(404, """{"error":{"message":"no data"}}""")
         }
     }

@@ -1,10 +1,13 @@
 package com.cappielloantonio.tempo.service
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.PendingIntent.FLAG_UPDATE_CURRENT
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Build
+import android.util.Log
 import androidx.lifecycle.Observer
 import androidx.media3.cast.CastPlayer
 import androidx.media3.cast.SessionAvailabilityListener
@@ -20,6 +23,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSession.ControllerInfo
 import com.cappielloantonio.tempo.App
 import com.cappielloantonio.tempo.audio.EqualizerProcessor
@@ -94,6 +98,24 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
 
     override fun onGetSession(controllerInfo: ControllerInfo): MediaLibrarySession {
         return mediaLibrarySession
+    }
+
+    override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        // The notification controller may only have caught up with the restored queue now.
+        if (Build.VERSION.SDK_INT >= 35 && this::bluetoothResume.isInitialized && bluetoothResume.resumeWhenReady()) return
+        super.onUpdateNotification(session, startInForegroundRequired)
+    }
+
+    private fun canStartBluetoothPlayback(): Boolean {
+        if (Build.VERSION.SDK_INT < 35 || isPlaybackOngoing) return true
+        return try {
+            // Android 15+ requires a foreground service before a background player requests audio focus.
+            super.onUpdateNotification(mediaLibrarySession, true)
+            isPlaybackOngoing
+        } catch (e: ForegroundServiceStartNotAllowedException) {
+            Log.w("MediaService", "Cannot start Bluetooth playback in the foreground", e)
+            false
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -199,7 +221,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         }
 
         // Plays again when the Bluetooth device that was walked away from comes back.
-        bluetoothResume = BluetoothResume(this, player) {
+        bluetoothResume = BluetoothResume(this, player, ::canStartBluetoothPlayback) {
             !(this::castPlayer.isInitialized && castPlayer.isCastSessionAvailable)
         }
 

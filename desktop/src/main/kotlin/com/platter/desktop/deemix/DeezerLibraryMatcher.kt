@@ -1,0 +1,21 @@
+package com.platter.desktop.deemix
+
+import com.platter.desktop.api.ArtistCredit
+import com.platter.desktop.api.Song
+import com.platter.desktop.search.QueryVariants
+import com.platter.search.RecordingMatcher
+import com.platter.search.RecordingMetadata
+
+internal class DeezerLibraryMatcher(songs: List<Song>) {
+    private val matcher = RecordingMatcher(
+        songs.filter { it.isMusic && !it.isVideo },
+        { song -> RecordingMetadata(song.title, song.artist, song.album, song.duration, song.track,
+            song.discNumber, artistLine = song.artistLine(), id = song.id) },
+        QueryVariants::normalize,
+        ArtistCredit::pieces,
+    )
+
+    fun match(track: DeezerTrack, albumTitle: String? = track.album?.title): Song? =
+        matcher.match(RecordingMetadata(track.title, track.artist?.name, albumTitle, track.duration,
+            track.trackPosition, track.diskNumber))
+}

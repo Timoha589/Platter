@@ -397,7 +397,7 @@ class ScreenshotTest {
             shoot("45-deezer-artist")
             app.navigate(Screen.Deezer(com.platter.desktop.deemix.DeezerHit.Kind.ALBUM, 201))
             shoot("46-deezer-album")
-            app.dialog = AppDialog.ConfirmDeezer(com.platter.desktop.deemix.DeezerHit(com.platter.desktop.deemix.DeezerHit.Kind.ARTIST, 1, "Beatles", "", "", null, null, false))
+            app.dialog = AppDialog.ConfirmDeezer(com.platter.desktop.deemix.DeezerHit(com.platter.desktop.deemix.DeezerHit.Kind.ARTIST, 1, "Beatles", "", "", null, null))
             shoot("47-dialog-download-artist")
 
             app.dialog = AppDialog.Equalizer

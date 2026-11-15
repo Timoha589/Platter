@@ -2,6 +2,8 @@ package com.cappielloantonio.tempo.helper.search;
 
 import androidx.annotation.NonNull;
 
+import com.platter.search.TrackSearch;
+
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -231,6 +233,7 @@ public final class QueryVariants {
         if (trimmed.isEmpty()) return variants;
 
         variants.add(new Variant(trimmed, Variant.Origin.TYPED));
+        if (new TrackSearch(trimmed).isSingleCharacter()) return variants;
 
         String lowered = trimmed.toLowerCase();
 

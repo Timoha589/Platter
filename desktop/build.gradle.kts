@@ -7,13 +7,20 @@ plugins {
 }
 
 /** The one place the version is written: the installer, the running app (`-Dplatter.version`) and the updater all read it. */
-val platterVersion = "1.0.9"
+val platterVersion = "1.1.0"
 
 group = "com.platter"
 version = platterVersion
 
 kotlin {
     jvmToolchain(21)
+    sourceSets.named("main") {
+        kotlin.srcDir("../search-common/src/main/kotlin")
+    }
+}
+
+sourceSets.main {
+    java.srcDir("../search-common/src/main/java")
 }
 
 dependencies {

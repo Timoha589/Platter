@@ -47,7 +47,7 @@ class DeemixControllerTest {
     private fun windows() = assumeTrue(System.getProperty("os.name").startsWith("Windows"), "the site password is sealed with DPAPI, which is Windows-only")
 
     private fun hit(id: Long, kind: DeezerHit.Kind = DeezerHit.Kind.TRACK, link: String? = "https://www.deezer.com/track/$id") =
-        DeezerHit(kind, id, "Title $id", "Artist", "", null, if (kind == DeezerHit.Kind.TRACK) link else null, false)
+        DeezerHit(kind, id, "Title $id", "Artist", "", null, if (kind == DeezerHit.Kind.TRACK) link else null)
 
     // --- the account ------------------------------------------------------------------------------------
 
@@ -140,6 +140,7 @@ class DeemixControllerTest {
         assertEquals(listOf("Album · 1969", "Single · 1968"), page.albums.map { it.caption })
         assertEquals("Abbey Road", page.tracks.first().caption)
         assertTrue(page.tracks.first().inLibrary)
+        assertEquals("deezer-studio", page.tracks.first().localTrackId)
     }
 
     @Test
@@ -151,6 +152,7 @@ class DeemixControllerTest {
         assertEquals("Album · Beatles · 1969", page.caption)
         assertEquals("https://img.test/abbeyx.jpg", page.image)
         assertEquals(listOf("Beatles · 3:01", "Beatles · 3:02", "Beatles · 3:03"), page.tracks.map { it.caption })
+        assertEquals("deezer-studio", page.tracks.first().localTrackId)
         assertTrue(page.albums.isEmpty())
         assertNull(runBlocking { app.deezerPage(DeezerHit.Kind.ALBUM, 424242) })
     }
@@ -237,11 +239,45 @@ class DeemixControllerTest {
     // --- previews -------------------------------------------------------------------------------------------------------
 
     @Test
+    fun `the marked studio ID is the one streamed from the library`() = FakeSubsonic().use { fake ->
+        windows()
+        val app = app(fake)
+        val hit = runBlocking { app.deezerSearch("beatles") }!!.rows.first { it.id == 101L }
+        assertTrue(hit.inLibrary)
+        assertEquals("deezer-studio", hit.localTrackId)
+
+        app.playDeezerTrack(hit)
+
+        waitUntil("the marked recording to stream") {
+            fake.requestsTo("stream").any { it.queryParameter("id") == hit.localTrackId }
+        }
+        assertEquals(hit.localTrackId, app.player.state.value.current?.id)
+        assertFalse(fake.requestsTo("stream").any { it.queryParameter("id") == "deezer-live" })
+        assertFalse(fake.deemixCalls.any { it.second == "api/preview" })
+    }
+
+    @Test
+    fun `an unmatched studio row plays a preview when the library only has the concert release`() = FakeSubsonic().use { fake ->
+        windows()
+        fake.deezerLibraryTracks = fake.deezerLibraryTracks.take(1)
+        val app = app(fake)
+        val hit = runBlocking { app.deezerSearch("beatles") }!!.rows.first { it.id == 101L }
+        assertFalse(hit.inLibrary)
+        assertNull(hit.localTrackId)
+
+        app.playDeezerTrack(hit)
+
+        waitUntil("the Deezer preview request") { fake.deemixCalls.any { it.second == "api/preview" } }
+        assertEquals(hit.key, app.previewKey)
+        assertTrue(fake.requestsTo("stream").isEmpty())
+    }
+
+    @Test
     fun `a preview is fetched with the site's token, plays, and ends by itself`() = FakeSubsonic().use { fake ->
         windows()
         val app = app(fake)
         val track = hit(101)
-        app.togglePreview(track)
+        app.playDeezerTrack(track)
         assertEquals(track.key, app.previewKey)
         waitUntil("the preview to play") { app.previewState == AppController.PreviewState.PLAYING }
         assertTrue(fake.deemixCalls.any { it.second == "api/preview" })
@@ -257,13 +293,13 @@ class DeemixControllerTest {
         val app = app(fake)
         val first = hit(101)
         val second = hit(102)
-        app.togglePreview(first)
+        app.playDeezerTrack(first)
         waitUntil("playing") { app.previewState == AppController.PreviewState.PLAYING }
-        app.togglePreview(first)
+        app.playDeezerTrack(first)
         assertEquals(AppController.PreviewState.STOPPED, app.previewState)
 
-        app.togglePreview(first)
-        app.togglePreview(second)
+        app.playDeezerTrack(first)
+        app.playDeezerTrack(second)
         assertEquals(second.key, app.previewKey)
         waitUntil("the second") { app.previewState == AppController.PreviewState.PLAYING }
         app.stopPreview()
@@ -276,7 +312,7 @@ class DeemixControllerTest {
         app.player.play(listOf(Song().apply { id = "slow-music"; title = "Long"; artist = "A"; duration = 100 }))
         waitUntil("the music") { app.player.state.value.isPlaying }
 
-        app.togglePreview(hit(101))
+        app.playDeezerTrack(hit(101))
         waitUntil("the preview") { app.previewState == AppController.PreviewState.PLAYING }
         waitUntil("the music to give way") { !app.player.state.value.isPlaying }
 
@@ -288,7 +324,7 @@ class DeemixControllerTest {
     fun `a preview the site refuses is reported, and leaves no preview playing`() = FakeSubsonic().use { fake ->
         windows()
         val app = app(fake, password = "wrong")
-        app.togglePreview(hit(101))
+        app.playDeezerTrack(hit(101))
         waitUntil("the message") { app.toast == "Could not play the preview" }
         assertEquals(AppController.PreviewState.STOPPED, app.previewState)
         assertIs<DeemixStatus>(app.deemixStatus)
@@ -298,7 +334,7 @@ class DeemixControllerTest {
     fun `only a track can be previewed`() = FakeSubsonic().use { fake ->
         windows()
         val app = app(fake)
-        app.togglePreview(hit(201, DeezerHit.Kind.ALBUM))
+        app.playDeezerTrack(hit(201, DeezerHit.Kind.ALBUM))
         assertNull(app.previewKey)
     }
 }

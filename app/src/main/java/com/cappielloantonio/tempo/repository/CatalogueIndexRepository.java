@@ -38,8 +38,8 @@ import retrofit2.Response;
  * Artists come whole in a single {@code getArtists}. Albums have to be paged, so
  * they are capped: a spelling reference stops paying for itself long before a
  * large library is exhausted, and the fetch is background work nobody asked for.
- * Tracks are left out entirely - stock Subsonic has no way to enumerate them,
- * and a library holds far more track titles than the other two put together.
+ * Track metadata is indexed separately by {@code TrackCatalogue} using paged
+ * OpenSubsonic search results.
  */
 @OptIn(markerClass = UnstableApi.class)
 public class CatalogueIndexRepository {

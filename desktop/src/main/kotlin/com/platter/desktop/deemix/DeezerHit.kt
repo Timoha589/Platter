@@ -1,5 +1,6 @@
 package com.platter.desktop.deemix
 
+import com.platter.desktop.api.Song
 import com.platter.desktop.i18n.t
 import java.text.NumberFormat
 import java.util.Locale
@@ -15,7 +16,7 @@ data class DeezerHit(
     val detail: String,
     val image: String?,
     val link: String?,
-    val inLibrary: Boolean,
+    val localTrack: Song? = null,
     /** The second line as a page wants it, instead of the one search builds. */
     val caption: String? = null,
 ) {
@@ -24,26 +25,29 @@ data class DeezerHit(
     enum class State { IDLE, WORKING, QUEUED }
 
     val key: String get() = "$kind:$id"
+    val localTrackId: String? get() = localTrack?.id?.takeIf { it.isNotBlank() }
+    val inLibrary: Boolean get() = localTrackId != null
 
     companion object {
         fun artist(artist: DeezerArtist): DeezerHit? {
             val id = artist.id ?: return null
             val name = artist.name?.takeIf { it.isNotBlank() } ?: return null
-            return DeezerHit(Kind.ARTIST, id, name, "", "", artist.pictureMedium, null, false)
+            return DeezerHit(Kind.ARTIST, id, name, "", "", artist.pictureMedium, null)
         }
 
         fun album(album: DeezerAlbum, caption: String? = null): DeezerHit? {
             val id = album.id ?: return null
             val title = album.title?.takeIf { it.isNotBlank() } ?: return null
-            return DeezerHit(Kind.ALBUM, id, title, album.artist?.name.orEmpty(), "", album.coverMedium, null, false, caption)
+            return DeezerHit(Kind.ALBUM, id, title, album.artist?.name.orEmpty(), "", album.coverMedium, null, caption = caption)
         }
 
         /** [cover] stands in for tracks that come without their album - an album's own tracklist. */
-        fun track(track: DeezerTrack, inLibrary: Boolean, caption: String? = null, cover: String? = null): DeezerHit? {
+        fun track(track: DeezerTrack, localTrack: Song? = null, caption: String? = null, cover: String? = null): DeezerHit? {
             val id = track.id ?: return null
             val title = track.title?.takeIf { it.isNotBlank() } ?: return null
             if (track.link == null) return null
-            return DeezerHit(Kind.TRACK, id, title, track.artist?.name.orEmpty(), track.album?.title.orEmpty(), track.album?.coverMedium ?: cover, track.link, inLibrary, caption)
+            return DeezerHit(Kind.TRACK, id, title, track.artist?.name.orEmpty(), track.album?.title.orEmpty(),
+                track.album?.coverMedium ?: cover, track.link, localTrack, caption)
         }
     }
 }
@@ -69,7 +73,7 @@ class DeezerHits(val artists: List<DeezerHit>, val rows: List<DeezerHit>) {
             val search = results.search
             val artists = search.artists.orEmpty().sortedByDescending { it.fanCount ?: 0 }.mapNotNull { DeezerHit.artist(it) }.take(MAX_ARTISTS)
             val albums = search.albums.orEmpty().mapNotNull { DeezerHit.album(it) }.take(MAX_ALBUMS)
-            val tracks = search.tracks.orEmpty().mapNotNull { DeezerHit.track(it, results.isInLibrary(it)) }.take(MAX_TRACKS)
+            val tracks = search.tracks.orEmpty().mapNotNull { DeezerHit.track(it, results.libraryTracks[it.id]) }.take(MAX_TRACKS)
             return DeezerHits(artists, tracks + albums)
         }
     }
@@ -88,7 +92,7 @@ class DeezerPage(
         fun ofArtist(loaded: DeezerArtistPage): DeezerPage {
             val artist = loaded.artist
             // By an artist's own page, the artist is a given: a track is placed by its record.
-            val tracks = loaded.top.mapNotNull { DeezerHit.track(it, loaded.inLibrary[it.id.toString()] == true, caption = it.album?.title.orEmpty()) }
+            val tracks = loaded.top.mapNotNull { DeezerHit.track(it, loaded.libraryTracks[it.id], caption = it.album?.title.orEmpty()) }
             val albums = loaded.albums.mapNotNull { DeezerHit.album(it, caption = releaseCaption(it)) }
 
             val fans = artist.fanCount ?: 0
@@ -100,7 +104,7 @@ class DeezerPage(
             val album = loaded.album
             // An album's tracklist comes without the album: the rows borrow its cover.
             val tracks = loaded.tracks.mapNotNull {
-                DeezerHit.track(it, loaded.inLibrary[it.id.toString()] == true, caption = trackCaption(it.artist?.name, it.duration), cover = album.coverMedium)
+                DeezerHit.track(it, loaded.libraryTracks[it.id], caption = trackCaption(it.artist?.name, it.duration), cover = album.coverMedium)
             }
             val caption = listOfNotNull(
                 releaseType(album.recordType),

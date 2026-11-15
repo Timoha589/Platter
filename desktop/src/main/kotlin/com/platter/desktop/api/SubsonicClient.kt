@@ -1,10 +1,12 @@
 package com.platter.desktop.api
 
 import com.platter.desktop.i18n.t
+import com.platter.search.TrackChanges
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
+import retrofit2.HttpException
 import retrofit2.converter.gson.GsonConverterFactory
 import java.security.MessageDigest
 import java.util.UUID
@@ -196,6 +198,16 @@ class SubsonicClient(val credentials: Credentials, http: OkHttpClient = defaultH
     /** Songs matching [query], from [offset] on: a name can match more songs than one answer holds. */
     suspend fun searchSongs(query: String, count: Int, offset: Int): List<Song> =
         call { it.searchSongs(params, query, count, offset, 0, 0) }.searchResult3?.songs.orEmpty()
+
+    suspend fun trackChanges(cursor: String?): TrackChanges? = try {
+        call { it.trackChanges(params, cursor) }.platterTrackChanges
+            ?: throw java.io.IOException("Missing track journal response")
+    } catch (e: HttpException) {
+        if (e.code() == 404 || e.code() == 405 || e.code() == 501) {
+            e.response()?.errorBody()?.close()
+            null
+        } else throw e
+    }
 
     suspend fun playlists(): List<Playlist> = call { it.getPlaylists(params) }.playlists?.playlists.orEmpty()
 

@@ -2,12 +2,14 @@ package com.platter.desktop.deemix
 
 import com.google.gson.JsonParser
 import com.platter.desktop.api.Song
-import com.platter.desktop.search.QueryVariants
 import com.platter.desktop.wave.NetworkAddress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl
@@ -61,14 +63,12 @@ class DeemixConfig(
 
 class DeemixPreview(val url: String, val authorization: String)
 
-class DeezerArtistPage(val artist: DeezerArtist, val top: List<DeezerTrack>, val albums: List<DeezerAlbum>, val inLibrary: Map<String, Boolean>)
+class DeezerArtistPage(val artist: DeezerArtist, val top: List<DeezerTrack>, val albums: List<DeezerAlbum>, val libraryTracks: Map<Long, Song>)
 
-class DeezerAlbumPage(val album: DeezerAlbum, val tracks: List<DeezerTrack>, val inLibrary: Map<String, Boolean>)
+class DeezerAlbumPage(val album: DeezerAlbum, val tracks: List<DeezerTrack>, val libraryTracks: Map<Long, Song>)
 
-/** A Deezer search, with the tracks the library already holds marked by id. */
-class DeezerResults(val search: DeezerSearch, val inLibrary: Map<String, Boolean>) {
-    fun isInLibrary(track: DeezerTrack): Boolean = inLibrary[track.id.toString()] == true
-}
+/** Deezer results with their resolved library recordings, keyed by Deezer ID. */
+class DeezerResults(val search: DeezerSearch, val libraryTracks: Map<Long, Song>)
 
 /**
  * Talks to Deemix plus as the signed-in listener - the Android app's `DeemixClient` on coroutines.
@@ -83,6 +83,8 @@ class DeemixClient(
     catalogUrl: String = "https://api.deezer.com/",
     private val now: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
+    private val libraryLookups = Semaphore(6)
+
     private val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(DOWNLOAD_TIMEOUT_S, TimeUnit.SECONDS)
@@ -153,7 +155,9 @@ class DeemixClient(
 
             val parent = if (labels.size >= 3) labels.drop(1) else labels
             val sibling = "https://" + (listOf(SUBDOMAIN) + parent).joinToString(".") + "/"
-            listOf(sibling, onPort)
+            // Only under the server's own domain: deemix.duckdns.org beside home.duckdns.org is someone else's, and gets the password.
+            val sameOwner = server.topPrivateDomain() != null && sibling.toHttpUrlOrNull()?.topPrivateDomain() == server.topPrivateDomain()
+            if (sameOwner) listOf(sibling, onPort) else listOf(onPort)
         }.distinct()
     }
 
@@ -218,11 +222,11 @@ class DeemixClient(
 
     suspend fun usage(): DeemixResult<DeemixUsage> = authorized(SEARCH_TIMEOUT_S) { usage(it) }
 
-    /** Searches Deezer, and marks which of the tracks found the library already has - the check the site runs before offering a download. */
+    /** Searches Deezer and resolves the tracks the signed-in library can play. */
     suspend fun search(query: String): DeemixResult<DeezerResults> {
         val found = authorized(SEARCH_TIMEOUT_S) { search(it, query) }
         val search = found.value ?: return found as DeemixResult.Failed
-        return DeemixResult.Ok(DeezerResults(search, libraryMarks(search.tracks.orEmpty())))
+        return DeemixResult.Ok(DeezerResults(search, libraryTracks(search.tracks.orEmpty())))
     }
 
     /** An artist's page: who they are, their most played tracks, and every release - from Deezer's own catalogue, the tracks marked against the library. */
@@ -234,7 +238,7 @@ class DeemixClient(
         val artist = catalog { artist(id) }?.takeIf { it.id != null } ?: return@coroutineScope DeemixResult.Failed(DeemixResult.Failure.UNREACHABLE)
         val top = popular.await().orEmpty()
         val albums = releases.await().orEmpty()
-        DeemixResult.Ok(DeezerArtistPage(artist, top, albums, libraryMarks(top)))
+        DeemixResult.Ok(DeezerArtistPage(artist, top, albums, libraryTracks(top)))
     }
 
     /** An album's page: the record and its tracklist, marked against the library. */
@@ -243,7 +247,7 @@ class DeemixClient(
 
         val album = catalog { album(id) }?.takeIf { it.id != null } ?: return@coroutineScope DeemixResult.Failed(DeemixResult.Failure.UNREACHABLE)
         val tracks = tracklist.await().orEmpty()
-        DeemixResult.Ok(DeezerAlbumPage(album, tracks, libraryMarks(tracks)))
+        DeemixResult.Ok(DeezerAlbumPage(album, tracks, libraryTracks(tracks, album.title)))
     }
 
     /* A catalogue call's body, or null when Deezer could not be reached or said no. */
@@ -253,59 +257,29 @@ class DeemixClient(
         null
     }
 
-    /**
-     * Which of [tracks] the library already holds. An answer without the marks is still an answer: every track
-     * then simply offers a download, and the server skips the ones it already has.
-     */
-    private suspend fun libraryMarks(tracks: List<DeezerTrack>): Map<String, Boolean> {
-        val checked = tracks.filter { it.id != null && it.link != null }.map { LibraryCheckItem(it.id.toString(), it.artist?.name.orEmpty(), it.title.orEmpty()) }
-        if (checked.isEmpty()) return emptyMap()
-
-        val marks = authorized(SEARCH_TIMEOUT_S) { checkLibrary(it, LibraryCheckBody(checked)) }.value?.results.orEmpty()
-        val unmarked = tracks.filter { it.id != null && it.link != null && marks[it.id.toString()] != true }
-        return marks + creditedInLibrary(unmarked)
-    }
-
-    /*
-     * The site matches a track on its artist exactly, so a song the library tags with every performer -
-     * "ivycomb/Stephanafro" where Deezer says "ivycomb" - reads as missing, and search offered to download the very
-     * song it listed above. What the site leaves unmarked is looked up in the library itself, one search per
-     * artist, and the artist then only has to be one of the credits.
-     */
-    private suspend fun creditedInLibrary(tracks: List<DeezerTrack>): Map<String, Boolean> = coroutineScope {
-        if (tracks.isEmpty()) return@coroutineScope emptyMap()
-
-        val byArtist = tracks.filter { !it.artist?.name.isNullOrBlank() }.groupBy { it.artist!!.name!! }
-        val lookups = byArtist.keys.associateWith { artist ->
+    /** Resolve IDs with the listener's own Subsonic access, one lookup per artist. */
+    private suspend fun libraryTracks(tracks: List<DeezerTrack>, albumTitle: String? = null): Map<Long, Song> = coroutineScope {
+        val byArtist = tracks.filter { it.id != null && it.link != null && !it.artist?.name.isNullOrBlank() }
+            .groupBy { it.artist!!.name!! }
+        byArtist.map { (artist, entries) ->
             async {
                 try {
-                    withTimeoutOrNull(SEARCH_TIMEOUT_S * 1000) { config.searchLibrary(artist) }
+                    withTimeoutOrNull(SEARCH_TIMEOUT_S * 1000) {
+                        libraryLookups.withPermit {
+                            val matcher = DeezerLibraryMatcher(config.searchLibrary(artist))
+                            entries.mapNotNull { track ->
+                                matcher.match(track, track.album?.title ?: albumTitle)?.let { track.id!! to it }
+                            }
+                        }
+                    }.orEmpty()
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Exception) {
-                    null
+                } catch (_: Exception) {
+                    emptyList()
                 }
             }
-        }
-
-        val found = mutableMapOf<String, Boolean>()
-        for ((artist, lookup) in lookups) {
-            val songs = lookup.await() ?: continue
-            val credits = credits(artist)
-            for (track in byArtist.getValue(artist)) {
-                val title = comparableTitle(track.title)
-                val held = songs.any { song -> comparableTitle(song.title) == title && credits(song.artistLine()).any { it in credits } }
-                if (held) found[track.id.toString()] = true
-            }
-        }
-        found
+        }.awaitAll().flatten().toMap()
     }
-
-    private fun credits(artists: String?): Set<String> =
-        QueryVariants.normalize(artists).split(CREDIT_JOINS).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-
-    /* "Song (feat. Someone)" on one side and "Song" on the other are the same recording. */
-    private fun comparableTitle(title: String?): String = QueryVariants.normalize(title).replace(FEATURING, "").trim()
 
     /**
      * Where to stream a track's 30-second preview from, and the header that opens it. The site's own proxy, not
@@ -482,7 +456,5 @@ class DeemixClient(
         /* After a failed connection, how long the search stops knocking on every keystroke. */
         const val UNREACHABLE_BACKOFF_MS = 60 * 1000L
 
-        val CREDIT_JOINS = Regex("\\s*(?:/|,|;|&|\\s(?:feat|ft)\\.?\\s)\\s*")
-        val FEATURING = Regex("\\s*[(\\[](?:feat|ft|with)\\.?\\s[^)\\]]*[)\\]]")
     }
 }

@@ -53,6 +53,8 @@ import com.platter.desktop.search.FuzzyIndex
 import com.platter.desktop.search.LibrarySignals
 import com.platter.desktop.search.RankedResults
 import com.platter.desktop.search.SearchEngine
+import com.platter.desktop.search.TrackCatalogue
+import com.platter.search.TrackSearch
 import com.platter.desktop.wave.WaveClient
 import com.platter.desktop.wave.WaveController
 import com.platter.desktop.wave.WaveLyrics
@@ -953,6 +955,10 @@ class AppController(
 
     private var catalogueJob: Deferred<Catalogue>? = null
     private var engine: SearchEngine? = null
+    private var trackCatalogue: TrackCatalogue? = null
+    private var trackAccount: Pair<String, String>? = null
+    var trackIndexRevision by mutableStateOf(0)
+        private set
     private var signals = LibrarySignals.Empty
     private var signalsAt = 0L
     private var signalsStale = true
@@ -976,6 +982,9 @@ class AppController(
         catalogueJob?.cancel()
         catalogueJob = null
         engine = null
+        trackCatalogue?.cancel()
+        trackCatalogue = null
+        trackAccount = null
         signals = LibrarySignals.Empty
         signalsStale = true
     }
@@ -1008,20 +1017,38 @@ class AppController(
 
     /** Warms what the first search will want, so typing does not wait for it. */
     fun prepareSearch() {
-        if (client == null) return
+        val c = client ?: return
+        tracksFor(c)
         scope.launch { runCatching { librarySignals() } }
         scope.launch { runCatching { catalogue() } }
     }
 
     /** The query and its rewrites, ranked the way the Android app ranks them. */
-    suspend fun search(query: String): RankedResults {
+    suspend fun search(query: String, onLocal: ((RankedResults) -> Unit)? = null): RankedResults {
         val c = client ?: return RankedResults.Empty
+        val tracks = tracksFor(c)
         val e = engine ?: SearchEngine(
-            source = { q -> c.search(q, songs = 20, albums = 20, artists = 20) },
+            source = { q -> c.search(q, songs = TrackSearch.PAGE_SIZE) },
             signals = { librarySignals() },
             fuzzy = { runCatching { catalogue().fuzzy }.getOrDefault(FuzzyIndex.empty()) },
+            songPage = c::searchSongs,
+            localTracks = tracks::find,
         ).also { engine = it }
-        return e.search(query)
+        return e.search(query, onLocal)
+    }
+
+    private fun tracksFor(c: SubsonicClient): TrackCatalogue {
+        val account = (serverUrl ?: c.credentials.serverUrl) to c.credentials.username
+        if (trackAccount != account) {
+            trackCatalogue?.cancel()
+            trackCatalogue = null
+            engine = null
+            trackAccount = account
+        }
+        val tracks = trackCatalogue ?: TrackCatalogue(scope, store.directory.resolve("search"), account.first, account.second)
+            .also { trackCatalogue = it }
+        tracks.refresh(c) { if (trackCatalogue === tracks) trackIndexRevision++ }
+        return tracks
     }
 
     var recentSearches by mutableStateOf(saved.recentSearches)
@@ -1033,7 +1060,7 @@ class AppController(
      */
     fun commitSearch(query: String = searchQuery) {
         val q = query.trim()
-        if (q.length < SearchEngine.MIN_QUERY_LENGTH) return
+        if (q.isEmpty()) return
         recentSearches = (listOf(q) + recentSearches.filterNot { it.equals(q, ignoreCase = true) }).take(MAX_RECENT)
         store.update { recentSearches = this@AppController.recentSearches }
     }
@@ -1382,6 +1409,7 @@ class AppController(
     fun shutdown() {
         remote?.stop()
         remote = null
+        trackCatalogue?.cancel()
         background.forEach { it.cancel() }
         downloader.cancelAll()
         stopPreviewIfAny()
@@ -1860,10 +1888,24 @@ class AppController(
             user = { client?.credentials?.username },
             ownPassword = { deemixPassword },
             serverPassword = { password },
-            searchLibrary = { artist -> client?.search(artist, songs = LIBRARY_SONGS_PER_ARTIST, albums = 0, artists = 0)?.songs.orEmpty() },
+            searchLibrary = ::librarySongsForDeezer,
         ),
         catalogUrl = deezerCatalogUrl,
     )
+
+    private suspend fun librarySongsForDeezer(artist: String): List<Song> {
+        val library = client ?: return emptyList()
+        val found = linkedMapOf<String, Song>()
+        var offset = 0
+        repeat(DEEZER_LIBRARY_MAX_PAGES) {
+            val page = library.searchSongs(artist, DEEZER_LIBRARY_PAGE_SIZE, offset)
+            val previousCount = found.size
+            for (song in page) song.id?.takeIf { it.isNotBlank() }?.let { found.putIfAbsent(it, song) }
+            if (page.size < DEEZER_LIBRARY_PAGE_SIZE || found.size == previousCount) return found.values.toList()
+            offset += page.size
+        }
+        return found.values.toList()
+    }
 
     fun deemixQuotaText(): String = DeemixWords.quota(deemixUsage)
 
@@ -1910,16 +1952,20 @@ class AppController(
 
     /** What Deezer has for [query], marked against the library; null where there is no account or no site, and then the section is simply not there. */
     suspend fun deezerSearch(query: String): DeezerHits? {
-        if (client == null) return null
+        val library = client ?: return null
         val found = deemix.search(query).value ?: return null
+        if (client !== library) return null
         if (deemixUsage == null) refreshQuota()
         return DeezerHits.of(found)
     }
 
     /** An artist's or album's page from Deezer, or null when it could not be opened. */
-    suspend fun deezerPage(kind: DeezerHit.Kind, id: Long): DeezerPage? =
-        if (kind == DeezerHit.Kind.ALBUM) deemix.albumPage(id).value?.let { DeezerPage.ofAlbum(it) }
+    suspend fun deezerPage(kind: DeezerHit.Kind, id: Long): DeezerPage? {
+        val library = client ?: return null
+        val page = if (kind == DeezerHit.Kind.ALBUM) deemix.albumPage(id).value?.let { DeezerPage.ofAlbum(it) }
         else deemix.artistPage(id).value?.let { DeezerPage.ofArtist(it) }
+        return page.takeIf { client === library }
+    }
 
     /** Asks Deemix plus to download [hit]. An album or an artist goes through [AppDialog.ConfirmDeezer] first. */
     fun deezerDownload(hit: DeezerHit) {
@@ -1992,9 +2038,15 @@ class AppController(
         scope.launch { stopPreview() }
     }.also { previewPlayerInstance = it }
 
-    /** Starts [hit]'s 30-second preview, or stops it if it is the one playing. It pauses the music, as a call would, and does not touch the queue. */
-    fun togglePreview(hit: DeezerHit) {
+    /** Plays the resolved library recording, or toggles the Deezer preview when no recording was resolved. */
+    fun playDeezerTrack(hit: DeezerHit) {
         if (hit.kind != DeezerHit.Kind.TRACK) return
+        val song = hit.localTrack
+        if (song != null && hit.localTrackId != null) {
+            stopPreview()
+            player.play(listOf(song))
+            return
+        }
         if (previewKey == hit.key) {
             stopPreview()
             return
@@ -2154,7 +2206,8 @@ class AppController(
         private const val GENRE_SONGS = 100
         private const val SHUFFLE_ALL = 100
         private const val DISCOGRAPHY_ALBUMS = 30
-        private const val LIBRARY_SONGS_PER_ARTIST = 500
+        private const val DEEZER_LIBRARY_PAGE_SIZE = 500
+        private const val DEEZER_LIBRARY_MAX_PAGES = 4
 
         /** Enough artists per part of a credit to see the part on its own or inside other credits. */
         private const val CREDIT_SEARCH_ARTISTS = 40

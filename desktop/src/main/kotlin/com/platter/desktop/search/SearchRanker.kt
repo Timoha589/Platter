@@ -5,6 +5,8 @@ import com.platter.desktop.api.Artist
 import com.platter.desktop.api.SearchResult
 import com.platter.desktop.api.Song
 import com.platter.desktop.search.LibrarySignals.Kind
+import com.platter.search.TrackSearch
+import com.platter.search.TrackIndex
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
@@ -15,6 +17,7 @@ class RankedResults(
     val albums: List<Album>,
     val songs: List<Song>,
     val top: Top?,
+    internal val hasStrongMatch: Boolean = false,
 ) {
     val isEmpty: Boolean get() = artists.isEmpty() && albums.isEmpty() && songs.isEmpty()
 
@@ -51,15 +54,14 @@ class RankedResults(
 /**
  * Puts the results in the order a person would have put them in - ported from the Android app's `SearchRanker`.
  *
- * `search3` answers a substring query with whatever matched, in the order the server happened to store it. Nothing
- * here filters - every result the server sent is kept - but three things decide where each one lands:
+ * Every result the server returned is kept. Three things decide where each one lands:
  *  1. **How the query matched.** A name that is the query beats a name that starts with it, which beats a name with
  *     a word starting with it, which beats a name that merely contains it.
  *  2. **Which spelling matched.** A hit on the query as typed outranks a hit on one of the rewrites.
  *  3. **Whether it is already yours.** Starred, played before, played often, rated.
  */
 object SearchRanker {
-    // Match tiers. The gaps between them keep the personal boost from overturning a genuinely better textual match.
+    // Text scores for results without an exact match on the original track title.
     private const val EXACT = 100.0
     private const val PREFIX = 82.0
     private const val WORD_PREFIX = 64.0
@@ -114,10 +116,12 @@ object SearchRanker {
         results: List<SearchResult?>,
         signals: LibrarySignals,
         intent: String? = null,
+        localTracks: List<TrackIndex.Match<Song>> = emptyList(),
     ): RankedResults {
         if (variants.isEmpty()) return RankedResults.Empty
 
         val typed = intent?.let(::Intent)
+        val trackSearch = TrackSearch(intent ?: variants.first().text)
         val queries = variants.map { QueryVariants.normalize(it.text) }
         val weights = variants.map { it.weight }
 
@@ -131,16 +135,32 @@ object SearchRanker {
             result.albums.orEmpty().forEach { a -> a.id?.let { albums.putIfAbsent(it, a) } }
             result.songs.orEmpty().forEach { s -> s.id?.let { songs.putIfAbsent(it, s) } }
         }
+        val indexMatches = HashMap<String, TrackIndex.Match<Song>>()
+        for (hit in localTracks) {
+            val id = hit.song.id ?: continue
+            songs.putIfAbsent(id, hit.song)
+            val previous = indexMatches[id]
+            if (previous == null || hit.edits < previous.edits) indexMatches[id] = hit
+        }
+
+        if (trackSearch.isSingleCharacter) {
+            artists.values.removeIf { !trackSearch.matchesName(it.name) }
+            albums.values.removeIf { !trackSearch.matchesName(it.name) }
+            songs.values.removeIf { !trackSearch.matchesName(it.title) }
+        }
 
         val scoredArtists = artists.values.map { scoreArtist(it, queries, weights, signals, typed) }.sortedByDescending { it.total }
         val scoredAlbums = albums.values.map { scoreAlbum(it, queries, weights, signals, typed) }.sortedByDescending { it.total }
-        val scoredSongs = songs.values.map { scoreSong(it, queries, weights, signals, typed) }.sortedByDescending { it.total }
+        val scoredSongs = songs.values.map { scoreSong(it, queries, weights, signals, typed, trackSearch, indexMatches[it.id]) }
+            .sortedWith(compareByDescending<Scored<Song>> { it.trackPriority }
+                .thenByDescending { it.textScore }.thenByDescending { it.personal })
 
         return RankedResults(
             scoredArtists.map { it.item },
             scoredAlbums.map { it.item },
             scoredSongs.map { it.item },
-            pickTop(scoredArtists.firstOrNull(), scoredAlbums.firstOrNull(), scoredSongs.firstOrNull()),
+            pickTop(scoredArtists.firstOrNull(), scoredAlbums.firstOrNull(), scoredSongs.firstOrNull(), trackSearch),
+            scoredSongs.any { it.strong } || scoredArtists.any { it.strong } || scoredAlbums.any { it.strong },
         )
     }
 
@@ -169,7 +189,7 @@ object SearchRanker {
         return Scored(album, match, personal)
     }
 
-    private fun scoreSong(song: Song, queries: List<String>, weights: List<Double>, signals: LibrarySignals, intent: Intent?): Scored<Song> {
+    private fun scoreSong(song: Song, queries: List<String>, weights: List<Double>, signals: LibrarySignals, intent: Intent?, trackSearch: TrackSearch, correction: TrackIndex.Match<Song>?): Scored<Song> {
         val match = max(
             max(
                 bestMatch(queries, weights, song.title),
@@ -183,7 +203,9 @@ object SearchRanker {
             playCount = song.playCount,
             userRating = song.userRating,
         )
-        return Scored(song, match, personal)
+        val textMatch = if (correction?.prefix == true) max(match, PREFIX) else match
+        return Scored(song, textMatch, personal, trackSearch.match(song.title, song.artistLine(), song.artist),
+            correction?.edits ?: 0, trackSearch.matchesTitleWords(song.title))
     }
 
     /** The best any of the spellings does against any of the given fields, discounted by how much it is trusted. */
@@ -297,7 +319,19 @@ object SearchRanker {
      * The single result to lead with, or null when no candidate matched on any field this can read. Leading with a
      * result whose relevance cannot be explained is worse than leading with nothing.
      */
-    private fun pickTop(artist: Scored<Artist>?, album: Scored<Album>?, song: Scored<Song>?): RankedResults.Top? {
+    private fun pickTop(artist: Scored<Artist>?, album: Scored<Album>?, song: Scored<Song>?, trackSearch: TrackSearch): RankedResults.Top? {
+        if (song != null && song.exactTitle == TrackSearch.EXACT_TITLE_AND_ARTIST) return RankedResults.Top.OfSong(song.item)
+        if (song != null && song.exactTitle == TrackSearch.EXACT_TITLE) {
+            if (artist != null && artist.total + ARTIST_TOP_PRIOR >= song.total &&
+                (trackSearch.matchesName(artist.item.name) || trackSearch.matchesName(artist.item.sortName))
+            ) return RankedResults.Top.OfArtist(artist.item)
+            return RankedResults.Top.OfSong(song.item)
+        }
+        if (song != null && song.edits > 0 && !song.literalTitle) {
+            if (artist != null && trackSearch.matchesName(artist.item.name)) return RankedResults.Top.OfArtist(artist.item)
+            if (album != null && trackSearch.matchesName(album.item.name)) return RankedResults.Top.OfAlbum(album.item)
+            return RankedResults.Top.OfSong(song.item)
+        }
         val artistScore = if (artist == null || !artist.matched) Double.NEGATIVE_INFINITY else artist.total + ARTIST_TOP_PRIOR
         val albumScore = if (album == null || !album.matched) Double.NEGATIVE_INFINITY else album.total + ALBUM_TOP_PRIOR
         val songScore = if (song == null || !song.matched) Double.NEGATIVE_INFINITY else song.total
@@ -312,10 +346,18 @@ object SearchRanker {
         }
     }
 
-    private class Scored<T>(val item: T, private val match: Double, private val personal: Double) {
+    private class Scored<T>(val item: T, private val match: Double, val personal: Double, val exactTitle: Int = 0,
+                            val edits: Int = 0, val literalTitle: Boolean = false) {
+        val trackPriority: Int get() = TrackSearch.trackPriority(exactTitle, literalTitle, edits)
+        val strong: Boolean get() = exactTitle > 0 || literalTitle || (edits == 0 && match >= WORD_PREFIX)
         /** Kept apart from the total because familiarity alone must never promote something to the top card. */
-        val matched: Boolean get() = match > 0
-        val total: Double get() = (if (match > 0) match else UNEXPLAINED) + personal
+        val matched: Boolean get() = literalTitle || match > 0
+        val textScore: Double get() = when {
+            exactTitle > 0 -> EXACT
+            match > 0 -> match
+            else -> UNEXPLAINED
+        }
+        val total: Double get() = textScore + personal
     }
 
     /** The query as typed, folded once for every name it is held against. */
