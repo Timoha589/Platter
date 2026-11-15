@@ -161,6 +161,16 @@ class SearchRankerTest {
         SearchRanker.rank(typed(query), listOf(result), signals)
 
     @Test
+    fun `a credited artist outranks a starred band with that name as a prefix`() {
+        val tribute = song("tribute", "Hello", "Adele Tribute Band").apply { starred = "2024-01-01T00:00:00Z" }
+        val original = song("original", "Hello", "Adele")
+        val ranked = rank("Hello Adele", SearchResult().apply { songs = listOf(tribute, original) })
+
+        assertEquals(listOf("original", "tribute"), ranked.songs.map { it.id })
+        assertEquals("original", assertIs<RankedResults.Top.OfSong>(ranked.top).song.id)
+    }
+
+    @Test
     fun `a name that is the query beats one that starts with it, and that beats one that holds it`() {
         val ranked = rank(
             "abbey",
@@ -225,6 +235,32 @@ class SearchRankerTest {
     }
 
     @Test
+    fun `a full title outranks a familiar remix and a hit on the album`() {
+        val remix = song("remix", "La La La (Kaos Remix)").apply {
+            starred = "2024-01-01T00:00:00Z"
+            playCount = 20
+        }
+        val original = song("original", "La La La", "Naughty Boy/Sam Smith")
+        val ranked = rank("La la la", SearchResult().apply {
+            songs = listOf(remix, song("album-hit", "Another Song", onAlbum = "La La La"), original)
+            albums = listOf(album("album", "La La La", starred = true))
+        })
+        assertEquals(listOf("original", "remix", "album-hit"), ranked.songs.map { it.id })
+        assertEquals("original", assertIs<RankedResults.Top.OfSong>(ranked.top).song.id)
+    }
+
+    @Test
+    fun `title and a co-performer outrank a namesake by a different artist`() {
+        val original = song("original", "La La La", "Naughty Boy").apply { displayArtist = "Naughty Boy feat. Sam Smith" }
+        val namesake = song("namesake", "La La La", "Sam Smithers").apply { starred = "2024-01-01T00:00:00Z" }
+        for (query in listOf("La la la Sam Smith", "Sam Smith La La La")) {
+            val ranked = rank(query, SearchResult().apply { songs = listOf(namesake, original) })
+            assertEquals("original", ranked.songs.first().id)
+            assertEquals("original", assertIs<RankedResults.Top.OfSong>(ranked.top).song.id)
+        }
+    }
+
+    @Test
     fun `everything the server sent is kept, and an unexplained hit never leads`() {
         val ranked = rank("zzz", SearchResult().apply { songs = listOf(song("1", "Something unrelated", "Nobody")) })
         assertEquals(1, ranked.songs.size)
@@ -283,6 +319,58 @@ class SearchEngineTest {
         SearchEngine({ q -> source(q) }, { LibrarySignals.Empty }, { index })
 
     @Test
+    fun `a single letter keeps exact names without rewriting the query or accepting prefixes`() = runBlocking {
+        val asked = mutableListOf<String>()
+        val result = engine { query ->
+            asked += query
+            SearchResult().apply {
+                songs = listOf(song("prefix", "Xylophone"), song("title", "X"), song("punctuated", "X!"))
+                artists = listOf(artist("different", "X Ambassadors"))
+                albums = listOf(album("different", "X and Y"), album("exact", "X"))
+            }
+        }.search(" X ")
+
+        assertEquals(listOf("X"), asked)
+        assertEquals(listOf("title"), result.songs.map { it.id })
+        assertTrue(result.artists.isEmpty())
+        assertEquals(listOf("exact"), result.albums.map { it.id })
+        assertEquals("title", assertIs<RankedResults.Top.OfSong>(result.top).song.id)
+    }
+
+    @Test
+    fun `a crowded phrase is paged even with an exact title from another artist`() = runBlocking {
+        val namesake = song("namesake", "La La La", "Other Artist")
+        val original = song("original", "La La La", "Naughty Boy/Sam Smith")
+        val remixes = (1..19).map { song("remix-$it", "La La La (Remix $it)") }
+        val offsets = ArrayList<Int>()
+        val result = SearchEngine(
+            source = { q -> SearchResult().apply { if (q == "La la la") songs = listOf(namesake) + remixes } },
+            signals = { LibrarySignals.Empty },
+            fuzzy = { FuzzyIndex.empty() },
+            songPage = { query, size, offset ->
+                assertEquals("\"La la la\"", query)
+                assertEquals(20, size)
+                offsets += offset
+                if (offset == 0) listOf(namesake) + remixes else listOf(original)
+            },
+        ).search("La la la")
+        assertEquals(listOf(0, 20), offsets)
+        assertEquals(listOf("namesake", "original"), result.songs.take(2).map { it.id })
+        assertEquals(21, result.songs.size)
+    }
+
+    @Test
+    fun `a failed phrase lookup keeps the results already received`() = runBlocking {
+        val result = SearchEngine(
+            source = { q -> SearchResult().apply { if (q == "Abbey Road") albums = listOf(album("a", q)) } },
+            signals = { LibrarySignals.Empty },
+            fuzzy = { FuzzyIndex.empty() },
+            songPage = { _, _, _ -> throw IOException("phrase failed") },
+        ).search("Abbey Road")
+        assertEquals("a", result.albums.single().id)
+    }
+
+    @Test
     fun `a Cyrillic name typed on the wrong layout is found by asking in the right one`() = runBlocking {
         val asked = ArrayList<String>()
         val result = engine { q ->
@@ -313,6 +401,37 @@ class SearchEngineTest {
             if (q.lowercase() == "love bottle" || q.lowercase() == "love in bottle") SearchResult().apply { songs = listOf(song("1", "Love in a Bottle")) } else SearchResult()
         }.search("Love in the Bottle")
         assertEquals("Love in a Bottle", result.songs.single().title)
+    }
+
+    @Test
+    fun `a weak first response triggers a retry and both rounds are kept`() = runBlocking {
+        val result = engine { query ->
+            SearchResult().apply {
+                songs = when (query) {
+                    "Love in the Bottle" -> listOf(song("noise", "Completely Different"))
+                    "Love Bottle" -> listOf(song("wanted", "Love in a Bottle"))
+                    else -> emptyList()
+                }
+            }
+        }.search("Love in the Bottle")
+
+        assertEquals(listOf("wanted", "noise"), result.songs.map { it.id })
+        assertEquals("wanted", assertIs<RankedResults.Top.OfSong>(result.top).song.id)
+    }
+
+    @Test
+    fun `weak first results survive failure of every fallback request`() = runBlocking {
+        val query = "Love in the Bottle"
+        val original = QueryVariants.of(query).map { it.text }.toSet()
+        val calls = mutableListOf<String>()
+        val result = engine { spelling ->
+            calls += spelling
+            if (spelling !in original) throw IOException("retry failed")
+            SearchResult().apply { if (spelling == query) songs = listOf(song("noise", "Completely Different")) }
+        }.search(query)
+
+        assertTrue(calls.any { it !in original })
+        assertEquals(listOf("noise"), result.songs.map { it.id })
     }
 
     @Test

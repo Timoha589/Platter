@@ -17,6 +17,9 @@ interface SubsonicService {
     @GET("ping")
     suspend fun ping(@QueryMap params: Map<String, String>): ApiResponse
 
+    @GET("platterTrackChanges")
+    suspend fun trackChanges(@QueryMap params: Map<String, String>, @Query("cursor") cursor: String?): ApiResponse
+
     @GET("getArtists")
     suspend fun getArtists(@QueryMap params: Map<String, String>): ApiResponse
 

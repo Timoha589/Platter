@@ -5,8 +5,9 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.cappielloantonio.tempo.App
-import com.cappielloantonio.tempo.helper.search.QueryVariants
+import com.cappielloantonio.tempo.subsonic.api.searching.SearchingClient
 import com.cappielloantonio.tempo.subsonic.models.Child
+import com.cappielloantonio.tempo.subsonic.utils.ResponseUtil
 import com.cappielloantonio.tempo.util.NetworkAddress
 import com.cappielloantonio.tempo.util.Preferences
 import com.google.gson.JsonParser
@@ -61,12 +62,25 @@ class DeemixRequest internal constructor() {
     var isCancelled = false
         private set
 
-    @Volatile
-    internal var call: Call<*>? = null
+    private val calls = mutableSetOf<Call<*>>()
+
+    internal fun <T> execute(call: Call<T>): Response<T> {
+        synchronized(calls) {
+            if (isCancelled) throw IOException("Request cancelled")
+            calls.add(call)
+        }
+        return try {
+            call.execute()
+        } finally {
+            synchronized(calls) { calls.remove(call) }
+        }
+    }
 
     fun cancel() {
-        isCancelled = true
-        call?.cancel()
+        synchronized(calls) {
+            isCancelled = true
+            calls.forEach { it.cancel() }
+        }
     }
 }
 
@@ -104,11 +118,9 @@ object DeemixClient {
     private const val MAX_RELEASES = 500
     private const val MAX_ALBUM_TRACKS = 500
 
-    /* Enough for a whole discography, joint credits included. */
-    private const val LIBRARY_SONGS_PER_ARTIST = 500
-
-    private val CREDIT_JOINS = Regex("\\s*(?:/|,|;|&|\\s(?:feat|ft)\\.?\\s)\\s*")
-    private val FEATURING = Regex("\\s*[(\\[](?:feat|ft|with)\\.?\\s[^)\\]]*[)\\]]")
+    private const val LIBRARY_PAGE_SIZE = 500
+    private const val LIBRARY_MAX_PAGES = 4
+    private const val LIBRARY_PAGE_TIMEOUT_S = 8L
 
     /* After a failed connection, how long the search stops knocking on every keystroke. */
     private const val UNREACHABLE_BACKOFF_MS = 60 * 1000L
@@ -131,6 +143,7 @@ object DeemixClient {
     }
 
     private val executor = Executors.newCachedThreadPool()
+    private val libraryExecutor = Executors.newFixedThreadPool(6)
     private val main = Handler(Looper.getMainLooper())
 
     @Volatile
@@ -185,7 +198,9 @@ object DeemixClient {
 
             val parent = if (labels.size >= 3) labels.drop(1) else labels
             val sibling = "https://" + (listOf(SUBDOMAIN) + parent).joinToString(".") + "/"
-            listOf(sibling, onPort)
+            // Only under the server's own domain: deemix.duckdns.org beside home.duckdns.org is someone else's, and gets the password.
+            val sameOwner = server.topPrivateDomain() != null && sibling.toHttpUrlOrNull()?.topPrivateDomain() == server.topPrivateDomain()
+            if (sameOwner) listOf(sibling, onPort) else listOf(onPort)
         }.distinct()
     }
 
@@ -251,8 +266,7 @@ object DeemixClient {
             run(callback) { request -> authorized(request, SEARCH_TIMEOUT_S) { usage(it) } }
 
     /**
-     * Searches Deezer, and marks which of the tracks found the library already
-     * has - the same check the site runs before offering a download.
+     * Searches Deezer and resolves the tracks the signed-in library can play.
      */
     @JvmStatic
     fun search(query: String, callback: DeemixCallback<DeezerResults>): DeemixRequest =
@@ -261,13 +275,12 @@ object DeemixClient {
                 if (!found.isOk) return@run DeemixResult.failed(found.failure!!, found.message)
 
                 val search = found.value!!
-                DeemixResult.ok(DeezerResults(search, libraryMarks(request, search.tracks.orEmpty())))
+                DeemixResult.ok(DeezerResults(search, libraryTracks(request, search.tracks.orEmpty())))
             }
 
     /**
      * An artist's page: who they are, their most played tracks, and every
-     * release - read from Deezer's own catalogue, the tracks marked against
-     * the library through Deemix plus.
+     * release, with the popular tracks resolved against the library.
      */
     @JvmStatic
     fun artistPage(id: Long, callback: DeemixCallback<DeezerArtistPage>): DeemixRequest =
@@ -281,7 +294,7 @@ object DeemixClient {
                 val top = popular.get().orEmpty()
                 val albums = releases.get().orEmpty()
 
-                DeemixResult.ok(DeezerArtistPage(artist, top, albums, libraryMarks(request, top)))
+                DeemixResult.ok(DeezerArtistPage(artist, top, albums, libraryTracks(request, top)))
             }
 
     /** An album's page: the record and its tracklist, marked against the library. */
@@ -294,7 +307,7 @@ object DeemixClient {
                         ?: return@run DeemixResult.failed(DeemixResult.Failure.UNREACHABLE)
                 val tracks = tracklist.get().orEmpty()
 
-                DeemixResult.ok(DeezerAlbumPage(album, tracks, libraryMarks(request, tracks)))
+                DeemixResult.ok(DeezerAlbumPage(album, tracks, libraryTracks(request, tracks, album.title)))
             }
 
     /* A catalogue call's body, or null when Deezer could not be reached or said no. */
@@ -305,69 +318,47 @@ object DeemixClient {
         null
     }
 
-    /**
-     * Which of [tracks] the library already holds - the same check the site
-     * runs before offering a download. An answer without the marks is still an
-     * answer: every track then simply offers a download, and the server skips
-     * the ones it already has.
-     */
-    private fun libraryMarks(request: DeemixRequest, tracks: List<DeezerTrack>): Map<String, Boolean> {
-        val checked = tracks.filter { it.id != null && it.link != null }.map {
-            LibraryCheckItem(it.id.toString(), it.artist?.name.orEmpty(), it.title.orEmpty())
-        }
-        if (checked.isEmpty()) return emptyMap()
+    /** Resolve IDs with the listener's own Subsonic access, one lookup per artist. */
+    private fun libraryTracks(request: DeemixRequest, tracks: List<DeezerTrack>, albumTitle: String? = null): Map<Long, Child> {
+        if (request.isCancelled) return emptyMap()
+        val byArtist = tracks.filter { it.id != null && it.link != null && !it.artist?.name.isNullOrBlank() }
+                .groupBy { it.artist!!.name!! }
+        if (byArtist.isEmpty()) return emptyMap()
 
-        val marks = authorized(request, SEARCH_TIMEOUT_S) { checkLibrary(it, LibraryCheckBody(checked)) }
-                .value?.results.orEmpty()
-
-        val unmarked = tracks.filter { it.id != null && it.link != null && marks[it.id.toString()] != true }
-        return marks + creditedInLibrary(request, unmarked)
-    }
-
-    /*
-     * The site matches a track on its artist exactly, so a song the library
-     * tags with every performer - "ivycomb/Stephanafro" where Deezer says
-     * "ivycomb" - reads as missing, and search offered to download the very
-     * song it listed above. What the site leaves unmarked is looked up in the
-     * library itself, one search per artist, and the artist then only has to
-     * be one of the credits.
-     */
-    private fun creditedInLibrary(request: DeemixRequest, tracks: List<DeezerTrack>): Map<String, Boolean> {
-        if (tracks.isEmpty() || request.isCancelled) return emptyMap()
-
-        val byArtist = tracks.filter { !it.artist?.name.isNullOrBlank() }.groupBy { it.artist!!.name!! }
-        val lookups = byArtist.keys.associateWith { artist -> executor.submit(Callable { librarySongsBy(artist) }) }
-
-        val found = mutableMapOf<String, Boolean>()
-        for ((artist, lookup) in lookups) {
-            val songs = runCatching { lookup.get(SEARCH_TIMEOUT_S, TimeUnit.SECONDS) }.getOrNull() ?: continue
-            val credits = credits(artist)
-
-            for (track in byArtist.getValue(artist)) {
-                val title = comparableTitle(track.title)
-                val held = songs.any { song ->
-                    comparableTitle(song.title) == title && credits(song.artistLine()).any { it in credits }
+        val searching = runCatching { App.getSubsonicClientInstance(false).searchingClient }.getOrNull() ?: return emptyMap()
+        val tasks = byArtist.map { (artist, candidates) ->
+            Callable {
+                val matcher = DeezerLibraryMatcher(librarySongsBy(request, searching, artist))
+                candidates.mapNotNull { track ->
+                    matcher.match(track, track.album?.title ?: albumTitle)
+                            ?.let { track.id!! to it }
                 }
-                if (held) found[track.id.toString()] = true
             }
         }
-        return found
+        return libraryExecutor.invokeAll(tasks, SEARCH_TIMEOUT_S, TimeUnit.SECONDS)
+                .flatMap { runCatching { it.get() }.getOrNull().orEmpty() }
+                .toMap()
     }
 
     /* The server's full-text search finds an artist inside a joint credit too. */
-    private fun librarySongsBy(artist: String): List<Child> =
-            App.getSubsonicClientInstance(false)
-                    .searchingClient
-                    .search3(artist, LIBRARY_SONGS_PER_ARTIST, 0, 0)
-                    .execute()
-                    .body()?.subsonicResponse?.searchResult3?.songs.orEmpty()
-
-    private fun credits(artists: String?): Set<String> =
-            QueryVariants.normalize(artists).split(CREDIT_JOINS).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-
-    /* "Song (feat. Someone)" on one side and "Song" on the other are the same recording. */
-    private fun comparableTitle(title: String?): String =
-            QueryVariants.normalize(title).replace(FEATURING, "").trim()
+    private fun librarySongsBy(request: DeemixRequest, searching: SearchingClient, artist: String): List<Child> {
+        val songs = linkedMapOf<String, Child>()
+        var offset = 0
+        repeat(LIBRARY_MAX_PAGES) {
+            if (request.isCancelled || Thread.currentThread().isInterrupted) return emptyList()
+            val call = searching.searchSongs(artist, LIBRARY_PAGE_SIZE, offset)
+            call.timeout().timeout(LIBRARY_PAGE_TIMEOUT_S, TimeUnit.SECONDS)
+            val response = request.execute(call)
+            if (!response.isSuccessful) response.errorBody()?.close()
+            val body = ResponseUtil.body(response) ?: return emptyList()
+            val page = body.searchResult3?.songs.orEmpty()
+            val previousCount = songs.size
+            for (song in page) if (!song.id.isNullOrBlank()) songs.putIfAbsent(song.id, song)
+            if (page.size < LIBRARY_PAGE_SIZE || songs.size == previousCount) return songs.values.toList()
+            offset += page.size
+        }
+        return songs.values.toList()
+    }
 
     /**
      * Where to stream a track's 30-second preview from, and the header that
@@ -452,10 +443,8 @@ object DeemixClient {
 
             val call = api.make("Bearer $token")
             call.timeout().timeout(timeoutS, TimeUnit.SECONDS)
-            request.call = call
-
             val response = try {
-                call.execute()
+                request.execute(call)
             } catch (e: IOException) {
                 if (!request.isCancelled) markUnreachable()
                 return DeemixResult.failed(DeemixResult.Failure.UNREACHABLE, e.message)
@@ -589,12 +578,10 @@ class DeezerArtistPage(
         val artist: DeezerArtist,
         val top: List<DeezerTrack>,
         val albums: List<DeezerAlbum>,
-        val inLibrary: Map<String, Boolean>
+        val libraryTracks: Map<Long, Child>
 )
 
-class DeezerAlbumPage(val album: DeezerAlbum, val tracks: List<DeezerTrack>, val inLibrary: Map<String, Boolean>)
+class DeezerAlbumPage(val album: DeezerAlbum, val tracks: List<DeezerTrack>, val libraryTracks: Map<Long, Child>)
 
-/** A Deezer search, with the tracks the library already holds marked by id. */
-class DeezerResults(val search: DeezerSearch, val inLibrary: Map<String, Boolean>) {
-    fun isInLibrary(track: DeezerTrack): Boolean = inLibrary[track.id.toString()] == true
-}
+/** Deezer results with their resolved library recordings, keyed by Deezer ID. */
+class DeezerResults(val search: DeezerSearch, val libraryTracks: Map<Long, Child>)

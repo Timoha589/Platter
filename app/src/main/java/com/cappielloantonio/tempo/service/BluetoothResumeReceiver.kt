@@ -38,15 +38,16 @@ class BluetoothResumeReceiver : BroadcastReceiver() {
         }
         if (!BluetoothResume.sameDevice(key, awaited)) return
 
-        val pending = goAsync()
-        val browser = MediaBrowser.Builder(context, SessionToken(context, ComponentName(context, MediaService::class.java)))
-                .buildAsync()
+        // The receiver context cannot bind to a service. Use the application context
+        // so the browser connection can outlive this broadcast.
+        val appContext = context.applicationContext
+        val token = SessionToken(appContext, ComponentName(appContext, MediaService::class.java))
+        val browser = MediaBrowser.Builder(appContext, token).buildAsync()
         MediaManager.check(browser)
 
         // The link comes up before the audio does; once playing, the player keeps itself alive.
         Handler(Looper.getMainLooper()).postDelayed({
             MediaBrowser.releaseFuture(browser)
-            pending.finish()
         }, HOLD_MS)
     }
 

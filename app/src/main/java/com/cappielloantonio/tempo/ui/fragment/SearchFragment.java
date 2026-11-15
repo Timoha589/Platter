@@ -22,8 +22,6 @@ import androidx.annotation.Nullable;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.LiveData;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
@@ -37,7 +35,6 @@ import com.cappielloantonio.tempo.deemix.DeemixQuota;
 import com.cappielloantonio.tempo.deemix.DeezerPreviewPlayer;
 import com.cappielloantonio.tempo.glide.CustomGlideRequest;
 import com.cappielloantonio.tempo.helper.recyclerview.CustomLinearSnapHelper;
-import com.cappielloantonio.tempo.helper.search.QueryVariants;
 import com.cappielloantonio.tempo.helper.search.RankedResults;
 import com.cappielloantonio.tempo.helper.view.SkeletonView;
 import com.cappielloantonio.tempo.lyricsearch.LyricMatch;
@@ -62,6 +59,7 @@ import com.cappielloantonio.tempo.ui.dialog.DeezerDownloadDialog;
 import com.google.android.material.shape.RelativeCornerSize;
 import com.google.android.material.shape.ShapeAppearanceModel;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.platter.search.TrackSearch;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -72,13 +70,6 @@ import java.util.Set;
 @UnstableApi
 public class SearchFragment extends Fragment implements ClickCallback {
     private static final String TAG = "SearchFragment";
-
-    /**
-     * Results arrive while the query is being typed, so the threshold is what
-     * makes a search worth running at all rather than what makes it valid. One
-     * character matches most of the library and answers nothing.
-     */
-    private static final int MINIMUM_QUERY_LENGTH = 2;
 
     /**
      * How long the typing has to stop before the query is worth sending. Short
@@ -463,8 +454,13 @@ public class SearchFragment extends Fragment implements ClickCallback {
         if (bind.searchResultLayout.getVisibility() != View.VISIBLE) showLoading();
 
         searchViewModel.search(query);
-        deezerViewModel.search(query);
-        lyricViewModel.search(query);
+        if (new TrackSearch(query).isSingleCharacter()) {
+            deezerViewModel.clear();
+            lyricViewModel.clear();
+        } else {
+            deezerViewModel.search(query);
+            lyricViewModel.search(query);
+        }
     }
 
     public void setRecentSuggestions() {
@@ -613,10 +609,13 @@ public class SearchFragment extends Fragment implements ClickCallback {
      * did not turn up still stays, with its tick.
      */
     private void showDeezer() {
+        Set<String> listed = new HashSet<>();
+        for (Child song : currentResults.getSongs()) listed.add(song.getId());
+
         List<DeezerHit> fresh = new ArrayList<>();
         for (DeezerHit hit : deezerRows) {
-            boolean listed = hit.getKind() == DeezerHit.Kind.TRACK && libraryCopyOf(hit, currentResults.getSongs()) != null;
-            if (!listed) fresh.add(hit);
+            String localId = hit.getLocalTrackId();
+            if (localId == null || !listed.contains(localId)) fresh.add(hit);
         }
         deezerAdapter.setHits(fresh);
 
@@ -625,80 +624,18 @@ public class SearchFragment extends Fragment implements ClickCallback {
         bind.searchDeezerSector.setVisibility(answered && found ? View.VISIBLE : View.GONE);
     }
 
-    /**
-     * A Deezer track that is already in the library plays from the library, in
-     * full. Only a track the library does not have is worth a thirty-second
-     * preview - the tick on the row says it is there, and a tap that then
-     * plays a clip of it reads as the tick being wrong.
-     */
     private void playDeezerTrack(DeezerHit hit) {
-        if (!hit.getInLibrary()) {
+        Child song = hit.getLocalTrack();
+        if (song == null) {
             previewPlayer.toggle(hit.getKey(), hit.getId());
             return;
         }
 
-        Child listed = libraryCopyOf(hit, currentResults.getSongs());
-        if (listed != null) {
-            playFromResults(listed);
-            return;
-        }
-
-        /*
-         * The library's own results do not have it - Deezer matches more
-         * loosely than the server does - so the library is asked for the title
-         * itself. Only the first answer counts: this is a one-off lookup.
-         */
-        LiveData<List<Child>> lookup = searchViewModel.findSongs(hit.getTitle());
-        lookup.observe(getViewLifecycleOwner(), new Observer<List<Child>>() {
-            @Override
-            public void onChanged(List<Child> songs) {
-                lookup.removeObserver(this);
-                if (bind == null) return;
-
-                Child song = libraryCopyOf(hit, songs);
-
-                if (song == null) {
-                    // Deemix plus says it is there but the server cannot find
-                    // it (not scanned yet, tagged differently): the clip is
-                    // still better than nothing.
-                    previewPlayer.toggle(hit.getKey(), hit.getId());
-                    return;
-                }
-
-                previewPlayer.stop();
-
-                Bundle bundle = new Bundle();
-                bundle.putParcelableArrayList(Constants.TRACKS_OBJECT, new ArrayList<>(Collections.singletonList(song)));
-                bundle.putInt(Constants.ITEM_POSITION, 0);
-                onMediaClick(bundle);
-            }
-        });
-    }
-
-    /**
-     * The library track a Deezer track is, matched on title and artist with
-     * case, accents and ё folded away. A library title may carry more than
-     * Deezer's - "(Remastered)", a featured artist - so a title that starts
-     * with Deezer's still counts; the artist has to agree either way.
-     */
-    @Nullable
-    private static Child libraryCopyOf(DeezerHit hit, @Nullable List<Child> songs) {
-        if (songs == null) return null;
-
-        String title = QueryVariants.normalize(hit.getTitle());
-        String artist = QueryVariants.normalize(hit.getArtist());
-
-        for (Child song : songs) {
-            String songTitle = QueryVariants.normalize(song.getTitle());
-            String songArtist = QueryVariants.normalize(song.artistLine());
-
-            boolean sameTitle = songTitle.equals(title) || songTitle.startsWith(title);
-            boolean sameArtist = artist.isEmpty() || songArtist.contains(artist) || artist.contains(songArtist);
-
-            if (sameTitle && sameArtist && !songArtist.isEmpty()) return song;
-        }
-
-        return null;
+        previewPlayer.stop();
+        Bundle bundle = new Bundle();
+        bundle.putParcelableArrayList(Constants.TRACKS_OBJECT, new ArrayList<>(Collections.singletonList(song)));
+        bundle.putInt(Constants.ITEM_POSITION, 0);
+        onMediaClick(bundle);
     }
 
     private void confirmDownload(DeezerHit hit) {
@@ -832,7 +769,7 @@ public class SearchFragment extends Fragment implements ClickCallback {
     }
 
     private boolean isQueryValid(String query) {
-        return !TextUtils.isEmpty(query) && query.trim().length() >= MINIMUM_QUERY_LENGTH;
+        return query != null && !query.trim().isEmpty();
     }
 
     /**

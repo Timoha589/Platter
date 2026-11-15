@@ -4,8 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.annotation.OptIn
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,6 +16,7 @@ import com.cappielloantonio.tempo.R
 import com.cappielloantonio.tempo.databinding.FragmentDeezerPageBinding
 import com.cappielloantonio.tempo.deemix.DeemixQuota
 import com.cappielloantonio.tempo.deemix.DeezerPreviewPlayer
+import com.cappielloantonio.tempo.service.MediaManager
 import com.cappielloantonio.tempo.ui.activity.MainActivity
 import com.cappielloantonio.tempo.ui.adapter.DeezerPageActionsAdapter
 import com.cappielloantonio.tempo.ui.adapter.DeezerResultAdapter
@@ -30,9 +33,10 @@ import com.google.android.material.shape.ShapeAppearanceModel
  * library could have, with a download on everything.
  *
  * An artist shows their most played tracks and every release; a release opens
- * the same page for the album, with its tracklist. Tracks play their preview on
- * a tap, as in search.
+ * the same page for the album, with its tracklist. Matched tracks play from the
+ * library. Other tracks offer a preview.
  */
+@OptIn(UnstableApi::class)
 class DeezerPageFragment : Fragment() {
     private var bind: FragmentDeezerPageBinding? = null
 
@@ -57,7 +61,7 @@ class DeezerPageFragment : Fragment() {
         val args = requireArguments()
         kind = DeezerHit.Kind.valueOf(args.getString(KIND, DeezerHit.Kind.ARTIST.name))
         id = args.getLong(ID)
-        self = DeezerHit(kind, id, args.getString(TITLE).orEmpty(), "", "", args.getString(IMAGE), null, false)
+        self = DeezerHit(kind, id, args.getString(TITLE).orEmpty(), "", "", args.getString(IMAGE), null)
 
         pageViewModel = ViewModelProvider(this)[DeezerPageViewModel::class.java]
         downloads = ViewModelProvider(requireActivity())[DeezerSearchViewModel::class.java]
@@ -151,18 +155,30 @@ class DeezerPageFragment : Fragment() {
         tracksHeader = DeezerSectionHeaderAdapter(
                 if (kind == DeezerHit.Kind.ALBUM) R.string.search_title_song else R.string.deezer_page_top_tracks)
         tracks = DeezerResultAdapter(
-                onPreview = { previewPlayer?.toggle(it.key, it.id) },
+                onPlay = ::playTrack,
                 onDownload = { DeezerDownloadDialog.confirm(requireContext(), downloads, it) },
                 onOpen = {})
 
         albumsHeader = DeezerSectionHeaderAdapter(R.string.deezer_page_releases)
         albums = DeezerResultAdapter(
-                onPreview = {},
+                onPlay = {},
                 onDownload = { DeezerDownloadDialog.confirm(requireContext(), downloads, it) },
                 onOpen = { open(it) })
 
         bind.deezerPageList.layoutManager = LinearLayoutManager(requireContext())
         bind.deezerPageList.adapter = ConcatAdapter(actions, tracksHeader, tracks, albumsHeader, albums)
+    }
+
+    private fun playTrack(hit: DeezerHit) {
+        val song = hit.localTrack
+        if (song == null) {
+            previewPlayer?.toggle(hit.key, hit.id)
+            return
+        }
+        previewPlayer?.stop()
+        val activity = requireActivity() as MainActivity
+        MediaManager.startQueue(activity.mediaBrowserListenableFuture, song)
+        activity.setBottomSheetInPeek(true)
     }
 
     private fun observe() {

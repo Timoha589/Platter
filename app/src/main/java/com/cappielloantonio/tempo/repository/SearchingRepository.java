@@ -13,11 +13,14 @@ import com.cappielloantonio.tempo.model.RecentSearch;
 import com.cappielloantonio.tempo.subsonic.base.ApiResponse;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.SearchResult3;
+import com.cappielloantonio.tempo.subsonic.models.SubsonicResponse;
+import com.platter.search.TrackSearch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -41,40 +44,6 @@ public class SearchingRepository {
     private int generation = 0;
 
     /**
-     * The library's songs for one query, outside the search in progress: this
-     * neither cancels that search nor is cancelled by the next one.
-     * <p>
-     * Always answers - an empty list when the request fails - so a caller
-     * waiting on it can fall back rather than wait forever. It used to read
-     * the search2 slot of a search3 response, which is never filled, and so
-     * never answered with anything.
-     */
-    public MutableLiveData<List<Child>> findSongs(String query) {
-        MutableLiveData<List<Child>> result = new MutableLiveData<>();
-
-        App.getSubsonicClientInstance(false)
-                .getSearchingClient()
-                .search3(query, 20, 0, 0)
-                .enqueue(new Callback<ApiResponse>() {
-                    @Override
-                    public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
-                        SearchResult3 found = response.isSuccessful() && response.body() != null
-                                ? response.body().getSubsonicResponse().getSearchResult3()
-                                : null;
-
-                        result.setValue(found != null && found.getSongs() != null ? found.getSongs() : Collections.emptyList());
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
-                        result.setValue(Collections.emptyList());
-                    }
-                });
-
-        return result;
-    }
-
-    /**
      * Runs every spelling of the query at once and answers once they have all
      * reported, with one slot per spelling in the order they were given.
      * <p>
@@ -83,12 +52,12 @@ public class SearchingRepository {
      * loading state it can never come out of. A failed spelling contributes a
      * null slot rather than silence.
      */
-    public MutableLiveData<List<SearchResult3>> search3(List<QueryVariants.Variant> variants) {
+    public MutableLiveData<List<SearchResult3>> search3(List<QueryVariants.Variant> variants, boolean expandTracks) {
         MutableLiveData<List<SearchResult3>> results = new MutableLiveData<>();
 
         cancelPendingSearch();
 
-        int currentGeneration = ++generation;
+        int currentGeneration = generation;
 
         if (variants.isEmpty()) {
             results.setValue(Collections.emptyList());
@@ -100,39 +69,87 @@ public class SearchingRepository {
 
         for (int index = 0; index < variants.size(); index++) {
             int slot = index;
+            String query = variants.get(index).text();
 
             Call<ApiResponse> call = App.getSubsonicClientInstance(false)
                     .getSearchingClient()
-                    .search3(variants.get(index).text(), 20, 20, 20);
+                    .search3(query, TrackSearch.PAGE_SIZE, 20, 20);
 
-            pendingCalls.add(call);
-
-            call.enqueue(new Callback<ApiResponse>() {
-                @Override
-                public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        complete(response.body().getSubsonicResponse().getSearchResult3());
-                    } else {
-                        complete(null);
-                    }
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
-                    complete(null);
-                }
-
-                private void complete(SearchResult3 result) {
-                    if (currentGeneration != generation) return;
-
+            enqueueSearch(call, currentGeneration, result -> {
+                Runnable complete = () -> {
                     collected[slot] = result;
-
                     if (--outstanding[0] == 0) results.setValue(Arrays.asList(collected));
+                };
+                if (slot == 0 && expandTracks && result != null) {
+                    addPhraseMatches(query, result, currentGeneration, complete);
+                } else {
+                    complete.run();
                 }
             });
         }
 
         return results;
+    }
+
+    private void addPhraseMatches(String query, SearchResult3 result, int currentGeneration, Runnable complete) {
+        List<Child> first = result.getSongs() == null ? Collections.emptyList() : result.getSongs();
+        TrackSearch trackSearch = new TrackSearch(query);
+        boolean exact = first.stream().anyMatch(song -> trackSearch.match(song.getTitle(), song.artistLine(), song.getArtist()) > 0);
+        String phrase = trackSearch.phrase(first.size(), exact);
+        if (phrase == null) {
+            complete.run();
+            return;
+        }
+
+        List<Child> songs = new ArrayList<>(first);
+        int offset = phrase.equals(query) ? first.size() : 0;
+        loadSongPages(phrase, offset, songs, currentGeneration, () -> {
+            result.setSongs(songs);
+            complete.run();
+        });
+    }
+
+    private void loadSongPages(String phrase, int offset, List<Child> songs, int currentGeneration, Runnable complete) {
+        Call<ApiResponse> call = App.getSubsonicClientInstance(false).getSearchingClient()
+                .searchSongs(phrase, TrackSearch.PAGE_SIZE, offset);
+        enqueueSearch(call, currentGeneration, response -> {
+            List<Child> page = response == null ? null : response.getSongs();
+            if (page == null) {
+                complete.run();
+                return;
+            }
+
+            songs.addAll(page);
+            int nextOffset = offset + page.size();
+            if (page.size() < TrackSearch.PAGE_SIZE || nextOffset >= TrackSearch.MAX_SONGS_PER_PHRASE) {
+                complete.run();
+            } else {
+                loadSongPages(phrase, nextOffset, songs, currentGeneration, complete);
+            }
+        });
+    }
+
+    private void enqueueSearch(Call<ApiResponse> call, int currentGeneration, Consumer<SearchResult3> complete) {
+        pendingCalls.add(call);
+        call.enqueue(new Callback<ApiResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
+                if (currentGeneration != generation) return;
+                ApiResponse body = response.isSuccessful() ? response.body() : null;
+                SubsonicResponse subsonic = body == null ? null : body.getSubsonicResponse();
+                if (subsonic == null || !"ok".equals(subsonic.getStatus())) {
+                    complete.accept(null);
+                    return;
+                }
+                SearchResult3 result = subsonic.getSearchResult3();
+                complete.accept(result == null ? new SearchResult3() : result);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
+                if (currentGeneration == generation) complete.accept(null);
+            }
+        });
     }
 
     /**
@@ -141,6 +158,7 @@ public class SearchingRepository {
      * away should, so a search nobody is waiting for stops using the radio.
      */
     public void cancelPendingSearch() {
+        generation++;
         for (Call<ApiResponse> call : pendingCalls) {
             if (!call.isCanceled()) call.cancel();
         }

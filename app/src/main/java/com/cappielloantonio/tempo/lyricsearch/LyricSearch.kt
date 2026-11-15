@@ -261,7 +261,7 @@ object LyricSearch {
             val track = tracks.firstOrNull {
                 sameTitle(it.title, match.title) && sameArtist(it.artist?.name, match.artistNames)
             }
-            if (track != null) return DeezerHit.track(track, false)
+            if (track != null) return DeezerHit.track(track)
         }
 
         return null

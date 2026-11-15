@@ -16,6 +16,7 @@ import com.cappielloantonio.tempo.deemix.DeezerArtist
 import com.cappielloantonio.tempo.deemix.DeezerTrack
 import com.cappielloantonio.tempo.deemix.DeezerResults
 import com.cappielloantonio.tempo.deemix.DownloadMany
+import com.cappielloantonio.tempo.subsonic.models.Child
 
 /** One row of the Deezer section: something the site could download. */
 data class DeezerHit(
@@ -28,7 +29,7 @@ data class DeezerHit(
         val detail: String,
         val image: String?,
         val link: String?,
-        val inLibrary: Boolean,
+        val localTrack: Child? = null,
         /** The second line as a page wants it, instead of the one search builds. */
         val caption: String? = null
 ) {
@@ -37,28 +38,30 @@ data class DeezerHit(
     enum class State { IDLE, WORKING, QUEUED }
 
     val key: String get() = "$kind:$id"
+    val localTrackId: String? get() = localTrack?.id
+    val inLibrary: Boolean get() = localTrackId != null
 
     companion object {
         fun artist(artist: DeezerArtist): DeezerHit? {
             val id = artist.id ?: return null
             val name = artist.name?.takeIf { it.isNotBlank() } ?: return null
-            return DeezerHit(Kind.ARTIST, id, name, "", "", artist.pictureMedium, null, false)
+            return DeezerHit(Kind.ARTIST, id, name, "", "", artist.pictureMedium, null)
         }
 
         fun album(album: DeezerAlbum, caption: String? = null): DeezerHit? {
             val id = album.id ?: return null
             val title = album.title?.takeIf { it.isNotBlank() } ?: return null
             return DeezerHit(Kind.ALBUM, id, title, album.artist?.name.orEmpty(), "",
-                    album.coverMedium, null, false, caption)
+                    album.coverMedium, null, caption = caption)
         }
 
         /** [cover] stands in for tracks that come without their album - an album's own tracklist. */
-        fun track(track: DeezerTrack, inLibrary: Boolean, caption: String? = null, cover: String? = null): DeezerHit? {
+        fun track(track: DeezerTrack, localTrack: Child? = null, caption: String? = null, cover: String? = null): DeezerHit? {
             val id = track.id ?: return null
             val title = track.title?.takeIf { it.isNotBlank() } ?: return null
             if (track.link == null) return null
             return DeezerHit(Kind.TRACK, id, title, track.artist?.name.orEmpty(), track.album?.title.orEmpty(),
-                    track.album?.coverMedium ?: cover, track.link, inLibrary, caption)
+                    track.album?.coverMedium ?: cover, track.link, localTrack, caption)
         }
     }
 }
@@ -193,7 +196,7 @@ class DeezerSearchViewModel(application: Application) : AndroidViewModel(applica
                 .mapNotNull { DeezerHit.artist(it) }
                 .take(MAX_ARTISTS)
         val albums = search.albums.orEmpty().mapNotNull { DeezerHit.album(it) }.take(MAX_ALBUMS)
-        val tracks = search.tracks.orEmpty().mapNotNull { DeezerHit.track(it, results.isInLibrary(it)) }.take(MAX_TRACKS)
+        val tracks = search.tracks.orEmpty().mapNotNull { DeezerHit.track(it, results.libraryTracks[it.id]) }.take(MAX_TRACKS)
 
         return artists + tracks + albums
     }

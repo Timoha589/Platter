@@ -29,6 +29,7 @@ import com.cappielloantonio.tempo.util.Preferences
 class BluetoothResume(
         context: Context,
         private val player: Player,
+        private val canStartPlayback: () -> Boolean,
         // False while casting, when the local player is not the one being listened to.
         private val isLocal: () -> Boolean
 ) : Player.Listener {
@@ -36,12 +37,15 @@ class BluetoothResume(
     private var noisyAt = Long.MIN_VALUE / 2
     private var resumedAt = Long.MIN_VALUE / 2
 
-    // The device came back before the queue did: play as soon as there is something to play.
-    private var waitingForQueue = false
+    // A reconnect can arrive before the queue and media notification are ready.
+    private var reconnectedDevice: String? = null
 
     private val devices = object : AudioDeviceCallback() {
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
             val lost = removedDevices.firstOrNull(::isBluetoothSink) ?: return
+            if (removedDevices.any { isBluetoothSink(it) && sameDevice(keyOf(it), reconnectedDevice) }) {
+                reconnectedDevice = null
+            }
 
             // The device can be reported gone before the player is told to pause, or after.
             if (player.playWhenReady || SystemClock.elapsedRealtime() - noisyAt < NOISY_WINDOW_MS) {
@@ -55,8 +59,8 @@ class BluetoothResume(
             if (!Preferences.isBluetoothResume() || !isLocal()) return
             if (addedDevices.none { isBluetoothSink(it) && sameDevice(keyOf(it), awaited) }) return
 
-            Preferences.setBluetoothResumeDevice(null)
-            if (player.mediaItemCount > 0) resume() else waitingForQueue = true
+            reconnectedDevice = awaited
+            resumeWhenReady()
         }
     }
 
@@ -74,21 +78,28 @@ class BluetoothResume(
         } else if (playWhenReady || reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
             // Played again some other way, or paused on purpose: nothing is left to pick up.
             Preferences.setBluetoothResumeDevice(null)
-            waitingForQueue = false
+            reconnectedDevice = null
         }
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-        if (waitingForQueue && !timeline.isEmpty && isLocal()) {
-            waitingForQueue = false
-            resume()
-        }
+        if (!timeline.isEmpty) resumeWhenReady()
     }
 
-    private fun resume() {
+    fun resumeWhenReady(): Boolean {
+        val device = reconnectedDevice ?: return false
+        if (!Preferences.isBluetoothResume() || !sameDevice(device, Preferences.getBluetoothResumeDevice())) {
+            reconnectedDevice = null
+            return false
+        }
+        if (!isLocal() || player.mediaItemCount == 0 || !canStartPlayback()) return false
+
+        reconnectedDevice = null
+        Preferences.setBluetoothResumeDevice(null)
         if (player.playbackState == Player.STATE_IDLE) player.prepare()
         resumedAt = SystemClock.elapsedRealtime()
         player.play()
+        return true
     }
 
     fun release() {

@@ -13,11 +13,11 @@ import com.cappielloantonio.tempo.viewmodel.DeezerHit
 
 /**
  * Deezer tracks and albums, in search and on the Deezer pages. A tap on a
- * track plays its preview, a tap on an album opens it. A download spends the
+ * track plays it, a tap on an album opens it. A download spends the
  * day's quota, so it happens only on the button that says so.
  */
 class DeezerResultAdapter(
-        private val onPreview: (DeezerHit) -> Unit,
+        private val onPlay: (DeezerHit) -> Unit,
         private val onDownload: (DeezerHit) -> Unit,
         private val onOpen: (DeezerHit) -> Unit
 ) : RecyclerView.Adapter<DeezerResultAdapter.ViewHolder>() {
@@ -80,7 +80,7 @@ class DeezerResultAdapter(
             bind.deezerTitle.setTextColor(ContextCompat.getColor(context,
                     if (previewing) R.color.spotify_green else R.color.titleTextColor))
 
-            bind.root.setOnClickListener { if (isTrack) onPreview(hit) else onOpen(hit) }
+            bind.root.setOnClickListener { if (isTrack) onPlay(hit) else onOpen(hit) }
 
             val done = hit.inLibrary || state == DeezerHit.State.QUEUED
             val working = state == DeezerHit.State.WORKING

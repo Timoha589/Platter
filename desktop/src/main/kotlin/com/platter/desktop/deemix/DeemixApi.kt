@@ -88,12 +88,6 @@ data class DeezerSearch(
     val albums: List<DeezerAlbum>?,
 )
 
-data class LibraryCheckItem(val id: String, val artist: String, val title: String)
-
-data class LibraryCheckBody(val tracks: List<LibraryCheckItem>)
-
-data class LibraryCheck(val results: Map<String, Boolean>?)
-
 data class DownloadUrlBody(val url: String)
 
 data class DownloadAlbumBody(val id: Long, val title: String)
@@ -122,9 +116,6 @@ interface DeemixService {
 
     @GET("api/search-all")
     suspend fun search(@Header("Authorization") auth: String, @Query("q") query: String): Response<DeezerSearch>
-
-    @POST("api/navidrome/check-bulk")
-    suspend fun checkLibrary(@Header("Authorization") auth: String, @Body body: LibraryCheckBody): Response<LibraryCheck>
 
     @POST("api/download")
     suspend fun downloadTrack(@Header("Authorization") auth: String, @Body body: DownloadUrlBody): Response<DownloadOne>

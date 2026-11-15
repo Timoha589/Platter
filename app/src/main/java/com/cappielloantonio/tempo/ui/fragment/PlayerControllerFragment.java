@@ -836,12 +836,6 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         });
     }
 
-    public void goToControllerPage() {
-        playerMediaCoverViewPager.animate().cancel();
-        playerMediaCoverViewPager.setAlpha(1f);
-        playerMediaCoverViewPager.setCurrentItem(0, false);
-    }
-
     public void goToLyricsPage() {
         fadeToPage(1);
     }

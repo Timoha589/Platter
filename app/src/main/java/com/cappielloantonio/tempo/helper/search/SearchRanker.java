@@ -7,8 +7,12 @@ import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
 import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.SearchResult3;
+import com.platter.search.TrackSearch;
+import com.platter.search.TrackIndex;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -124,9 +128,15 @@ public final class SearchRanker {
      *               queried were guesses at it; null when they were not
      */
     public static RankedResults rank(List<QueryVariants.Variant> variants, List<SearchResult3> results, LibrarySignals signals, @Nullable String intent) {
+        return rank(variants, results, signals, intent, Collections.emptyList());
+    }
+
+    public static RankedResults rank(List<QueryVariants.Variant> variants, List<SearchResult3> results, LibrarySignals signals,
+                                     @Nullable String intent, List<TrackIndex.Match<Child>> localTracks) {
         if (variants.isEmpty()) return RankedResults.empty();
 
         Intent typed = intent == null ? null : new Intent(intent);
+        TrackSearch trackSearch = new TrackSearch(intent == null ? variants.get(0).text() : intent);
 
         List<String> normalizedQueries = new ArrayList<>(variants.size());
         List<Double> weights = new ArrayList<>(variants.size());
@@ -152,6 +162,19 @@ public final class SearchRanker {
             collect(albums, result.getAlbums());
             collect(songs, result.getSongs());
         }
+        Map<String, TrackIndex.Match<Child>> indexMatches = new HashMap<>();
+        for (TrackIndex.Match<Child> hit : localTracks) {
+            String id = hit.song.getId();
+            songs.putIfAbsent(id, hit.song);
+            TrackIndex.Match<Child> previous = indexMatches.get(id);
+            if (previous == null || hit.edits < previous.edits) indexMatches.put(id, hit);
+        }
+
+        if (trackSearch.isSingleCharacter()) {
+            artists.values().removeIf(artist -> !trackSearch.matchesName(artist.getName()));
+            albums.values().removeIf(album -> !trackSearch.matchesName(album.getName()));
+            songs.values().removeIf(song -> !trackSearch.matchesName(song.getTitle()));
+        }
 
         List<Scored<ArtistID3>> scoredArtists = new ArrayList<>(artists.size());
         for (ArtistID3 artist : artists.values()) {
@@ -165,18 +188,21 @@ public final class SearchRanker {
 
         List<Scored<Child>> scoredSongs = new ArrayList<>(songs.size());
         for (Child song : songs.values()) {
-            scoredSongs.add(scoreSong(song, normalizedQueries, weights, signals, typed));
+            scoredSongs.add(scoreSong(song, normalizedQueries, weights, signals, typed, trackSearch, indexMatches.get(song.getId())));
         }
 
         sort(scoredArtists);
         sort(scoredAlbums);
-        sort(scoredSongs);
+        scoredSongs.sort(Comparator.comparingInt((Scored<Child> entry) -> entry.trackPriority())
+                .thenComparingDouble(Scored::textScore).thenComparingDouble(entry -> entry.personal).reversed());
 
         return new RankedResults(
                 items(scoredArtists),
                 items(scoredAlbums),
                 items(scoredSongs),
-                pickTop(scoredArtists, scoredAlbums, scoredSongs)
+                pickTop(scoredArtists, scoredAlbums, scoredSongs, trackSearch),
+                scoredSongs.stream().anyMatch(Scored::strong) || scoredArtists.stream().anyMatch(Scored::strong)
+                        || scoredAlbums.stream().anyMatch(Scored::strong)
         );
     }
 
@@ -234,7 +260,8 @@ public final class SearchRanker {
         return new Scored<>(album, match, personal);
     }
 
-    private static Scored<Child> scoreSong(Child song, List<String> queries, List<Double> weights, LibrarySignals signals, @Nullable Intent intent) {
+    private static Scored<Child> scoreSong(Child song, List<String> queries, List<Double> weights, LibrarySignals signals, @Nullable Intent intent,
+                                           TrackSearch trackSearch, @Nullable TrackIndex.Match<Child> correction) {
         double match = Math.max(
                 Math.max(
                         bestMatch(queries, weights, song.getTitle()),
@@ -254,7 +281,10 @@ public final class SearchRanker {
                 song.getUserRating()
         );
 
-        return new Scored<>(song, match, personal);
+        int exactTitle = trackSearch.match(song.getTitle(), song.artistLine(), song.getArtist());
+        double textMatch = correction != null && correction.prefix ? Math.max(match, PREFIX) : match;
+        return new Scored<>(song, textMatch, personal, exactTitle, correction == null ? 0 : correction.edits,
+                trackSearch.matchesTitleWords(song.getTitle()));
     }
 
     /**
@@ -465,10 +495,24 @@ public final class SearchRanker {
      * "this is the one you meant" and would have no grounds for it.
      */
     @Nullable
-    private static RankedResults.TopResult pickTop(List<Scored<ArtistID3>> artists, List<Scored<AlbumID3>> albums, List<Scored<Child>> songs) {
+    private static RankedResults.TopResult pickTop(List<Scored<ArtistID3>> artists, List<Scored<AlbumID3>> albums, List<Scored<Child>> songs, TrackSearch trackSearch) {
         Scored<ArtistID3> artist = first(artists);
         Scored<AlbumID3> album = first(albums);
         Scored<Child> song = first(songs);
+
+        if (song != null && song.exactTitle == TrackSearch.EXACT_TITLE_AND_ARTIST) return RankedResults.TopResult.of(song.item);
+        if (song != null && song.exactTitle == TrackSearch.EXACT_TITLE) {
+            if (artist != null && artist.total() + ARTIST_TOP_PRIOR >= song.total()
+                    && (trackSearch.matchesName(artist.item.getName()) || trackSearch.matchesName(artist.item.getSortName()))) {
+                return RankedResults.TopResult.of(artist.item);
+            }
+            return RankedResults.TopResult.of(song.item);
+        }
+        if (song != null && song.edits > 0 && !song.literalTitle) {
+            if (artist != null && trackSearch.matchesName(artist.item.getName())) return RankedResults.TopResult.of(artist.item);
+            if (album != null && trackSearch.matchesName(album.item.getName())) return RankedResults.TopResult.of(album.item);
+            return RankedResults.TopResult.of(song.item);
+        }
 
         double artistScore = artist == null || !artist.matched() ? Double.NEGATIVE_INFINITY : artist.total() + ARTIST_TOP_PRIOR;
         double albumScore = album == null || !album.matched() ? Double.NEGATIVE_INFINITY : album.total() + ALBUM_TOP_PRIOR;
@@ -493,11 +537,29 @@ public final class SearchRanker {
         private final T item;
         private final double match;
         private final double personal;
+        private final int exactTitle;
+        private final int edits;
+        private final boolean literalTitle;
 
         private Scored(T item, double match, double personal) {
+            this(item, match, personal, 0, 0, false);
+        }
+
+        private Scored(T item, double match, double personal, int exactTitle, int edits, boolean literalTitle) {
             this.item = item;
             this.match = match;
             this.personal = personal;
+            this.exactTitle = exactTitle;
+            this.edits = edits;
+            this.literalTitle = literalTitle;
+        }
+
+        private int trackPriority() {
+            return TrackSearch.trackPriority(exactTitle, literalTitle, edits);
+        }
+
+        private boolean strong() {
+            return exactTitle > 0 || literalTitle || (edits == 0 && match >= WORD_PREFIX);
         }
 
         /**
@@ -506,11 +568,16 @@ public final class SearchRanker {
          * the top card, however starred and however often played.
          */
         private boolean matched() {
-            return match > 0;
+            return literalTitle || match > 0;
+        }
+
+        private double textScore() {
+            if (exactTitle > 0) return EXACT;
+            return match > 0 ? match : UNEXPLAINED;
         }
 
         private double total() {
-            return (match > 0 ? match : UNEXPLAINED) + personal;
+            return textScore() + personal;
         }
     }
 

@@ -1,6 +1,9 @@
 package com.platter.desktop.search
 
 import com.platter.desktop.api.SearchResult
+import com.platter.desktop.api.Song
+import com.platter.search.TrackSearch
+import com.platter.search.TrackIndex
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -13,49 +16,86 @@ fun interface SearchSource {
 }
 
 /**
- * Runs a query and every rewrite of it worth trying, ranks what comes back, and - when as typed it found nothing at
- * all - tries again with guesses: the nearest names in the library, the query with words dropped, the query cut
- * short. The same two-round search the Android app's `SearchViewModel` does.
+ * Combines indexed tracks with regular server search and a phrase lookup. If the matches are weak, tries again
+ * with guesses: the nearest names in the library, the query with words dropped, the query cut short.
  */
 class SearchEngine(
     private val source: SearchSource,
     private val signals: suspend () -> LibrarySignals,
     private val fuzzy: suspend () -> FuzzyIndex,
+    private val songPage: (suspend (query: String, count: Int, offset: Int) -> List<Song>)? = null,
+    private val localTracks: suspend (query: String, allowCorrections: Boolean) -> List<TrackIndex.Match<Song>> =
+        { _, _ -> emptyList() },
 ) {
     /** Throws when every request failed (the server is down), so the screen can say so rather than "no results". */
-    suspend fun search(query: String): RankedResults {
+    suspend fun search(query: String, onLocal: ((RankedResults) -> Unit)? = null): RankedResults {
         val variants = QueryVariants.of(query)
         if (variants.isEmpty()) return RankedResults.Empty
 
-        val ranked = round(variants, intent = null)
-        if (!ranked.isEmpty) return ranked
+        val trackSearch = TrackSearch(query)
+        val local = variants.flatMapIndexed { index, variant ->
+            localTracks(variant.text, index == 0 && trackSearch.allowsCorrections())
+        }
+        if (local.isNotEmpty() && onLocal != null) {
+            onLocal(SearchRanker.rank(variants, emptyList(), LibrarySignals.Empty, localTracks = local))
+        }
+        val results = fetch(variants, expandTracks = true, requireResponse = local.isEmpty())
+        val signals = signals()
+        val ranked = SearchRanker.rank(variants, results, signals, localTracks = local)
+        if (ranked.hasStrongMatch || !trackSearch.allowsCorrections() || results.all { it == null }) return ranked
 
-        val guesses = guessesFor(query)
+        val tried = variants.map { it.text.lowercase() }.toSet()
+        val guesses = guessesFor(query).filter { it.text.lowercase() !in tried }.distinctBy { it.text.lowercase() }
         if (guesses.isEmpty()) return ranked
 
         // A round of guesses is handed the query as typed as well: the spellings that fetched these results are
         // approximations, and only the original can tell which result is nearest to what was meant.
-        return round(guesses, intent = query)
+        val retry = fetch(guesses, expandTracks = false, requireResponse = false)
+        if (retry.all { it == null }) return ranked
+        return SearchRanker.rank(variants + guesses, results + retry, signals, query, local)
     }
 
-    private suspend fun round(variants: List<QueryVariants.Variant>, intent: String?): RankedResults {
-        var failure: Exception? = null
+    private suspend fun fetch(variants: List<QueryVariants.Variant>, expandTracks: Boolean, requireResponse: Boolean): List<SearchResult?> {
         val results = coroutineScope {
-            variants.map { variant ->
+            variants.mapIndexed { index, variant ->
                 async {
                     try {
-                        source.search(variant.text)
+                        val result = source.search(variant.text)
+                        if (index == 0 && expandTracks) addPhraseMatches(variant.text, result)
+                        Result.success(result)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        failure = failure ?: e
-                        null
+                        Result.failure(e)
                     }
                 }
             }.awaitAll()
         }
-        failure?.let { if (results.all { it == null }) throw it }
-        return SearchRanker.rank(variants, results, signals(), intent)
+        if (requireResponse && results.all { it.isFailure }) results.first().getOrThrow()
+        return results.map { it.getOrNull() }
+    }
+
+    private suspend fun addPhraseMatches(query: String, result: SearchResult) {
+        val fetch = songPage ?: return
+        val first = result.songs.orEmpty()
+        val trackSearch = TrackSearch(query)
+        val exact = first.any { trackSearch.match(it.title, it.artistLine(), it.artist) > 0 }
+        val phrase = trackSearch.phrase(first.size, exact) ?: return
+        val songs = first.toMutableList()
+        var offset = if (phrase == query) first.size else 0
+        while (offset < TrackSearch.MAX_SONGS_PER_PHRASE) {
+            val page = try {
+                fetch(phrase, TrackSearch.PAGE_SIZE, offset)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                break
+            }
+            songs += page
+            if (page.size < TrackSearch.PAGE_SIZE) break
+            offset += page.size
+        }
+        result.songs = songs
     }
 
     /**
@@ -87,8 +127,5 @@ class SearchEngine(
         private const val MAX_CORRECTIONS = 2
         private const val PREFIX_FALLBACK_RATIO = 0.6
         private const val SHORTEST_PREFIX = 4
-
-        /** Below this a query is not about anything ("Enter at least three characters" on the phone). */
-        const val MIN_QUERY_LENGTH = 3
     }
 }

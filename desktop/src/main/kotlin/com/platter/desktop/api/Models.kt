@@ -1,6 +1,7 @@
 package com.platter.desktop.api
 
 import com.google.gson.annotations.SerializedName
+import com.platter.search.TrackChanges
 
 /*
  * Subsonic / OpenSubsonic response shapes, cut down from the Android app's
@@ -33,6 +34,7 @@ class SubsonicResponse {
     var albumList2: AlbumList? = null
     var randomSongs: SongList? = null
     var searchResult3: SearchResult? = null
+    var platterTrackChanges: TrackChanges? = null
     var starred2: SearchResult? = null
     var playlists: PlaylistList? = null
     var playlist: Playlist? = null
@@ -276,6 +278,7 @@ class Song {
     var bitrate: Int? = null
     var suffix: String? = null
     var contentType: String? = null
+    var isVideo: Boolean = false
     var size: Long? = null
     var starred: String? = null
     var userRating: Int? = null

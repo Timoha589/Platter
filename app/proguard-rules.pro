@@ -26,3 +26,5 @@
 
 -keep class **.reflect.TypeToken { *; }
 -keep class * extends **.reflect.TypeToken
+-keep class com.platter.search.TrackChanges { *; }
+-keep class com.platter.search.TrackChanges$Change { *; }

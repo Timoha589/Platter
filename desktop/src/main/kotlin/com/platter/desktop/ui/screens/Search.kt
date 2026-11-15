@@ -43,12 +43,14 @@ import com.platter.desktop.Screen
 import com.platter.desktop.api.Song
 import com.platter.desktop.deemix.DeezerHits
 import com.platter.desktop.search.RankedResults
-import com.platter.desktop.search.SearchEngine
+import com.platter.search.TrackSearch
 import com.platter.desktop.ui.AlbumCard
 import com.platter.desktop.ui.ArtistCard
 import com.platter.desktop.ui.Chip
 import com.platter.desktop.ui.Cover
 import com.platter.desktop.ui.LoadView
+import com.platter.desktop.ui.Load
+import com.platter.desktop.ui.Loader
 import com.platter.desktop.ui.PlatterColors
 import com.platter.desktop.ui.PlatterShapes
 import com.platter.desktop.ui.PlatterSpacing
@@ -78,28 +80,32 @@ fun SearchScreen(app: AppController) {
         onDispose { if (app.screen is Screen.Album || app.screen is Screen.Artist) app.commitSearch(app.searchQuery) }
     }
 
-    if (query.length < SearchEngine.MIN_QUERY_LENGTH) {
-        Recent(app, typed = query.isNotEmpty())
+    if (query.isEmpty()) {
+        Recent(app)
         return
     }
+    val singleCharacter = remember(query) { TrackSearch(query).isSingleCharacter }
 
-    val loader = rememberLoader(client to query) { app.search(query) }
+    val searchKey = Triple(client, query, app.trackIndexRevision)
+    var cached by remember(searchKey) { mutableStateOf<RankedResults?>(null) }
+    val loader = rememberLoader(searchKey) { app.search(query) { cached = it } }
+    val visible = cached?.let { if (loader.state is Load.Ready) loader else Loader(Load.Ready(it), loader.retry) } ?: loader
     val player by app.player.state.collectAsState()
 
     // The library's own lyrics, searched by the wave service: a line of a song finds the song. Alongside, never in the way.
     var lyricHits by remember { mutableStateOf<WaveLyrics?>(null) }
     LaunchedEffect(client to query) {
         lyricHits = null
-        if (app.waveAvailable) lyricHits = app.searchLyrics(query)
+        if (!singleCharacter && app.waveAvailable) lyricHits = app.searchLyrics(query)
     }
     val lyricMatches = lyricHits?.results.orEmpty().filter { it.song?.id != null }
 
     val deezer by produceState<DeezerHits?>(null, client to query) {
         value = null
-        value = app.deezerSearch(query)
+        if (!singleCharacter) value = app.deezerSearch(query)
     }
 
-    LoadView(loader) { result ->
+    LoadView(visible) { result ->
         if (result.isEmpty && lyricMatches.isEmpty() && deezer?.isEmpty != false) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(t("No results found for “%s”", query), style = MaterialTheme.typography.titleMedium)
@@ -216,11 +222,11 @@ private fun TopCard(app: AppController, top: RankedResults.Top, onOpen: () -> Un
 
 /** Before anything is typed: the searches worth repeating. */
 @Composable
-private fun Recent(app: AppController, typed: Boolean) {
-    if (app.recentSearches.isEmpty() || typed) {
+private fun Recent(app: AppController) {
+    if (app.recentSearches.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                if (typed) t("Enter at least three characters") else t("Search for songs, albums and artists"),
+                t("Search for songs, albums and artists"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = PlatterColors.Mist,
             )

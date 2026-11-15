@@ -15,16 +15,18 @@ public final class RankedResults {
     private final List<AlbumID3> albums;
     private final List<Child> songs;
     private final TopResult top;
+    private final boolean strongMatch;
 
-    RankedResults(List<ArtistID3> artists, List<AlbumID3> albums, List<Child> songs, @Nullable TopResult top) {
+    RankedResults(List<ArtistID3> artists, List<AlbumID3> albums, List<Child> songs, @Nullable TopResult top, boolean strongMatch) {
         this.artists = artists;
         this.albums = albums;
         this.songs = songs;
         this.top = top;
+        this.strongMatch = strongMatch;
     }
 
     public static RankedResults empty() {
-        return new RankedResults(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null);
+        return new RankedResults(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), null, false);
     }
 
     public List<ArtistID3> getArtists() {
@@ -47,6 +49,10 @@ public final class RankedResults {
 
     public boolean isEmpty() {
         return artists.isEmpty() && albums.isEmpty() && songs.isEmpty();
+    }
+
+    public boolean hasStrongMatch() {
+        return strongMatch;
     }
 
     /**

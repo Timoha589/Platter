@@ -119,20 +119,20 @@ private fun DeezerAlbumCard(app: AppController, hit: DeezerHit) {
     }
 }
 
-/** A track on Deezer: press the play button for 30 seconds of it, the arrow to have the library fetch it. */
+/** A track on Deezer. Matched recordings play from the library and other tracks offer a preview. */
 @Composable
 fun DeezerTrackRow(app: AppController, hit: DeezerHit, caption: String) {
     val previewing = app.previewKey == hit.key
     Row(Modifier.fillMaxWidth().height(PlatterSpacing.TrackRowHeight).clip(PlatterShapes.Card).hoverFill(hover = PlatterColors.Smoke).padding(horizontal = PlatterSpacing.Bleed), verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(36.dp).clip(CircleShape).clickable { app.togglePreview(hit) },
+            Modifier.size(36.dp).clip(CircleShape).clickable { app.playDeezerTrack(hit) },
             contentAlignment = Alignment.Center,
         ) {
             when {
                 previewing && app.previewState == AppController.PreviewState.LOADING ->
                     CircularProgressIndicator(Modifier.size(20.dp), color = PlatterColors.Green, strokeWidth = 2.dp)
                 previewing -> Icon(Icons.Filled.Stop, t("Stop the preview"), tint = PlatterColors.Green, modifier = Modifier.size(24.dp))
-                else -> Icon(Icons.Filled.PlayArrow, t("Preview"), tint = PlatterColors.White, modifier = Modifier.size(24.dp))
+                else -> Icon(Icons.Filled.PlayArrow, if (hit.inLibrary) t("Play") else t("Preview"), tint = PlatterColors.White, modifier = Modifier.size(24.dp))
             }
         }
         Spacer(Modifier.width(8.dp))
@@ -202,7 +202,7 @@ fun DeezerScreen(app: AppController, kind: DeezerHit.Kind, id: Long) {
     var allTracks by remember(kind, id) { mutableStateOf(false) }
 
     LoadView(loader) { page: DeezerPage ->
-        val own = DeezerHit(kind, id, page.title, "", "", page.image, null, false)
+        val own = DeezerHit(kind, id, page.title, "", "", page.image, null)
         val state = app.deezerStates[own.key] ?: DeezerHit.State.IDLE
         LazyVerticalGrid(
             columns = GridCells.Adaptive(PlatterSpacing.CardCell),

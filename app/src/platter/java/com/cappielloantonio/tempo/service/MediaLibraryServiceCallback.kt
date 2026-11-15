@@ -87,6 +87,21 @@ open class MediaLibrarySessionCallback(
                 .setCustomLayout(customLayoutFor(session)).build()
         }
 
+        /*
+         * Every item's artwork and stream URI carries the Subsonic u=/t=/s=
+         * (or p=), so a controller sees credentials good for the whole account.
+         * Only this app and controllers Android itself trusts (system UI,
+         * Bluetooth, notification listeners) may connect. The legacy name is a
+         * caller of the platform session, which needs a token it could only
+         * have got through one of those.
+         */
+        if (!controller.isTrusted &&
+            controller.packageName != context.packageName &&
+            controller.packageName != MediaSession.ControllerInfo.LEGACY_CONTROLLER_PACKAGE_NAME
+        ) {
+            return MediaSession.ConnectionResult.reject()
+        }
+
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
     }
 
