@@ -475,10 +475,10 @@ class InteractionTest {
             step(20)
             onNodeWithText("Get from Deezer").assertIsDisplayed()
 
-            // The first "Preview" is the first row's: Come Together, which the library already has.
+            // Come Together plays from the library, so the first preview belongs to Here Comes the Sun.
             onAllNodesWithContentDescription("Preview")[0].performClick()
             step()
-            assertEquals("TRACK:101", app.previewKey)
+            assertEquals("TRACK:102", app.previewKey)
             com.platter.desktop.waitUntil("the preview to play") { app.previewState == AppController.PreviewState.PLAYING }
             onAllNodesWithContentDescription("Stop the preview")[0].performClick()
             step()
