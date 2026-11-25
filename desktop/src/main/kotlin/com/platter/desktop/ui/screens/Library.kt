@@ -100,7 +100,8 @@ fun LibraryScreen(app: AppController) {
                 LibraryTab.Artists -> SortMenu(t(artistSort.label), ArtistSort.entries.map { t(it.label) }) { app.choose("library.artistSort", ArtistSort.entries[it].name) }
                 else -> {}
             }
-            TextInput(filter, { filter = it }, t(tab.filter), Modifier.width(220.dp))
+            TextInput(filter, { filter = it }, t(tab.filter), Modifier.width(220.dp), correctable = true,
+                correctionAvailable = { app.dialog == null && !app.fullPlayer })
         }
         when (tab) {
             LibraryTab.Albums -> {

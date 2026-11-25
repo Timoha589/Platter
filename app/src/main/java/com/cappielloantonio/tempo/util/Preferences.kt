@@ -5,10 +5,11 @@ import com.cappielloantonio.tempo.App
 import com.cappielloantonio.tempo.model.HomeSector
 import com.cappielloantonio.tempo.subsonic.models.OpenSubsonicExtension
 import com.google.gson.Gson
+import com.platter.automix.AutoMixPlanner
 
 
 object Preferences {
-    private const val SERVER = "server"
+    internal const val SERVER = "server"
     private const val USER = "user"
     private const val PASSWORD = "password"
     private const val TOKEN = "token"
@@ -28,6 +29,8 @@ object Preferences {
     const val BLUETOOTH_RESUME = "bluetooth_resume"
     private const val BLUETOOTH_RESUME_DEVICE = "bluetooth_resume_device"
     const val CROSSFADE = "crossfade"
+    const val CROSSFADE_DURATION = "crossfade_duration"
+    const val AUTO_MIX = "auto_mix"
     private const val IMAGE_CACHE_SIZE = "image_cache_size"
     private const val STREAMING_CACHE_SIZE = "streaming_cache_size"
     private const val IMAGE_SIZE = "image_size"
@@ -37,7 +40,6 @@ object Preferences {
     private const val AUDIO_TRANSCODE_FORMAT_MOBILE = "audio_transcode_format_mobile"
     private const val WIFI_ONLY = "wifi_only"
     private const val DATA_SAVING_MODE = "data_saving_mode"
-    private const val SERVER_UNREACHABLE = "server_unreachable"
     private const val SYNC_STARRED_TRACKS_FOR_OFFLINE_USE = "sync_starred_tracks_for_offline_use"
     private const val CACHE_LIKED_TRACKS = "cache_liked_tracks"
     private const val SMART_DOWNLOAD = "smart_download"
@@ -254,9 +256,32 @@ object Preferences {
         App.getInstance().preferences.edit().putString(BLUETOOTH_RESUME_DEVICE, device).apply()
     }
 
+    enum class TransitionMode { OFF, CROSSFADE, AUTO_MIX }
+
     @JvmStatic
-    fun isCrossfadeEnabled(): Boolean {
-        return App.getInstance().preferences.getBoolean(CROSSFADE, true)
+    fun getCrossfadeDurationSeconds(): Int = App.getInstance().preferences
+        .getInt(CROSSFADE_DURATION, AutoMixPlanner.DEFAULT_CROSSFADE_SECONDS)
+        .coerceIn(AutoMixPlanner.MIN_CROSSFADE_SECONDS, AutoMixPlanner.MAX_CROSSFADE_SECONDS)
+
+    @JvmStatic
+    fun getTransitionMode(): TransitionMode {
+        val prefs = App.getInstance().preferences
+        return when {
+            PremiumServer.isInUse() && prefs.getBoolean(AUTO_MIX, true) -> TransitionMode.AUTO_MIX
+            prefs.getBoolean(CROSSFADE, true) -> TransitionMode.CROSSFADE
+            else -> TransitionMode.OFF
+        }
+    }
+
+    @JvmStatic
+    fun setTransitionMode(mode: TransitionMode) {
+        val autoMixAvailable = PremiumServer.isInUse()
+        if (mode == TransitionMode.AUTO_MIX && !autoMixAvailable) return
+
+        val editor = App.getInstance().preferences.edit()
+            .putBoolean(CROSSFADE, mode == TransitionMode.CROSSFADE)
+        if (autoMixAvailable) editor.putBoolean(AUTO_MIX, mode == TransitionMode.AUTO_MIX)
+        editor.apply()
     }
 
     @JvmStatic
@@ -366,18 +391,6 @@ object Preferences {
     @JvmStatic
     fun getSmartDownloadCacheSize(): Int {
         return App.getInstance().preferences.getString(SMART_DOWNLOAD_CACHE_SIZE, "100")!!.toInt()
-    }
-
-    @JvmStatic
-    fun showServerUnreachableDialog(): Boolean {
-        return App.getInstance().preferences.getLong(
-                SERVER_UNREACHABLE, 0
-        ) + 86400000 < System.currentTimeMillis()
-    }
-
-    @JvmStatic
-    fun setServerUnreachableDatetime() {
-        App.getInstance().preferences.edit().putLong(SERVER_UNREACHABLE, System.currentTimeMillis()).apply()
     }
 
     @JvmStatic

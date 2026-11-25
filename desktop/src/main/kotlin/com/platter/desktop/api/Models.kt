@@ -35,6 +35,7 @@ class SubsonicResponse {
     var randomSongs: SongList? = null
     var searchResult3: SearchResult? = null
     var platterTrackChanges: TrackChanges? = null
+    internal var platterAutoMix: AutoMixResponse? = null
     var starred2: SearchResult? = null
     var playlists: PlaylistList? = null
     var playlist: Playlist? = null

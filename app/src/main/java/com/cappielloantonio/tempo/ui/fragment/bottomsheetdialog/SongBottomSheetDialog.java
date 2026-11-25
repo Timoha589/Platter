@@ -122,18 +122,8 @@ public class SongBottomSheetDialog extends BottomSheetDialogFragment implements 
 
         TextView playRadio = view.findViewById(R.id.play_radio_text_view);
         playRadio.setOnClickListener(v -> {
-            MediaManager.startQueue(mediaBrowserListenableFuture, song);
-            ((MainActivity) requireActivity()).setBottomSheetInPeek(true);
-
-            songBottomSheetViewModel.getInstantMix(song).observe(getViewLifecycleOwner(), songs -> {
-
-                // The track is already playing; a mix with nothing in it just leaves it at that.
-                if (songs != null && !songs.isEmpty()) {
-                    MediaManager.enqueue(mediaBrowserListenableFuture, songs, true);
-                }
-
-                dismissBottomSheet();
-            });
+            ((MainActivity) requireActivity()).playInstantMix(song);
+            dismissBottomSheet();
         });
 
         TextView playNext = view.findViewById(R.id.play_next_text_view);

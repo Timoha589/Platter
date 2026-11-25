@@ -51,6 +51,8 @@ class RemoteCommands(private val app: AppController) {
         "shuffle" -> shuffle(a.bool("on"))
         "repeat" -> setRepeat(a.string("mode"))
         "search" -> search(a.need("query"), a.int("limit") ?: 10)
+        "focused_editor" -> a.long("window")?.let(app.focusedEditor::snapshot) ?: mapOf("active" to false)
+        "replace_focused_text" -> mapOf("applied" to replaceFocusedText(a))
         "playlists" -> mapOf("playlists" to playlists().map(::playlistJson))
         "play_item" -> playItem(a)
         "radio" -> radio(a)
@@ -79,6 +81,15 @@ class RemoteCommands(private val app: AppController) {
         "create_playlist" -> createPlaylist(a)
         "lyrics" -> lyrics(a)
         else -> throw RemoteError(404, "Unknown command \"$command\"")
+    }
+
+    private fun replaceFocusedText(a: Args): Boolean {
+        val window = a.long("window") ?: return false
+        val revision = a.long("revision") ?: return false
+        val before = a.rawString("before") ?: return false
+        val after = a.rawString("after") ?: return false
+        val layout = a.string("layout") ?: return false
+        return app.focusedEditor.replace(window, revision, before, after, layout)
     }
 
     // --- the player ---------------------------------------------------------------

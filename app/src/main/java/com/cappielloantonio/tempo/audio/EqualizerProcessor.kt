@@ -4,6 +4,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor.AudioFormat
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
+import com.platter.automix.bandGainWithBass
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
@@ -21,8 +22,12 @@ import kotlin.math.sin
  */
 @UnstableApi
 class EqualizerProcessor : BaseAudioProcessor() {
+    @Volatile
+    internal var mixBassGain: Float? = null
+
     // Worked out on the playback thread whenever the settings' version moves on.
     private var version = -1
+    private var appliedBassGain: Float? = null
     private var active = false
     private var preamp = 1f
     private var bandCount = 0
@@ -96,24 +101,38 @@ class EqualizerProcessor : BaseAudioProcessor() {
     /** Works the filters out again when the listener has moved something since the last buffer. */
     private fun refresh() {
         val now = PlatterEqualizer.version
-        if (now == version) return
+        val bass = mixBassGain
+        if (now == version && bass == appliedBassGain) return
         version = now
+        appliedBassGain = bass
 
         val settings = PlatterEqualizer.settings
+        if (!settings.enabled && bass == null) {
+            active = false
+            return
+        }
         val rate = inputAudioFormat.sampleRate.toFloat()
         val channels = inputAudioFormat.channelCount
-        val gains = settings.gains()
+        val gains = settings.gains().mapIndexed { band, gain ->
+            val base = if (settings.enabled) gain else 0f
+            if (bass != null) bandGainWithBass(base, band, bass) else base
+        }
 
-        // Level bands cost nothing, and bands too close to half the sample rate cannot be made: both are left out.
-        val bands = gains.indices.filter { abs(gains[it]) >= 0.05f && EqSettings.FREQUENCIES[it] < rate * 0.45f }
-        active = settings.enabled && (bands.isNotEmpty() || abs(settings.preamp) >= 0.05f)
-        preamp = 10f.pow(settings.preamp / 20f)
+        // Keep the low filters in place while mixing so their memory survives the handoff.
+        val bands = gains.indices.filter {
+            (abs(gains[it]) >= 0.05f || bass != null && it < 2) && EqSettings.FREQUENCIES[it] < rate * 0.45f
+        }
+        val preampDb = if (settings.enabled) settings.preamp else 0f
+        active = bands.isNotEmpty() || abs(preampDb) >= 0.05f
+        preamp = 10f.pow(preampDb / 20f)
 
         val sameBands = bands == bandIndices
         bandIndices = bands
         bandCount = bands.size
-        b0 = FloatArray(bandCount); b1 = FloatArray(bandCount); b2 = FloatArray(bandCount)
-        a1 = FloatArray(bandCount); a2 = FloatArray(bandCount)
+        if (b0.size != bandCount) {
+            b0 = FloatArray(bandCount); b1 = FloatArray(bandCount); b2 = FloatArray(bandCount)
+            a1 = FloatArray(bandCount); a2 = FloatArray(bandCount)
+        }
         bands.forEachIndexed { slot, band ->
             // A peaking filter (Robert Bristow-Johnson's cookbook), about an octave wide.
             val a = 10.0.pow(gains[band] / 40.0)

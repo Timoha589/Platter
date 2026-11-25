@@ -69,7 +69,7 @@ public final class DownloadUtil {
     }
 
     /* The same, with the given processors run over the decoded audio before it is played. */
-    public static RenderersFactory buildRenderersFactory(Context context, boolean preferExtensionRenderer, AudioProcessor... audioProcessors) {
+    public static DefaultRenderersFactory buildRenderersFactory(Context context, boolean preferExtensionRenderer, AudioProcessor... audioProcessors) {
         @DefaultRenderersFactory.ExtensionRendererMode int extensionRendererMode =
                 useExtensionRenderers()
                         ? (preferExtensionRenderer ? DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)

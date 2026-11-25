@@ -15,6 +15,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -52,6 +53,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
     private lateinit var librarySessionCallback: MediaLibrarySessionCallback
     private lateinit var scrobbleTracker: ScrobbleTracker
     private lateinit var crossfader: Crossfader
+    private val playerEqualizer = EqualizerProcessor()
     private lateinit var bluetoothResume: BluetoothResume
 
     /*
@@ -148,6 +150,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         // Shuffle and repeat are the listener's choice, not the session's: they outlive a restart.
         player.shuffleModeEnabled = Preferences.isShuffleMode()
         player.repeatMode = Preferences.getRepeatMode()
+        applySpeedByMediaType(player)
     }
 
     /*
@@ -156,8 +159,9 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
      * would make the main player give way to it, and its sound goes through
      * the shifter it is lined up with.
      */
-    private fun newHelperPlayer(shifter: SampleShifter): ExoPlayer = ExoPlayer.Builder(this)
-            .setRenderersFactory(DownloadUtil.buildRenderersFactory(this, false, shifter, EqualizerProcessor()))
+    private fun newHelperPlayer(shifter: SampleShifter, equalizer: EqualizerProcessor): ExoPlayer = ExoPlayer.Builder(this)
+            .setRenderersFactory(DownloadUtil.buildRenderersFactory(this, false, shifter, equalizer)
+                    .setEnableAudioTrackPlaybackParams(true))
             .setMediaSourceFactory(getMediaSourceFactory())
             .setAudioAttributes(AudioAttributes.DEFAULT, false)
             .build()
@@ -167,8 +171,27 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
                         .isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS
         ) {
             castPlayer = CastPlayer(CastContext.getSharedInstance(this))
+            applySpeedByMediaType(castPlayer)
             castPlayer.setSessionAvailabilityListener(this)
         }
+    }
+
+    /** Music can briefly change tempo during AutoMix. Only change the default when the media type changes. */
+    private fun applySpeedByMediaType(target: Player) {
+        target.addListener(object : Player.Listener {
+            private var currentType: String? = null
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val type = mediaItem?.mediaMetadata?.extras?.getString("type") ?: Constants.MEDIA_TYPE_MUSIC
+                if (type == currentType || !target.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH)) return
+                currentType = type
+                val speed = when (type) {
+                    Constants.MEDIA_TYPE_PODCAST, Constants.MEDIA_TYPE_RADIO -> Preferences.getPlaybackSpeed()
+                    else -> Constants.MEDIA_PLAYBACK_SPEED_100
+                }
+                target.playbackParameters = PlaybackParameters(speed)
+            }
+        })
     }
 
     /*
@@ -216,7 +239,7 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         player.addListener(scrobbleTracker)
 
         // Overlaps the end of a track with the start of the next one.
-        crossfader = Crossfader(player, ::newHelperPlayer) {
+        crossfader = Crossfader(player, playerEqualizer, ::newHelperPlayer) {
             !(this::castPlayer.isInitialized && castPlayer.isCastSessionAvailable)
         }
 
@@ -382,6 +405,12 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
      * track, or previous rewinding the current one, stays paused.
      */
     private fun resumingOnSkip(player: Player): Player = object : ForwardingPlayer(player) {
+        override fun setPlaybackParameters(playbackParameters: PlaybackParameters) {
+            changePlaybackRate { super.setPlaybackParameters(playbackParameters) }
+        }
+
+        override fun setPlaybackSpeed(speed: Float) = changePlaybackRate { super.setPlaybackSpeed(speed) }
+
         override fun seekToNext() = resumeIfMoved { super.seekToNext() }
 
         override fun seekToPrevious() = resumeIfMoved { super.seekToPrevious() }
@@ -391,6 +420,13 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         override fun seekToPreviousMediaItem() = resumeIfMoved { super.seekToPreviousMediaItem() }
 
         override fun seekToDefaultPosition(mediaItemIndex: Int) = resumeIfMoved { super.seekToDefaultPosition(mediaItemIndex) }
+
+        private fun changePlaybackRate(change: () -> Unit) {
+            val local = player === this@MediaService.player && ::crossfader.isInitialized
+            if (local) crossfader.onUserPlaybackParametersChanging()
+            change()
+            if (local) crossfader.refresh()
+        }
 
         private inline fun resumeIfMoved(skip: () -> Unit) {
             val from = currentMediaItemIndex
@@ -417,17 +453,20 @@ class MediaService : MediaLibraryService(), SessionAvailabilityListener {
         clearListener()
     }
 
-    // The app's equalizer is in the sound of every player, the crossfade's helper as well.
-    private fun getRenderersFactory() = DownloadUtil.buildRenderersFactory(this, false, EqualizerProcessor())
+    // Tempo changes during AutoMix must leave the PCM filters and buffered audio in place.
+    private fun getRenderersFactory() = DownloadUtil.buildRenderersFactory(this, false, playerEqualizer)
+            .setEnableAudioTrackPlaybackParams(true)
 
     private fun getMediaSourceFactory() =
             DefaultMediaSourceFactory(this).setDataSourceFactory(DownloadUtil.getDataSourceFactory(this))
 
     override fun onCastSessionAvailable() {
+        if (::crossfader.isInitialized) crossfader.refresh()
         setPlayer(player, castPlayer)
     }
 
     override fun onCastSessionUnavailable() {
         setPlayer(castPlayer, player)
+        if (::crossfader.isInitialized) crossfader.refresh()
     }
 }

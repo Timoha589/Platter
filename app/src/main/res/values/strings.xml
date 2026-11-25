@@ -256,11 +256,12 @@
     <string name="player_download_started">Downloading track</string>
     <string name="player_download_removed">Download removed</string>
     <plurals name="player_instant_mix_added">
-        <item quantity="one">Queue updated: %d track up next</item>
-        <item quantity="other">Queue updated: %d tracks up next</item>
+        <item quantity="one">Added %d track to the queue</item>
+        <item quantity="other">Added %d tracks to the queue</item>
     </plurals>
     <string name="player_instant_mix_empty">No similar tracks found</string>
     <string name="player_instant_mix_failed">Couldn\'t make a mix</string>
+    <string name="instant_mix_loading">Finding similar tracks…</string>
     <string name="player_instant_mix_button">Instant mix</string>
     <string name="player_add_to_playlist_button">Add to playlist</string>
     <string name="player_lyrics_toggle_button">Show lyrics</string>
@@ -344,11 +345,6 @@
     <string name="server_signup_dialog_neutral_button">Delete</string>
     <string name="server_signup_dialog_positive_button">Save</string>
     <string name="server_signup_dialog_title">Add server</string>
-    <string name="server_unreachable_dialog_negative_button">Cancel</string>
-    <string name="server_unreachable_dialog_neutral_button">Go to login</string>
-    <string name="server_unreachable_dialog_positive_button">Continue anyway</string>
-    <string name="server_unreachable_dialog_summary">The requested server is unavailable. If you choose to continue this dialog will not appear for the next hour.</string>
-    <string name="server_unreachable_dialog_title">Server unreachable</string>
     <string name="settings_about_summary">Platter is an open source and lightweight music client for Subsonic, designed and built natively for Android. It is a fork of Tempo by Antonio Cappiello, released under the GPL v3.</string>
     <string name="settings_about_title">About</string>
     <string name="settings_always_on_display">Always on display</string>
@@ -419,6 +415,9 @@
     <string name="settings_title_replay_gain">Replay Gain</string>
     <string name="settings_crossfade_title">Crossfade</string>
     <string name="settings_crossfade_summary">The end of a track overlaps with the start of the next. Not applied between consecutive tracks of the same album.</string>
+    <string name="settings_crossfade_duration_title">Crossfade duration (s)</string>
+    <string name="settings_auto_mix_title">AutoMix</string>
+    <string name="settings_auto_mix_summary">Uses track analysis from your server to choose where to blend songs and sync compatible beats.</string>
     <string name="settings_bluetooth_resume_title">Resume on Bluetooth reconnect</string>
     <string name="settings_bluetooth_resume_summary">When the Bluetooth device playback was paused by disconnecting comes back, such as a car stereo, playback continues - even with the screen off.</string>
     <string name="settings_title_scrobble">Scrobble</string>

@@ -3,9 +3,20 @@ package com.platter.desktop.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -31,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.width
@@ -47,6 +59,7 @@ import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.RepeatOne
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.Title
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.VolumeUp
@@ -57,18 +70,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect as DrawRect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.withSaveLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -89,14 +115,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.platter.desktop.AppController
 import com.platter.desktop.Screen
 import com.platter.desktop.api.Song
 import com.platter.desktop.i18n.t
+import com.platter.desktop.player.FADE_TICK_MS
+import com.platter.desktop.player.FadeMode
+import com.platter.desktop.player.FadeTransition
 import com.platter.desktop.player.PlayerState
 import com.platter.desktop.player.RepeatMode
+import kotlin.random.Random
 
 /** How long one track takes to give way to the next: the cover's slide, and the colours of the background turning over. */
 private const val TRACK_MS = 480
@@ -118,22 +149,26 @@ fun FullPlayer(app: AppController) {
     // With nothing playing there is nothing to show.
     LaunchedEffect(song == null) { if (song == null) app.fullPlayer = false }
 
-    val direction = remember { Direction() }
+    val direction = remember { TrackDirection() }
     val forward = direction.update(s.queue.index, s.queue.songs, s.queue.repeat == RepeatMode.All)
 
-    // Colours arrive after the cover does; until they do the last ones stay, and every change is a turn from one to the other.
-    val palette = rememberCoverPalette(app, song?.coverArtId)
-    var shown by remember { mutableStateOf(CoverPalette(PlatterColors.Smoke, PlatterColors.Iron)) }
-    LaunchedEffect(palette) { palette?.let { shown = it } }
-    val first by animateColorAsState(shown.primary, tween(BACKGROUND_MS))
-    val second by animateColorAsState(shown.secondary, tween(BACKGROUND_MS))
+    val mix = s.fadeTransition?.takeUnless { it.mode == FadeMode.Crossfade }
+    val nextCover = if (app.autoMix) s.queue.after(auto = true)?.let { s.queue.songs[it].coverArtId } else null
+    // Keep each loaded palette associated with its cover as the next track becomes current.
+    val palettes = mutableMapOf<String, CoverPalette?>()
+    for (cover in listOfNotNull(song?.coverArtId, mix?.outgoingCoverArtId, nextCover).distinct()) {
+        palettes[cover] = key(cover) { rememberCoverPalette(app, cover) }
+    }
+    val background = rememberPlayerBackground(
+        song, s.queue.index, song?.coverArtId?.let(palettes::get), mix?.outgoingCoverArtId?.let(palettes::get), s.fadeTransition,
+    )
 
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     BoxWithConstraints(
         Modifier.fillMaxSize()
-            .background(Brush.linearGradient(listOf(first, second, lerp(second, Color.Black, 0.7f))))
+            .background(Brush.linearGradient(listOf(background.primary, background.secondary, lerp(background.secondary, Color.Black, 0.7f))))
             // Nothing under the player may be reached through it.
             .pointerInput(Unit) { detectTapGestures { } }
             .focusRequester(focus).focusable()
@@ -160,8 +195,49 @@ fun FullPlayer(app: AppController) {
     }
 }
 
+private data class MixBackgroundTarget(val palette: CoverPalette, val loadedAt: Float)
+
+@Composable
+internal fun rememberPlayerBackground(
+    song: Song?,
+    queueIndex: Int,
+    palette: CoverPalette?,
+    outgoingPalette: CoverPalette?,
+    fade: FadeTransition?,
+): CoverPalette {
+    val mix = fade?.takeUnless { it.mode == FadeMode.Crossfade }
+    var lastPalette by remember { mutableStateOf(CoverPalette(PlatterColors.Smoke, PlatterColors.Iron)) }
+    val fallback = remember(song, queueIndex, mix?.mode, mix?.outgoingCoverArtId) { lastPalette }
+    var target by remember(song, queueIndex) {
+        mutableStateOf(if (mix != null) palette?.let { MixBackgroundTarget(it, 0f) } else null)
+    }
+    LaunchedEffect(palette, mix?.mode, song, queueIndex) {
+        if (palette != null) {
+            lastPalette = palette
+            // A palette that arrives during the mix uses the remaining audio progress.
+            if (mix != null && target == null) target = MixBackgroundTarget(palette, mix.progress)
+        }
+    }
+    val shown = if (mix != null) {
+        val from = outgoingPalette ?: fallback
+        val to = target
+        if (to == null) from else {
+            val remaining = 1f - to.loadedAt
+            val fraction = if (remaining > 0f) ((mix.progress - to.loadedAt) / remaining).coerceIn(0f, 1f) else 1f
+            CoverPalette(lerp(from.primary, to.palette.primary, fraction), lerp(from.secondary, to.palette.secondary, fraction))
+        }
+    } else palette ?: lastPalette
+    // Smooth between samples, including when the player clears the completed fade on its final tick.
+    val followsAudio = mix != null || target?.palette == shown
+    val duration = if (followsAudio) FADE_TICK_MS.toInt() else BACKGROUND_MS
+    val easing = if (followsAudio) LinearEasing else FastOutSlowInEasing
+    val first by animateColorAsState(shown.primary, tween(duration, easing = easing))
+    val second by animateColorAsState(shown.secondary, tween(duration, easing = easing))
+    return CoverPalette(first, second)
+}
+
 /** Which way the queue has just moved: forward unless the index went down. A queue that is a new list, or one that wrapped round, counts as forward. */
-private class Direction {
+internal class TrackDirection {
     private var index = -1
     private var songs: List<Song>? = null
     private var forward = true
@@ -350,7 +426,13 @@ private fun Arranged(app: AppController, s: PlayerState, song: Song?, forward: B
                 .graphicsLayer { scaleX = scale; scaleY = scale },
         ) {
             // The corners stay as round on the screen as everywhere else, however far the cover is shrunk.
-            CoverStage(app, song, forward, poses.side, RoundedCornerShape(6.dp / scale), Modifier.fillMaxSize())
+            CoverStage(
+                app, song, s.fadeTransition, forward, poses.side,
+                shape = RoundedCornerShape(6.dp / scale),
+                modifier = Modifier.fillMaxSize(),
+                shadow = 32.dp,
+                stageWidth = stageW,
+            )
         }
 
         Box(
@@ -364,6 +446,12 @@ private fun Arranged(app: AppController, s: PlayerState, song: Song?, forward: B
             }
         }
 
+        if (s.autoMixTransition != null) {
+            Box(Modifier.offset(footer.x, footer.y - 19.dp).size(footer.w, 20.dp), contentAlignment = Alignment.Center) {
+                AutoMixLabel()
+            }
+        }
+
         Column(Modifier.offset(footer.x, footer.y).width(footer.w)) {
             Seek(app, s)
             Spacer(Modifier.height(18.dp))
@@ -374,27 +462,208 @@ private fun Arranged(app: AppController, s: PlayerState, song: Song?, forward: B
     }
 }
 
+@Composable
+private fun AutoMixLabel() {
+    var width by remember { mutableStateOf(1) }
+    val shimmer = rememberInfiniteTransition(label = "automix-shimmer")
+    val sweep by shimmer.animateFloat(
+        initialValue = -0.3f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(tween(1_900, easing = LinearEasing)),
+        label = "automix-shimmer-position",
+    )
+    val gray = PlatterColors.Mist
+    val brush = Brush.horizontalGradient(
+        0f to gray, 0.5f to Color.White, 1f to gray,
+        startX = (sweep - 0.25f) * width,
+        endX = (sweep + 0.25f) * width,
+    )
+    Text(
+        t("AutoMix"),
+        style = MaterialTheme.typography.labelLarge.copy(brush = brush, fontWeight = FontWeight.SemiBold),
+        modifier = Modifier.onSizeChanged { width = it.width.coerceAtLeast(1) },
+        maxLines = 1,
+    )
+}
+
 /**
  * The cover, [side] wide, on the stage the track change happens on: the old cover slides off the way the listener went
- * while the new one slides in from the other side, each shrinking as it leaves and growing as it arrives.
+ * while the new one slides in from the other side. An AutoMix fallback follows the fade clock. A beat mix dissolves in patches.
  */
 @Composable
-private fun CoverStage(app: AppController, song: Song?, forward: Boolean, side: Dp, shape: Shape, modifier: Modifier) {
-    AnimatedContent(
-        targetState = song,
-        modifier = modifier,
-        contentAlignment = Alignment.Center,
-        contentKey = { it?.id },
-        transitionSpec = { turn(forward, distance = 2) },
-        label = "full-player-cover",
-    ) { shown ->
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (shown != null) {
-                Cover(app, shown.coverArtId, side, shape, Modifier.shadow(32.dp, shape))
+internal fun CoverStage(
+    app: AppController,
+    song: Song?,
+    fade: FadeTransition?,
+    forward: Boolean,
+    side: Dp,
+    shape: Shape = PlatterShapes.Card,
+    modifier: Modifier = Modifier.size(side),
+    shadow: Dp = 0.dp,
+    stageWidth: Dp = side,
+) {
+    val artwork = song?.let { TrackArtwork(it.id, it.coverArtId) }
+    val slide = with(LocalDensity.current) { stageWidth.toPx() / 2 } * if (forward) 1 else -1
+    val mix = fade?.takeUnless { it.mode == FadeMode.Crossfade }
+    val mode = mix?.mode
+    val progress = remember(artwork, mode) { Animatable(mix?.progress ?: 1f) }
+    LaunchedEffect(progress, mix?.progress) {
+        if (mix != null) progress.animateTo(mix.progress, tween(FADE_TICK_MS.toInt(), easing = LinearEasing))
+    }
+    val track = remember {
+        val initial = if (fade?.mode == FadeMode.AutoMixFallback) TrackArtwork(null, fade.outgoingCoverArtId) else artwork
+        SeekableTransitionState(initial)
+    }
+    val transition = rememberTransition(track, label = "track-cover")
+    LaunchedEffect(artwork, mode) {
+        when (mode) {
+            FadeMode.AutoMixFallback -> snapshotFlow { progress.value }.collect { track.seekTo(it, artwork) }
+            FadeMode.AutoMix -> track.snapTo(artwork)
+            else -> if (track.targetState == artwork) track.snapTo(artwork) else track.animateTo(artwork)
+        }
+    }
+
+    Box(modifier, contentAlignment = Alignment.Center) {
+        // Fading content is rendered into a bounded layer. Include the whole shadow in that layer.
+        val shadowPadding = shadow * 2.5f
+        val animatedBounds = if (shadow > 0.dp) {
+            Modifier.requiredSize(stageWidth + shadowPadding * 2, side + shadowPadding * 2)
+                .coverEdgeFade(stageWidth) {
+                    val fraction = track.fraction
+                    if (mode == FadeMode.AutoMix) 0f else minOf(1f, fraction * 5, (1f - fraction) * 5)
+                }
+        } else Modifier.fillMaxSize()
+        transition.AnimatedContent(
+            modifier = animatedBounds,
+            contentAlignment = Alignment.Center,
+            contentKey = { it?.songId ?: it },
+            transitionSpec = {
+                if (shadow > 0.dp) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                else turn(forward, distance = 2)
+            },
+        ) { shown ->
+            val motion = this.transition
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (shown != null) {
+                    if (shadow > 0.dp) {
+                        Box(Modifier.size(side + shadowPadding * 2).coverTurn(motion, slide), contentAlignment = Alignment.Center) {
+                            Cover(app, shown.coverArtId, side, shape, Modifier.shadow(shadow, shape))
+                        }
+                    } else Cover(app, shown.coverArtId, side, shape)
+                }
             }
+        }
+        if (fade?.mode == FadeMode.AutoMix && song != null && fade.outgoingCoverArtId != song.coverArtId) {
+            val seed = remember(fade.outgoingCoverArtId, song.id) { Random.nextInt() }
+            Cover(app, fade.outgoingCoverArtId, side, shape, Modifier.coverDissolve(seed) { progress.value })
         }
     }
 }
+
+@Composable
+private fun Modifier.coverTurn(transition: Transition<EnterExitState>, slide: Float): Modifier {
+    val movement = tween<Float>(TRACK_MS, easing = FastOutSlowInEasing)
+    val offset by transition.animateFloat(transitionSpec = { movement }, label = "cover offset") {
+        when (it) {
+            EnterExitState.PreEnter -> slide
+            EnterExitState.Visible -> 0f
+            EnterExitState.PostExit -> -slide
+        }
+    }
+    val zoom by transition.animateFloat(transitionSpec = { movement }, label = "cover scale") {
+        if (it == EnterExitState.Visible) 1f else 0.9f
+    }
+    val fadeMs = TRACK_MS * 2 / 3
+    // Bring the new cover up while the old one still casts a shadow.
+    val opacity by transition.animateFloat(transitionSpec = {
+        tween(fadeMs, delayMillis = if (targetState == EnterExitState.Visible) 0 else TRACK_MS - fadeMs)
+    }, label = "cover opacity") { if (it == EnterExitState.Visible) 1f else 0f }
+    return graphicsLayer {
+        translationX = offset
+        scaleX = zoom
+        scaleY = zoom
+        alpha = opacity
+    }
+}
+
+private data class TrackArtwork(val songId: String?, val coverArtId: String?)
+
+private fun Modifier.coverEdgeFade(stageWidth: Dp, strength: () -> Float): Modifier =
+    drawWithCache {
+        // Anchor the fade to the stage so the covers pass through it as they slide.
+        val width = minOf(size.width, stageWidth.toPx())
+        val start = (size.width - width) / 2
+        val featherWidth = (STAGE_MARGIN / 2).toPx().coerceAtMost(width / 2)
+        val feather = featherWidth / width
+        val mask = Brush.horizontalGradient(
+            0f to Color.Black, feather to Color.Transparent,
+            1f - feather to Color.Transparent, 1f to Color.Black,
+            startX = start, endX = start + width,
+        )
+        val edgeSize = Size(featherWidth + 1f, size.height)
+        val leftEdge = Offset(start - 1f, 0f)
+        val rightEdge = Offset(start + width - featherWidth, 0f)
+        val layerPaint = Paint()
+        onDrawWithContent {
+            val amount = strength()
+            if (amount <= 0f) {
+                drawContent()
+                return@onDrawWithContent
+            }
+            // Move the fade out into the padding at the ends of the transition to let the resting shadow through.
+            val fadeWidth = lerpF(size.width, width, amount)
+            val left = (size.width - fadeWidth) / 2
+            val right = left + fadeWidth
+            // Clip the composite where the gradient reaches zero so a scaled layer cannot leak a pixel at its edge.
+            clipRect(left = left, right = right) {
+                drawIntoCanvas { canvas ->
+                    canvas.withSaveLayer(DrawRect(left, 0f, right, size.height), layerPaint) {
+                        this@onDrawWithContent.drawContent()
+                        scale(scaleX = fadeWidth / width, scaleY = 1f) {
+                            drawRect(mask, topLeft = leftEdge, size = edgeSize, blendMode = BlendMode.DstOut)
+                            drawRect(mask, topLeft = rightEdge, size = edgeSize, blendMode = BlendMode.DstOut)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+private data class DissolvePatch(val center: Offset, val radius: Float, val start: Float, val mask: Brush)
+
+private fun Modifier.coverDissolve(seed: Int, progress: () -> Float): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithCache {
+            val random = Random(seed)
+            val cell = size.minDimension / 4f
+            // Jitter the centers while ensuring every point is covered before the outgoing layer is removed.
+            val patches = List(16) { index ->
+                val center = Offset(
+                    (index % 4 + 0.3f + random.nextFloat() * 0.4f) * cell,
+                    (index / 4 + 0.3f + random.nextFloat() * 0.4f) * cell,
+                )
+                val radius = ((1.65f + random.nextFloat() * 0.45f) * cell).coerceAtLeast(1f)
+                val start = random.nextFloat() * 0.64f
+                val mask = Brush.radialGradient(
+                    0f to Color.Black, 0.64f to Color.Black, 1f to Color.Transparent,
+                    center = center, radius = radius,
+                )
+                DissolvePatch(center, radius, start, mask)
+            }
+            onDrawWithContent {
+                drawContent()
+                val mixProgress = progress()
+                for (patch in patches) {
+                    val fade = ((mixProgress - patch.start) / 0.36f).coerceIn(0f, 1f)
+                    if (fade > 0f) {
+                        drawCircle(
+                            patch.mask, patch.radius, patch.center,
+                            alpha = fade * fade * (3f - 2f * fade), blendMode = BlendMode.DstOut,
+                        )
+                    }
+                }
+            }
+        }
 
 /** Title over artist, which turn over with the cover - nearer, since they are small and a long slide would be a long smear. */
 @Composable
@@ -476,8 +745,8 @@ private fun Seek(app: AppController, s: PlayerState) {
         return
     }
     Column {
-        ProgressBar(
-            fraction = if (s.durationMs > 0) s.positionMs.toFloat() / s.durationMs else 0f,
+        PlaybackProgressBar(
+            state = s,
             onSeek = { app.player.seek(it) },
             modifier = Modifier.fillMaxWidth(),
         )

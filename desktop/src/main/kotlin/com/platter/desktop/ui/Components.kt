@@ -50,6 +50,11 @@ import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
@@ -60,8 +65,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -69,12 +76,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -91,11 +103,13 @@ import coil3.compose.AsyncImage
 import com.platter.desktop.AppController
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
-import kotlin.math.roundToInt
 import com.platter.desktop.Screen
 import com.platter.desktop.api.Album
 import com.platter.desktop.api.Artist
 import com.platter.desktop.api.Song
+import com.platter.desktop.player.FadeMode
+import com.platter.desktop.player.PlayerState
+import com.platter.desktop.player.TimelineOverlap
 import kotlinx.coroutines.CancellationException
 
 // --- loading ---------------------------------------------------------------
@@ -579,18 +593,96 @@ fun Modifier.wheelVolume(app: AppController): Modifier {
     }
 }
 
+private val crossfadeUpcoming = Color(0xFF6B82A6)
+private val crossfadePlayed = Color(0xFF579DFF)
+private val crossfadeStart = Color(0xFFB4CCEF)
+private val autoMixUpcoming = listOf(
+    Color(0xFFD83ECC), Color(0xFF8D54F4), Color(0xFF28C6DE), Color(0xFF3DE5A2),
+)
+private val autoMixPlayed = listOf(
+    Color(0xFFFF6CDE), Color(0xFFAE7BFF), Color(0xFF50ECFF), Color(0xFF83FFBE),
+)
+
+internal data class ProgressHighlight(
+    val range: ClosedFloatingPointRange<Float>,
+    val mode: FadeMode,
+    val reveal: State<Float>,
+)
+
+private inline fun DrawScope.revealHighlight(start: Float, end: Float, progress: Float, draw: (Float) -> Unit) {
+    if (progress >= 1f) {
+        draw(1f)
+    } else {
+        draw(0.32f)
+        if (progress > 0f) {
+            val litEnd = start + (end - start) * progress
+            clipRect(left = start, right = litEnd) { draw(1f) }
+        }
+    }
+}
+
+private fun DrawScope.drawAutoMixHighlight(start: Float, end: Float, playedEnd: Float, sweep: Float, alpha: Float) {
+    val width = end - start
+    val height = 6.dp.toPx()
+    val top = (size.height - height) / 2
+    val topLeft = Offset(start, top)
+    val bounds = Size(width, height)
+    val radius = CornerRadius(minOf(height, width) / 2)
+    if (playedEnd < end) {
+        drawRoundRect(Brush.horizontalGradient(autoMixUpcoming, start, end), topLeft, bounds, radius, alpha = alpha)
+    }
+    if (playedEnd > start) {
+        clipRect(left = start, right = playedEnd) {
+            drawRoundRect(Brush.horizontalGradient(autoMixPlayed, start, end), topLeft, bounds, radius, alpha = alpha)
+        }
+    }
+    if (playedEnd < end && sweep > 0f && sweep < 1f) {
+        val halfWidth = (width * 0.30f).coerceIn(4.dp.toPx(), 20.dp.toPx())
+        val center = start - halfWidth + (width + 2 * halfWidth) * sweep
+        val reflection = Color(0xFFE6FFFA)
+        val glint = Brush.linearGradient(
+            0f to reflection.copy(alpha = 0f),
+            0.35f to reflection.copy(alpha = 0.16f),
+            0.55f to reflection.copy(alpha = 0.49f),
+            0.72f to reflection.copy(alpha = 0.22f),
+            1f to reflection.copy(alpha = 0f),
+            start = Offset(center - halfWidth, top + height),
+            end = Offset(center + halfWidth, top),
+        )
+        drawRoundRect(glint, topLeft, bounds, radius)
+    }
+}
+
 /**
  * A thin white bar on a steel track; tap or drag to seek. Under the pointer it turns green and shows the handle,
  * which is what says it can be taken hold of.
  */
 @Composable
-fun ProgressBar(fraction: Float, onSeek: (Float) -> Unit, modifier: Modifier = Modifier) {
+internal fun ProgressBar(
+    fraction: Float,
+    onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    highlights: List<ProgressHighlight> = emptyList(),
+    animateHighlights: Boolean = false,
+) {
     var width by remember { mutableStateOf(1) }
     var dragging by remember { mutableStateOf(false) }
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     val active = hovered || dragging
     val shown = fraction.coerceIn(0f, 1f)
+    val autoMixHighlights = highlights.filter { it.mode == FadeMode.AutoMix }
+    val glint = if (animateHighlights && autoMixHighlights.any { shown < it.range.endInclusive }) {
+        rememberInfiniteTransition(label = "AutoMix timeline").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(keyframes {
+                durationMillis = 3_400
+                1f at 2_200
+            }),
+            label = "AutoMix glint",
+        )
+    } else null
     Box(
         modifier
             .height(16.dp)
@@ -606,8 +698,45 @@ fun ProgressBar(fraction: Float, onSeek: (Float) -> Unit, modifier: Modifier = M
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(PlatterShapes.Pill).background(PlatterColors.Steel)) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(shown).background(if (active) PlatterColors.Green else PlatterColors.White))
+        Box(
+            Modifier.fillMaxWidth().height(8.dp).drawWithContent {
+                drawContent()
+                val playhead = size.width * shown
+                for ((range, _, reveal) in autoMixHighlights) {
+                    val start = size.width * range.start
+                    val end = size.width * range.endInclusive
+                    val progress = reveal.value
+                    val sweep = if (progress >= 1f) glint?.value ?: 0f else 0f
+                    revealHighlight(start, end, progress) { alpha ->
+                        drawAutoMixHighlight(start, end, minOf(playhead, end), sweep, alpha)
+                    }
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier.fillMaxWidth().height(4.dp).clip(PlatterShapes.Pill).background(PlatterColors.Steel)
+                    .drawWithContent {
+                        drawContent()
+                        val playhead = size.width * shown
+                        for ((range, mode, reveal) in highlights) {
+                            if (mode != FadeMode.AutoMixFallback) continue
+                            val start = size.width * range.start
+                            val end = size.width * range.endInclusive
+                            val playedEnd = minOf(playhead, end)
+                            revealHighlight(start, end, reveal.value) { alpha ->
+                                drawRect(crossfadeUpcoming, Offset(start, 0f), Size(end - start, size.height), alpha = alpha)
+                                if (playedEnd > start) {
+                                    drawRect(crossfadePlayed, Offset(start, 0f), Size(playedEnd - start, size.height), alpha = alpha)
+                                } else {
+                                    drawLine(crossfadeStart, Offset(start, 0f), Offset(start, size.height), strokeWidth = 1.dp.toPx(), alpha = alpha)
+                                }
+                            }
+                        }
+                    },
+            ) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(shown).background(if (active) PlatterColors.Green else PlatterColors.White))
+            }
         }
         if (active) {
             Box(
@@ -617,4 +746,40 @@ fun ProgressBar(fraction: Float, onSeek: (Float) -> Unit, modifier: Modifier = M
             )
         }
     }
+}
+
+@Composable
+fun PlaybackProgressBar(state: PlayerState, onSeek: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val duration = state.durationMs
+    val fraction = if (duration > 0) state.positionMs.toFloat() / duration else 0f
+    val highlights = key(state.current, state.queue.index) {
+        listOfNotNull(
+            rememberProgressHighlight(state.incomingOverlap, duration),
+            rememberProgressHighlight(state.upcomingOverlap, duration),
+        )
+    }
+    ProgressBar(
+        fraction = fraction,
+        onSeek = onSeek,
+        modifier = modifier,
+        highlights = highlights,
+        animateHighlights = state.isPlaying,
+    )
+}
+
+@Composable
+private fun rememberProgressHighlight(overlap: TimelineOverlap?, duration: Long): ProgressHighlight? {
+    val range = overlap?.rangeMs?.takeIf { duration > 0 }?.let {
+        val start = (it.first.toFloat() / duration).coerceIn(0f, 1f)
+        val end = (it.last.toFloat() / duration).coerceIn(0f, 1f)
+        (start..end).takeIf { end > start }
+    }
+    // Playback can briefly clear or revise a plan while the track stays the same.
+    val reveal = remember { Animatable(0f) }
+    val visible = range != null
+    LaunchedEffect(visible) {
+        if (visible && reveal.value < 1f) reveal.animateTo(1f, tween(300, easing = LinearOutSlowInEasing))
+    }
+    if (overlap == null || range == null) return null
+    return ProgressHighlight(range, overlap.mode, reveal.asState())
 }

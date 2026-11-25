@@ -1,6 +1,7 @@
 package com.platter.desktop.data
 
 import com.google.gson.Gson
+import com.platter.automix.AutoMixPlanner
 import com.platter.desktop.api.Credentials
 import java.nio.file.Files
 import java.nio.file.Path
@@ -81,8 +82,12 @@ class Settings {
     /** The server's address on the home network, used while it answers; null for none. */
     var localAddress: String? = null
 
-    /** The end of a track overlaps with the start of the next. On, as on the phone. */
+    /** Whether to use a regular crossfade when AutoMix is off. */
     var crossfade: Boolean = true
+    var crossfadeDurationSeconds: Int = AutoMixPlanner.DEFAULT_CROSSFADE_SECONDS
+
+    /** Also used when older settings files have no AutoMix field. */
+    var autoMix: Boolean = true
 
     /** Other programs on this computer (Jarvis) may drive the player through [com.platter.desktop.remote.RemoteControl]. No switch on screen yet: false here turns it off. */
     var remoteControl: Boolean = true

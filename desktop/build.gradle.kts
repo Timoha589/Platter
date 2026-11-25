@@ -7,7 +7,7 @@ plugins {
 }
 
 /** The one place the version is written: the installer, the running app (`-Dplatter.version`) and the updater all read it. */
-val platterVersion = "1.1.0"
+val platterVersion = "1.1.1"
 
 group = "com.platter"
 version = platterVersion
@@ -16,11 +16,13 @@ kotlin {
     jvmToolchain(21)
     sourceSets.named("main") {
         kotlin.srcDir("../search-common/src/main/kotlin")
+        kotlin.srcDir("../automix-common/src/main/kotlin")
     }
 }
 
 sourceSets.main {
     java.srcDir("../search-common/src/main/java")
+    resources.srcDir("../automix-common/src/main/resources")
 }
 
 dependencies {

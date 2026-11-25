@@ -20,6 +20,9 @@ interface SubsonicService {
     @GET("platterTrackChanges")
     suspend fun trackChanges(@QueryMap params: Map<String, String>, @Query("cursor") cursor: String?): ApiResponse
 
+    @GET("platterAutoMix")
+    suspend fun autoMix(@QueryMap params: Map<String, String>, @Query("id") ids: List<String>): ApiResponse
+
     @GET("getArtists")
     suspend fun getArtists(@QueryMap params: Map<String, String>): ApiResponse
 

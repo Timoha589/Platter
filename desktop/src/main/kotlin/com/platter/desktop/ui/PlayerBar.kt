@@ -86,6 +86,8 @@ private val TRANSPORT_MAX_WIDTH = 620.dp
 fun PlayerBar(app: AppController) {
     val s by app.player.state.collectAsState()
     val song = s.current
+    val direction = remember { TrackDirection() }
+    val forward = direction.update(s.queue.index, s.queue.songs, s.queue.repeat == RepeatMode.All)
 
     Row(
         Modifier.fillMaxWidth().height(PLAYER_BAR_HEIGHT).background(PlatterColors.Black).padding(horizontal = 16.dp),
@@ -95,7 +97,9 @@ fun PlayerBar(app: AppController) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             if (song != null) {
                 // The cover opens the player at full size.
-                Cover(app, song.coverArtId, 56.dp, modifier = Modifier.testTag("open-full-player").pointerHoverIcon(PointerIcon.Hand).clickable { app.fullPlayer = true })
+                Box(Modifier.testTag("open-full-player").pointerHoverIcon(PointerIcon.Hand).clickable { app.fullPlayer = true }) {
+                    CoverStage(app, song, s.fadeTransition, forward, 56.dp)
+                }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f, fill = false)) {
                     Text(
@@ -171,8 +175,8 @@ fun PlayerBar(app: AppController) {
                             modifier = Modifier.width(40.dp),
                         )
                         Spacer(Modifier.width(8.dp))
-                        ProgressBar(
-                            fraction = if (s.durationMs > 0) s.positionMs.toFloat() / s.durationMs else 0f,
+                        PlaybackProgressBar(
+                            state = s,
                             onSeek = { app.player.seek(it) },
                             modifier = Modifier.weight(1f),
                         )

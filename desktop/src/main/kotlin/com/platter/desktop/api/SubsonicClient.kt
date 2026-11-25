@@ -209,6 +209,14 @@ class SubsonicClient(val credentials: Credentials, http: OkHttpClient = defaultH
         } else throw e
     }
 
+    internal suspend fun autoMix(ids: List<String>): AutoMixResponse? = try {
+        call { it.autoMix(params, ids) }.platterAutoMix
+    } catch (e: HttpException) {
+        if (e.code() != 404 && e.code() != 405 && e.code() != 501) throw e
+        e.response()?.errorBody()?.close()
+        null
+    }
+
     suspend fun playlists(): List<Playlist> = call { it.getPlaylists(params) }.playlists?.playlists.orEmpty()
 
     suspend fun playlist(id: String): Playlist =

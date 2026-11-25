@@ -5,21 +5,19 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
-import androidx.media3.common.Timeline;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
 import androidx.media3.session.SessionToken;
 
 import com.cappielloantonio.tempo.databinding.InnerFragmentPlayerCoverBinding;
-import com.cappielloantonio.tempo.glide.CustomGlideRequest;
+import com.cappielloantonio.tempo.helper.view.DissolvingCoverView;
+import com.cappielloantonio.tempo.service.CoverTransition;
 import com.cappielloantonio.tempo.service.MediaService;
 import com.cappielloantonio.tempo.util.TrackSwipeCarousel;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -33,6 +31,8 @@ public class PlayerCoverFragment extends Fragment {
     private ListenableFuture<MediaBrowser> mediaBrowserListenableFuture;
 
     private TrackSwipeCarousel coverCarousel;
+    private final TrackSwipeCarousel.OverlayTurn dissolve =
+            (outgoing, incoming, token, progress) -> ((DissolvingCoverView) outgoing).dissolve(token, progress);
 
     /**
      * The gutter between one sleeve and the next while they are being dragged
@@ -51,6 +51,14 @@ public class PlayerCoverFragment extends Fragment {
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        CoverTransition.updates().observe(getViewLifecycleOwner(), transition -> {
+            if (coverCarousel != null && connectedBrowser() != null) coverCarousel.syncCover(transition, dissolve, null);
+        });
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
         initializeBrowser();
@@ -59,6 +67,7 @@ public class PlayerCoverFragment extends Fragment {
 
     @Override
     public void onStop() {
+        if (coverCarousel != null) coverCarousel.cancel();
         releaseBrowser();
         super.onStop();
     }
@@ -68,6 +77,7 @@ public class PlayerCoverFragment extends Fragment {
         super.onDestroyView();
 
         if (coverCarousel != null) coverCarousel.cancel();
+        coverCarousel = null;
 
         bind = null;
     }
@@ -91,12 +101,8 @@ public class PlayerCoverFragment extends Fragment {
 
                     @Override
                     public void onBindSlot(@NonNull View slot, @Nullable MediaMetadata metadata) {
-                        CustomGlideRequest.loadCover(
-                                requireContext(),
-                                (ImageView) slot,
-                                metadata != null && metadata.extras != null ? metadata.extras.getString("coverArtId") : null,
-                                CustomGlideRequest.ResourceType.Song
-                        );
+                        String artwork = metadata != null && metadata.extras != null ? metadata.extras.getString("coverArtId") : null;
+                        ((DissolvingCoverView) slot).loadArtwork(artwork);
                     }
 
                     @Override
@@ -115,6 +121,7 @@ public class PlayerCoverFragment extends Fragment {
                 bind.nowPlayingSongCoverNext
         );
 
+        coverCarousel.setCoverStage(bind.getRoot());
         bind.getRoot().setOnTouchListener(coverCarousel);
     }
 
@@ -134,14 +141,17 @@ public class PlayerCoverFragment extends Fragment {
     }
 
     private void releaseBrowser() {
-        MediaBrowser.releaseFuture(mediaBrowserListenableFuture);
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        mediaBrowserListenableFuture = null;
+        if (future != null) MediaBrowser.releaseFuture(future);
     }
 
     private void bindMediaController() {
-        mediaBrowserListenableFuture.addListener(() -> {
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        future.addListener(() -> {
+            if (future != mediaBrowserListenableFuture || bind == null) return;
             try {
-                MediaBrowser mediaBrowser = mediaBrowserListenableFuture.get();
-                setMediaBrowserListener(mediaBrowser);
+                setMediaBrowserListener(future.get());
             } catch (Exception exception) {
                 exception.printStackTrace();
             }
@@ -150,53 +160,19 @@ public class PlayerCoverFragment extends Fragment {
 
     private void setMediaBrowserListener(MediaBrowser mediaBrowser) {
         coverCarousel.bindAll();
+        coverCarousel.syncCover(CoverTransition.updates().getValue(), dissolve, null);
 
         mediaBrowser.addListener(new Player.Listener() {
-            /*
-             * A transition rather than a metadata change: the same track queued
-             * twice in a row carries the same metadata, and the strip has to
-             * follow the queue even when nothing about the track is different.
-             */
             @Override
-            public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
-                if (bind == null) return;
-
-                coverCarousel.sync();
-            }
-
-            @Override
-            public void onTimelineChanged(@NonNull Timeline timeline, int reason) {
-                if (bind == null) return;
-
-                coverCarousel.sync();
-            }
-
-            @Override
-            public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
-                if (bind == null) return;
-
-                coverCarousel.sync();
-            }
-
-            @Override
-            public void onRepeatModeChanged(int repeatMode) {
-                if (bind == null) return;
-
-                coverCarousel.sync();
-            }
-
-            /*
-             * Not because playing and pausing changes the sleeve, but because it
-             * is the thing the player says most often. sync() checks the strip
-             * against the queue and costs nothing when the two agree, so every
-             * play and pause is a chance to notice one that has come adrift.
-             */
-            @Override
-            public void onIsPlayingChanged(boolean isPlaying) {
-                if (bind == null) return;
-
-                coverCarousel.sync();
+            public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
+                if (mediaBrowser != connectedBrowser()) return;
+                if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_TIMELINE_CHANGED,
+                        Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED,
+                        Player.EVENT_IS_PLAYING_CHANGED)) {
+                    coverCarousel.syncCover(CoverTransition.updates().getValue(), dissolve, null);
+                }
             }
         });
     }
+
 }

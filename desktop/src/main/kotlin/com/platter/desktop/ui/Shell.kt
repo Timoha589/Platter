@@ -98,6 +98,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.platter.desktop.AppController
@@ -130,7 +132,7 @@ private val SIDEBAR_ROW_INSET = (PlatterSpacing.SidebarRowHeight - PlatterSpacin
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun Shell(app: AppController) {
+fun Shell(app: AppController) = CompositionLocalProvider(LocalFocusedEditor provides app.focusedEditor) {
     LaunchedEffect(app.client) { app.refreshPlaylists() }
 
     BoxWithConstraints(
@@ -444,9 +446,23 @@ private fun RoundButton(icon: ImageVector, description: String, enabled: Boolean
 /** Line breaks with the spaces around them; a search is one line. */
 private val LINE_BREAKS = Regex("[ \t]*[\r\n]+[ \t]*")
 
-/** The black strip across the top: the name over the sidebar, the arrows and search over the page, the account at the far end. */
 @Composable
 private fun TopBar(app: AppController) {
+    val input = rememberCorrectableInput(
+        text = { app.searchQuery },
+        change = {
+            app.searchQuery = it
+            if (it.isNotBlank() && app.screen != Screen.Search) app.navigate(Screen.Search)
+        },
+        available = { app.dialog == null && !app.fullPlayer },
+        normalize = { value ->
+            val text = value.text.replace(LINE_BREAKS, " ")
+            if (text == value.text) value else {
+                fun offset(index: Int) = value.text.substring(0, index).replace(LINE_BREAKS, " ").length
+                TextFieldValue(text, TextRange(offset(value.selection.start), offset(value.selection.end)))
+            }
+        },
+    )
     Row(Modifier.fillMaxWidth().height(64.dp).background(PlatterColors.Black).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.width(app.sidebarWidth.dp).padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             PlatterMark(28.dp)
@@ -467,20 +483,13 @@ private fun TopBar(app: AppController) {
             Box(Modifier.weight(1f)) {
                 if (app.searchQuery.isEmpty()) Text(t("What do you want to play?"), style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Bone)
                 BasicTextField(
-                    value = app.searchQuery,
-                    onValueChange = { typed ->
-                        // A name copied from a page or a file often brings a line break with it. The field is one line, so it
-                        // would show only what follows the break - nothing - and each paste would add to text that cannot be seen.
-                        val it = typed.replace(LINE_BREAKS, " ")
-                        app.searchQuery = it
-                        if (it.isNotBlank() && app.screen != Screen.Search) app.navigate(Screen.Search)
-                    },
+                    value = input.value,
+                    onValueChange = input.onChange,
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(color = PlatterColors.White),
                     cursorBrush = SolidColor(PlatterColors.White),
-                    modifier = Modifier.fillMaxWidth().onPreviewKeyEvent {
-                        // Enter is the listener saying "this is the search" - the moment worth remembering it. Previewed: the field itself
-                        // takes Enter as its own "done" and would not pass it on.
+                    modifier = Modifier.fillMaxWidth().then(input.modifier).onPreviewKeyEvent {
+                        // The field can take Enter as its own "done", so commit in preview.
                         if (it.type == KeyEventType.KeyDown && it.key == Key.Enter) {
                             app.commitSearch()
                             true

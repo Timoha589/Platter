@@ -2,8 +2,19 @@ package com.platter.desktop.ui
 
 import com.sun.jna.Library
 import com.sun.jna.Native
+import com.sun.jna.Platform
+import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.ptr.IntByReference
+
+internal fun isForegroundWindow(window: java.awt.Window, requested: Long): Boolean {
+    if (!Platform.isWindows() || !window.isFocused || requested == 0L) return false
+    return runCatching {
+        Pointer.nativeValue(Native.getComponentPointer(window)) == requested &&
+            Pointer.nativeValue(User32.INSTANCE.GetForegroundWindow()?.pointer) == requested
+    }.getOrDefault(false)
+}
 
 private interface Dwmapi : Library {
     fun DwmSetWindowAttribute(hwnd: WinDef.HWND, attribute: Int, value: IntByReference, size: Int): Int

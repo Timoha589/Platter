@@ -248,7 +248,7 @@ fun ArtistPage(app: AppController, id: String) {
             if (!bio.isNullOrBlank()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.padding(horizontal = 12.dp)) {
-                        SectionHeader(t("About"), Modifier.padding(horizontal = PlatterSpacing.Bleed))
+                        SectionHeader(t("Biography"), Modifier.padding(horizontal = PlatterSpacing.Bleed))
                         Text(
                             bio,
                             style = MaterialTheme.typography.bodyMedium,

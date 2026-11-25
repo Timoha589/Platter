@@ -1,5 +1,7 @@
 package com.platter.desktop.player
 
+import com.platter.automix.bandGainWithBass
+
 /**
  * The equalizer as the listener left it: on or off, a preamp, and a gain in dB for each of libvlc's ten bands.
  * An empty [bands] is flat.
@@ -11,6 +13,12 @@ data class EqSettings(
 ) {
     /** Always ten values, whatever was saved. */
     fun gains(): List<Float> = List(BANDS) { bands.getOrNull(it) ?: 0f }
+
+    /** Scale the low two bands for AutoMix, keeping the listener's settings as the baseline. */
+    internal fun gainsWithBass(bassGain: Float): FloatArray = FloatArray(BANDS) { band ->
+        val base = if (enabled) bands.getOrNull(band) ?: 0f else 0f
+        bandGainWithBass(base, band, bassGain)
+    }
 
     companion object {
         const val BANDS = 10

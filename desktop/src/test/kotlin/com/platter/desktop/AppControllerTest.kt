@@ -6,6 +6,7 @@ import com.platter.desktop.api.Song
 import com.platter.desktop.data.Settings
 import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.search.RankedResults
+import com.platter.desktop.wave.PremiumServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +39,53 @@ class AppControllerTest {
     }
 
     private fun song(id: String) = Song().apply { this.id = id; title = "Song $id"; artist = "Someone" }
+
+    @Test
+    fun `crossfade duration is restored even when AutoMix was enabled last`() = FakeSubsonic().use { fake ->
+        val settings = store()
+        val first = app(fake, settings) { serverUrl = PremiumServer.ADDRESS; localAddress = fake.url }
+        assertTrue(first.autoMix)
+        assertFalse(first.crossfade)
+        assertEquals(6, first.crossfadeDurationSeconds)
+        first.changeCrossfade(true)
+        first.changeCrossfadeDuration(10)
+        first.changeAutoMix(true)
+
+        val reopened = app(fake, settings) { serverUrl = PremiumServer.ADDRESS; localAddress = fake.url }
+        assertTrue(reopened.autoMix)
+        reopened.changeCrossfade(true)
+        assertEquals(10, reopened.crossfadeDurationSeconds)
+    }
+
+    @Test
+    fun `AutoMix follows the active server and keeps the listener's choice`() = FakeSubsonic().use { fake ->
+        val settings = store()
+        Files.writeString(dir.resolve("settings.json"), """{"crossfade":true}""")
+
+        val upgraded = app(fake, settings) { serverUrl = PremiumServer.ADDRESS; localAddress = fake.url }
+        assertTrue(upgraded.autoMixAvailable)
+        assertTrue(upgraded.autoMix)
+        assertFalse(upgraded.crossfade)
+
+        upgraded.signOut()
+        assertFalse(upgraded.autoMixAvailable)
+        assertFalse(upgraded.autoMix)
+        runBlocking { upgraded.signIn(fake.url, "tim", "pw") }
+        assertFalse(upgraded.autoMixAvailable)
+        upgraded.changeAutoMix(true)
+        assertFalse(upgraded.autoMix)
+        assertTrue(upgraded.crossfade)
+        upgraded.changeCrossfade(false)
+        assertTrue(settings.load().autoMix)
+
+        val premium = app(fake, settings) { serverUrl = PremiumServer.ADDRESS; localAddress = fake.url }
+        assertTrue(premium.autoMix)
+        premium.changeAutoMix(false)
+        val reopened = app(fake, settings) { serverUrl = PremiumServer.ADDRESS; localAddress = fake.url }
+        assertTrue(reopened.autoMixAvailable)
+        assertFalse(reopened.autoMix)
+        assertFalse(reopened.crossfade)
+    }
 
     // --- search -----------------------------------------------------------------------
 

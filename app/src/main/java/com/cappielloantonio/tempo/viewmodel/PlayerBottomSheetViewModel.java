@@ -404,17 +404,6 @@ public class PlayerBottomSheetViewModel extends AndroidViewModel {
         return descriptionLiveData;
     }
 
-    /*
-     * A LiveData of its own for every request. This used to be one field shared
-     * by all of them, primed with an empty list and observed afresh on every
-     * tap: the empty list was enqueued as if it were the mix, and each earlier
-     * observer was still attached when the next answer came - the second tap
-     * queued the mix twice, the third three times.
-     */
-    public LiveData<List<Child>> getMediaInstantMix(Child media) {
-        return songRepository.getInstantMix(media.getId(), 20);
-    }
-
     public LiveData<PlayQueue> getPlayQueue() {
         return queueRepository.getPlayQueue();
     }

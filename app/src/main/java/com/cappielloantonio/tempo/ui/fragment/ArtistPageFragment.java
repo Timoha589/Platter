@@ -188,16 +188,7 @@ public class ArtistPageFragment extends Fragment implements ClickCallback {
             });
         });
 
-        bind.artistPageRadioButton.setOnClickListener(v -> {
-            artistPageViewModel.getArtistInstantMix().observe(getViewLifecycleOwner(), songs -> {
-                if (!songs.isEmpty()) {
-                    MediaManager.startQueue(mediaBrowserListenableFuture, songs, 0);
-                    activity.setBottomSheetInPeek(true);
-                } else {
-                    Toast.makeText(requireContext(), getString(R.string.artist_error_retrieving_radio), Toast.LENGTH_SHORT).show();
-                }
-            });
-        });
+        bind.artistPageRadioButton.setOnClickListener(v -> activity.playInstantMix(artistPageViewModel.getArtist().getId()));
     }
 
     private void initTopSongsView() {

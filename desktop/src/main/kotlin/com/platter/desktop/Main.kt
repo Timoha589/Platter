@@ -23,6 +23,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.log.AppLog
 import com.platter.desktop.ui.PlatterColors
+import com.platter.desktop.ui.isForegroundWindow
 import com.platter.desktop.ui.PlatterTheme
 import com.platter.desktop.ui.windowIcons
 import com.platter.desktop.ui.tintTitleBar
@@ -112,7 +113,9 @@ private fun runApp() = application {
     ) {
         // The title bar takes the colour of the app, once the window is there to be painted.
         LaunchedEffect(Unit) {
-            tintTitleBar(this@Window.window)
+            val ownWindow = this@Window.window
+            app.focusedEditor.windowMatches = { isForegroundWindow(ownWindow, it) }
+            tintTitleBar(ownWindow)
             this@Window.window.iconImages = windowIcons()
         }
         PlatterTheme {

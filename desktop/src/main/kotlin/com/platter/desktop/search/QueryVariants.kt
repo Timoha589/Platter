@@ -196,6 +196,13 @@ object QueryVariants {
         return letters > 0 && matching * 2 > letters
     }
 
+    /** Physical US and Russian keys, including their shifted characters, for editing the query. */
+    internal fun swapKeyboardLayout(text: String, toRussian: Boolean): String {
+        val us = LATIN_KEYS + "/QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>~?"
+        val ru = CYRILLIC_KEYS + ".ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮЁ,"
+        return if (toRussian) swapLayout(text, us, ru) else swapLayout(text, ru, us)
+    }
+
     private fun swapLayout(text: String, from: String, to: String): String =
         buildString(text.length) {
             for (c in text) {

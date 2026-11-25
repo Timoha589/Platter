@@ -3,6 +3,7 @@ package com.cappielloantonio.tempo.util;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -13,14 +14,19 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.animation.LinearInterpolator;
 import android.view.animation.PathInterpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
 import androidx.media3.common.Timeline;
+
+import com.cappielloantonio.tempo.helper.view.CoverStageLayout;
+import com.cappielloantonio.tempo.service.CoverTransition;
 
 import java.util.Objects;
 
@@ -69,6 +75,7 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
 
     private static final long COMMIT_DURATION = 240;
     private static final long RETURN_DURATION = 280;
+    private static final PathInterpolator PAGE_TURN_EASING = new PathInterpolator(0.42f, 0f, 0.58f, 1f);
 
     /**
      * How long after the last page lands the player is told where to go. Set to
@@ -102,6 +109,10 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
          * The gesture has been claimed as a sideways drag.
          */
         void onDragStart();
+    }
+
+    public interface OverlayTurn {
+        void render(@NonNull View outgoing, @NonNull View incoming, long token, float progress);
     }
 
     private final ViewGroup strip;
@@ -167,6 +178,16 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
      */
     @Nullable
     private Runnable pendingEnd;
+
+    private int fastTurnDirection;
+    private float fastTurnProgress;
+    @Nullable
+    private CoverStageLayout coverStage;
+    private long playbackToken;
+    private boolean playbackTurn;
+    private float playbackProgress;
+    @Nullable
+    private OverlayTurn playbackOverlay;
 
     /**
      * A queue change that arrived mid-drag. Redrawing under a finger that is
@@ -239,8 +260,14 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
         // the outline the clip is taken from is rebuilt against the new size.
         strip.addOnLayoutChangeListener((view, l, t, r, b, oldL, oldT, oldR, oldB) -> {
             if (clipToStrip) strip.invalidateOutline();
-            if (!dragging && animator == null) applyOffset();
+            if (playbackTurn) applyPlaybackTurn();
+            else if (coverStage != null && fastTurnDirection != 0) applyCoverTurn(fastTurnDirection, fastTurnProgress);
+            else if (!dragging && animator == null) applyOffset();
         });
+    }
+
+    public void setCoverStage(@NonNull CoverStageLayout stage) {
+        coverStage = stage;
     }
 
     /**
@@ -249,6 +276,7 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
      * screen at all.
      */
     public void bindAll() {
+        finishPlaybackTurn();
         finishAnimation();
 
         offset = 0;
@@ -269,13 +297,22 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
         bindSlot(2, neighbourIndex(shown[1], 1));
     }
 
-    /**
-     * Brings the strip back in line with the player. Called for every change the
-     * player reports: the page turn is played out when the queue moved to a
-     * track already parked beside the middle one, and the strip is redrawn
-     * outright when it went somewhere else.
-     */
-    public void sync() {
+    /** The service reserves its next cover while it buffers and verifies the overlap. */
+    public void syncCover(@Nullable CoverTransition transition, @NonNull OverlayTurn dissolve, @Nullable OverlayTurn slide) {
+        Player player = callback.player();
+        MediaItem item = player != null ? player.getCurrentMediaItem() : null;
+        if (transition != null && item != null && player.getCurrentMediaItemIndex() == transition.getToIndex()
+                && item.mediaId.equals(transition.getToId())) {
+            CoverTransition.Mode mode = transition.getMode();
+            if (mode == CoverTransition.Mode.PENDING) return;
+            if (mode == CoverTransition.Mode.FAST_SLIDE) sync();
+            else syncPlaybackTurn(transition, mode == CoverTransition.Mode.DISSOLVE ? dissolve : slide);
+            return;
+        }
+        sync();
+    }
+
+    private void sync() {
         forgetAbandonedGesture();
 
         // The strip is ahead of the player on purpose. It will be caught up with
@@ -295,6 +332,9 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
             return;
         }
 
+        finishPlaybackTurn();
+        int index = currentIndex();
+        if (fastTurnDirection != 0 && isShowing(fastTurnDirection > 0 ? 2 : 0, index)) return;
         finishAnimation();
 
         /*
@@ -309,8 +349,6 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
             return;
         }
 
-        int index = currentIndex();
-
         if (isShowing(1, index)) {
             bindNeighbours();
             return;
@@ -322,16 +360,112 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
         else if (isShowing(0, index)) step = -1;
 
         if (step == 0) {
-            bindAll();
-            return;
+            if (index == NO_TRACK || shown[1] == NO_TRACK) {
+                bindAll();
+                return;
+            }
+            step = index < shown[1] ? -1 : 1;
+            bindSlot(step > 0 ? 2 : 0, index);
         }
 
         final int direction = step;
-
-        animateTo(-direction * pageWidth(), COMMIT_DURATION, () -> {
+        fastTurnDirection = direction;
+        Runnable settle = () -> {
+            fastTurnDirection = 0;
             rotate(direction);
             bindNeighbours();
+        };
+        if (coverStage == null) {
+            animateTo(-direction * pageWidth(), COMMIT_DURATION, settle);
+            return;
+        }
+
+        slots[direction > 0 ? 2 : 0].bringToFront();
+        fastTurnProgress = 0f;
+        ValueAnimator running = ValueAnimator.ofFloat(0f, 1f);
+        running.setInterpolator(new LinearInterpolator());
+        running.addUpdateListener(value -> {
+            fastTurnProgress = (float) value.getAnimatedValue();
+            applyCoverTurn(direction, fastTurnProgress);
         });
+        startAnimation(running, CoverStageLayout.TURN_DURATION_MS, settle);
+    }
+
+    /**
+     * Drives the already-loaded covers directly from the overlap sampled by the audio player.
+     * A horizontal gesture can take over at any point, so a finished token is never replayed.
+     */
+    private void syncPlaybackTurn(@NonNull CoverTransition transition, @Nullable OverlayTurn overlay) {
+        forgetAbandonedGesture();
+        if (pendingSeekIndex != NO_TRACK) return;
+        if (dragging) {
+            if (!isShowing(1, currentIndex())) syncPending = true;
+            return;
+        }
+        if (transition.getToken() != playbackToken) {
+            finishPlaybackTurn();
+            finishAnimation();
+            playbackToken = transition.getToken();
+            int index = currentIndex();
+            int fromIndex = transition.getFromIndex();
+            if (fromIndex == index || !Objects.equals(transition.getFromId(), mediaIdAt(fromIndex)) ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ValueAnimator.areAnimatorsEnabled())) {
+                bindAll();
+                return;
+            }
+            if (!isShowing(1, fromIndex)) {
+                bindSlot(1, fromIndex);
+                bindNeighbours();
+            }
+            if (!isShowing(2, index)) bindSlot(2, index);
+            playbackTurn = true;
+            playbackOverlay = overlay;
+            if (overlay != null) slots[1].bringToFront();
+            else if (coverStage != null) slots[2].bringToFront();
+        }
+
+        if (!playbackTurn) return;
+        float progress = transition.getProgress();
+        if (progress >= 1f) {
+            finishPlaybackTurn();
+        } else {
+            playbackProgress = coverStage == null && transition.getMode() == CoverTransition.Mode.SLIDE
+                    ? PAGE_TURN_EASING.getInterpolation(progress) : progress;
+            applyPlaybackTurn();
+        }
+    }
+
+    private void applyPlaybackTurn() {
+        if (playbackOverlay == null) {
+            if (coverStage != null) applyCoverTurn(1, playbackProgress);
+            else {
+                offset = -pageWidth() * playbackProgress;
+                applyOffset();
+            }
+            return;
+        }
+        slots[0].setAlpha(0f);
+        slots[1].setTranslationX(0f);
+        slots[2].setTranslationX(0f);
+        slots[2].setAlpha(1f);
+        playbackOverlay.render(slots[1], slots[2], playbackToken, playbackProgress);
+    }
+
+    private void applyCoverTurn(int direction, float progress) {
+        int next = direction > 0 ? 2 : 0;
+        slots[2 - next].setAlpha(0f);
+        coverStage.renderTurn(strip, slots[1], slots[next], direction, progress);
+    }
+
+    private void finishPlaybackTurn() {
+        if (!playbackTurn) return;
+        playbackTurn = false;
+        if (playbackOverlay != null) {
+            playbackOverlay.render(slots[1], slots[2], playbackToken, 1f);
+            playbackOverlay = null;
+        }
+        rotate(1);
+        bindNeighbours();
     }
 
     /**
@@ -355,6 +489,8 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
      * reason to lose it.
      */
     public void cancel() {
+        finishPlaybackTurn();
+        playbackToken = 0;
         finishAnimation();
         releaseVelocityTracker();
         dragging = false;
@@ -403,6 +539,8 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
                     }
 
                     dragging = true;
+
+                    finishPlaybackTurn();
 
                     // Count from where the drag was recognised, so the artwork
                     // does not jump a slop's worth on the first frame.
@@ -580,6 +718,10 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
 
         for (int i = 0; i < slots.length; i++) {
             slots[i].setTranslationX((i - 1) * page + offset);
+            if (coverStage != null) {
+                slots[i].setScaleX(1f);
+                slots[i].setScaleY(1f);
+            }
 
             /*
              * A neighbour is parked a page away, which is off the screen only
@@ -588,7 +730,7 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
              * showing beside the cover. Neighbours are there to be dragged in,
              * so at rest they are not drawn.
              */
-            if (i != 1) slots[i].setAlpha(offset == 0f ? 0f : 1f);
+            slots[i].setAlpha(i == 1 || offset != 0f ? 1f : 0f);
         }
     }
 
@@ -684,15 +826,18 @@ public class TrackSwipeCarousel implements View.OnTouchListener {
     /* ------------------------------------------------------------------ */
 
     private void animateTo(float target, long duration, @Nullable Runnable end) {
-        pendingEnd = end;
-
         ValueAnimator running = ValueAnimator.ofFloat(offset, target);
-        running.setDuration(duration);
-        running.setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f));
+        running.setInterpolator(PAGE_TURN_EASING);
         running.addUpdateListener(animation -> {
             offset = (float) animation.getAnimatedValue();
             applyOffset();
         });
+        startAnimation(running, duration, end);
+    }
+
+    private void startAnimation(@NonNull ValueAnimator running, long duration, @Nullable Runnable end) {
+        pendingEnd = end;
+        running.setDuration(duration);
         running.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
