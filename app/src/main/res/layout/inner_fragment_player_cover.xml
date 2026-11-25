@@ -1,4 +1,4 @@
-<androidx.constraintlayout.widget.ConstraintLayout
+<com.cappielloantonio.tempo.helper.view.CoverStageLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -28,23 +28,23 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <com.google.android.material.imageview.ShapeableImageView
+        <com.cappielloantonio.tempo.helper.view.DissolvingCoverView
             android:id="@+id/now_playing_song_cover_previous"
             style="@style/Widget.Platter.Cover"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <com.google.android.material.imageview.ShapeableImageView
+        <com.cappielloantonio.tempo.helper.view.DissolvingCoverView
             android:id="@+id/now_playing_song_cover_image_view"
             style="@style/Widget.Platter.Cover"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <com.google.android.material.imageview.ShapeableImageView
+        <com.cappielloantonio.tempo.helper.view.DissolvingCoverView
             android:id="@+id/now_playing_song_cover_next"
             style="@style/Widget.Platter.Cover"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
     </FrameLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+</com.cappielloantonio.tempo.helper.view.CoverStageLayout>

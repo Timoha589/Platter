@@ -5,7 +5,6 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.cappielloantonio.tempo.App;
 import com.cappielloantonio.tempo.interfaces.DecadesCallback;
-import com.cappielloantonio.tempo.interfaces.MediaCallback;
 import com.cappielloantonio.tempo.subsonic.base.ApiResponse;
 import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
 import com.cappielloantonio.tempo.subsonic.models.AlbumInfo;
@@ -184,31 +183,6 @@ public class AlbumRepository {
                 });
 
         return albumInfo;
-    }
-
-    public void getInstantMix(AlbumID3 album, int count, MediaCallback callback) {
-        App.getSubsonicClientInstance(false)
-                .getBrowsingClient()
-                .getSimilarSongs2(album.getId(), count)
-                .enqueue(new Callback<ApiResponse>() {
-                    @Override
-                    public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
-                        List<Child> songs = new ArrayList<>();
-                        SubsonicResponse body = ResponseUtil.body(response);
-
-                        // An album with nothing similar has a similarSongs2 but no song list; addAll(null) threw.
-                        if (body != null && body.getSimilarSongs2() != null && body.getSimilarSongs2().getSongs() != null) {
-                            songs.addAll(body.getSimilarSongs2().getSongs());
-                        }
-
-                        callback.onLoadMedia(songs);
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
-                        callback.onLoadMedia(new ArrayList<>());
-                    }
-                });
     }
 
     /*

@@ -30,19 +30,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.platter.automix.AutoMixPlanner.MAX_CROSSFADE_SECONDS
+import com.platter.automix.AutoMixPlanner.MIN_CROSSFADE_SECONDS
 import com.platter.desktop.AppController
 import com.platter.desktop.AppDialog
 import com.platter.desktop.DeemixStatus
@@ -54,6 +61,7 @@ import com.platter.desktop.ui.PlatterShapes
 import com.platter.desktop.ui.PlatterSpacing
 import com.platter.desktop.ui.PrimaryPill
 import com.platter.desktop.ui.TextInput
+import kotlin.math.roundToInt
 
 /** The bitrate caps offered, in kbps; 0 is the file as stored. */
 private val BITRATES = listOf(0, 320, 256, 192, 128, 96)
@@ -122,6 +130,14 @@ fun SettingsScreen(app: AppController) {
             }
             Setting(t("Crossfade"), t("The end of a track overlaps with the start of the next. Not applied between consecutive tracks of the same album.")) {
                 Toggle(app.crossfade) { app.changeCrossfade(it) }
+            }
+            if (app.crossfade) {
+                CrossfadeDuration(app.crossfadeDurationSeconds, app::changeCrossfadeDuration)
+            }
+            if (app.autoMixAvailable) {
+                Setting(t("AutoMix"), t("Use song structure and rhythm when analysis is available. Other tracks use the usual crossfade.")) {
+                    Toggle(app.autoMix) { app.changeAutoMix(it) }
+                }
             }
             Setting(t("Equalizer"), t("Shape the sound with ten bands.")) {
                 OutlinedPill(if (app.equalizer.enabled) t("Equalizer: on…") else t("Equalizer…")) { app.dialog = AppDialog.Equalizer }
@@ -230,6 +246,29 @@ fun SettingsScreen(app: AppController) {
             Setting(t("Source code"), REPOSITORY) {
                 OutlinedPill(t("Open on GitHub")) { openInBrowser(REPOSITORY) }
             }
+        }
+    }
+}
+
+@Composable
+private fun CrossfadeDuration(seconds: Int, onChange: (Int) -> Unit) {
+    var selected by remember(seconds) { mutableIntStateOf(seconds) }
+    val title = t("Crossfade duration")
+    val value = t("%d s", selected)
+    Setting(title) {
+        Row(Modifier.width(220.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Slider(
+                value = selected.toFloat(),
+                onValueChange = { selected = it.roundToInt() },
+                onValueChangeFinished = { onChange(selected) },
+                valueRange = MIN_CROSSFADE_SECONDS.toFloat()..MAX_CROSSFADE_SECONDS.toFloat(),
+                steps = MAX_CROSSFADE_SECONDS - MIN_CROSSFADE_SECONDS - 1,
+                modifier = Modifier.weight(1f).semantics {
+                    contentDescription = title
+                    stateDescription = value
+                },
+            )
+            Text(value, Modifier.widthIn(min = 32.dp), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

@@ -229,11 +229,6 @@
     <string name="server_signup_dialog_neutral_button">删除</string>
     <string name="server_signup_dialog_positive_button">保存</string>
     <string name="server_signup_dialog_title">添加服务器</string>
-    <string name="server_unreachable_dialog_negative_button">取消</string>
-    <string name="server_unreachable_dialog_neutral_button">前往登录</string>
-    <string name="server_unreachable_dialog_positive_button">仍然继续</string>
-    <string name="server_unreachable_dialog_summary">请求的服务器不可用。 如果您选择继续，此对话框在接下来的一个小时内将不会再次出现。</string>
-    <string name="server_unreachable_dialog_title">服务器无法访问</string>
     <string name="settings_about_summary">Platter 是 Subsonic 的开源轻量级音乐客户端，专为 Android 设计和构建。</string>
     <string name="settings_about_title">关于</string>
     <string name="settings_always_on_display">保持屏幕常亮</string>
@@ -295,6 +290,9 @@
     <string name="settings_title_replay_gain">播放增益</string>
     <string name="settings_crossfade_title">淡入淡出</string>
     <string name="settings_crossfade_summary">一首歌的结尾与下一首的开头重叠。同一专辑中相邻的曲目之间不适用。</string>
+    <string name="settings_crossfade_duration_title">淡入淡出时长（秒）</string>
+    <string name="settings_auto_mix_title">自动混音</string>
+    <string name="settings_auto_mix_summary">根据服务器的曲目分析选择过渡位置，并同步相容的节拍。</string>
     <string name="settings_bluetooth_resume_title">蓝牙重新连接时继续播放</string>
     <string name="settings_bluetooth_resume_summary">如果蓝牙设备（例如车载音响）断开导致播放暂停，该设备重新连接后将继续播放，即使屏幕已关闭。</string>
     <string name="settings_title_scrobble">音乐记录</string>
@@ -410,4 +408,5 @@
     <string name="eq_preset_name">预设名称</string>
     <string name="eq_save">保存</string>
     <string name="eq_delete_preset">删除预设 %1$s</string>
+    <string name="instant_mix_loading">正在查找相似曲目…</string>
 </resources>

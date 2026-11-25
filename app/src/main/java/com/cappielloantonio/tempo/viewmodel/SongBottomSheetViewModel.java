@@ -15,7 +15,6 @@ import com.cappielloantonio.tempo.repository.ArtistRepository;
 import com.cappielloantonio.tempo.repository.FavoriteRepository;
 import com.cappielloantonio.tempo.repository.PlaylistRepository;
 import com.cappielloantonio.tempo.repository.SharingRepository;
-import com.cappielloantonio.tempo.repository.SongRepository;
 import com.cappielloantonio.tempo.service.LikedTracksCache;
 import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
@@ -29,7 +28,6 @@ import java.util.List;
 
 @UnstableApi
 public class SongBottomSheetViewModel extends AndroidViewModel {
-    private final SongRepository songRepository;
     private final AlbumRepository albumRepository;
     private final ArtistRepository artistRepository;
     private final FavoriteRepository favoriteRepository;
@@ -42,7 +40,6 @@ public class SongBottomSheetViewModel extends AndroidViewModel {
     public SongBottomSheetViewModel(@NonNull Application application) {
         super(application);
 
-        songRepository = new SongRepository();
         albumRepository = new AlbumRepository();
         artistRepository = new ArtistRepository();
         favoriteRepository = new FavoriteRepository();
@@ -122,11 +119,6 @@ public class SongBottomSheetViewModel extends AndroidViewModel {
 
     public LiveData<ArtistID3> getArtist() {
         return artistRepository.getArtist(song.getArtistId());
-    }
-
-    /* One LiveData per request - see PlayerBottomSheetViewModel.getMediaInstantMix(). */
-    public LiveData<List<Child>> getInstantMix(Child media) {
-        return songRepository.getInstantMix(media.getId(), 20);
     }
 
     public MutableLiveData<Share> shareTrack() {

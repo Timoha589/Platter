@@ -96,6 +96,7 @@ class RemoteControl(private val app: AppController, private val file: Path) {
             "pid" to ProcessHandle.current().pid(),
             "version" to app.version,
             "api" to API_VERSION,
+            "focusedEditor" to 1,
         )
         val tmp = file.resolveSibling(file.fileName.toString() + ".tmp")
         Files.writeString(tmp, gson.toJson(info))
@@ -169,6 +170,10 @@ class RemoteControl(private val app: AppController, private val file: Path) {
 class Args(private val o: JsonObject) {
     fun string(name: String): String? =
         o.get(name)?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun rawString(name: String): String? = o.get(name)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString
+
+    fun long(name: String): Long? = string(name)?.toLongOrNull()
 
     fun double(name: String): Double? = string(name)?.toDoubleOrNull()
 

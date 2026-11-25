@@ -3,9 +3,6 @@ package com.cappielloantonio.tempo.ui.fragment;
 import android.animation.ValueAnimator;
 import android.content.ComponentName;
 import android.content.res.ColorStateList;
-import android.graphics.Bitmap;
-import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,10 +17,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.constraintlayout.widget.Guideline;
-import androidx.core.content.ContextCompat;
-import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
@@ -36,14 +32,13 @@ import androidx.navigation.fragment.NavHostFragment;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.request.target.CustomTarget;
-import com.bumptech.glide.request.transition.Transition;
 import com.cappielloantonio.tempo.R;
 import com.cappielloantonio.tempo.databinding.InnerFragmentPlayerControllerBinding;
-import com.cappielloantonio.tempo.glide.CustomGlideRequest;
+import com.cappielloantonio.tempo.helper.view.AutoMixTimeBar;
+import com.cappielloantonio.tempo.helper.view.PlayerGradient;
 import com.cappielloantonio.tempo.model.Download;
-import com.cappielloantonio.tempo.service.MediaManager;
+import com.cappielloantonio.tempo.service.AutoMixTimeline;
+import com.cappielloantonio.tempo.service.CoverTransition;
 import com.cappielloantonio.tempo.service.MediaService;
 import com.cappielloantonio.tempo.subsonic.models.AlbumID3;
 import com.cappielloantonio.tempo.subsonic.models.ArtistID3;
@@ -66,11 +61,10 @@ import com.cappielloantonio.tempo.util.Preferences;
 import com.cappielloantonio.tempo.viewmodel.PlayerBottomSheetViewModel;
 import com.cappielloantonio.tempo.helper.view.LikeAnimation;
 import com.google.android.material.chip.Chip;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
-import java.util.List;
+import java.util.Collections;
 import java.util.Objects;
 
 @UnstableApi
@@ -96,6 +90,8 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
     private ImageButton playerInstantMixButton;
     private ImageButton playerLyricsToggleButton;
     private ImageButton playerPlayPauseButton;
+    private AutoMixTimeBar timeBar;
+    private View autoMixLabel;
 
     private MainActivity activity;
     private PlayerBottomSheetViewModel playerBottomSheetViewModel;
@@ -104,27 +100,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
     /** What is playing, as the player knows it: the more sheet reads the title, the kind and the track info from it. */
     private MediaMetadata currentMetadata = MediaMetadata.EMPTY;
 
-    /*
-     * The player is painted with a slope between the two strongest colours of
-     * the artwork, from its top left corner to its bottom right one, falling off
-     * into the canvas black so the transport controls at the foot keep the
-     * contrast they were designed against - the same background the desktop
-     * player has. Both the drawable and the two colours it is currently showing
-     * are held so a track change can be tweened rather than cut.
-     */
-    private static final long BACKGROUND_DURATION = 800;
-
-    private GradientDrawable playerBackground;
-    private ValueAnimator playerBackgroundAnimator;
-    @ColorInt
-    private int playerBackgroundFirst;
-    @ColorInt
-    private int playerBackgroundSecond;
-    @ColorInt
-    private int playerBackgroundFirstTarget;
-    @ColorInt
-    private int playerBackgroundSecondTarget;
-    private CustomTarget<Bitmap> coverColorTarget;
+    private PlayerGradient playerGradient;
 
     /*
      * Landscape only. Without the words the player and the cover are a pair,
@@ -162,7 +138,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
 
         init();
         initLandscapePair();
-        initPlayerBackground();
+        playerGradient = new PlayerGradient(view, Glide.with(this), this::setPlayPauseTint);
         initQuickActionView();
         initCoverLyricsSlideView();
         initMediaListenable();
@@ -170,6 +146,20 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         initArtistLabelButton();
 
         return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        AutoMixTimeline.updates().observe(getViewLifecycleOwner(), this::showMixTimeline);
+        CoverTransition.updates().observe(getViewLifecycleOwner(), overlap -> {
+            if (bind == null) return;
+            Player player = bind.nowPlayingMediaControllerView.getPlayer();
+            if (player != null) {
+                playerGradient.updateOverlap(player, overlap);
+                showAutoMixLabel(player, overlap);
+            }
+        });
     }
 
     @Override
@@ -189,22 +179,22 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
     public void onDestroyView() {
         super.onDestroyView();
 
-        if (playerBackgroundAnimator != null) {
-            playerBackgroundAnimator.cancel();
-            playerBackgroundAnimator = null;
-        }
+        playerGradient.dispose();
+        playerGradient = null;
 
         if (slideAnimator != null) {
             slideAnimator.cancel();
             slideAnimator = null;
         }
 
-        coverColorTarget = null;
-
+        timeBar = null;
+        autoMixLabel = null;
         bind = null;
     }
 
     private void init() {
+        timeBar = bind.getRoot().findViewById(R.id.exo_progress);
+        autoMixLabel = bind.getRoot().findViewById(R.id.player_auto_mix_label);
         playerMediaCoverViewPager = bind.getRoot().findViewById(R.id.player_media_cover_view_pager);
         buttonFavorite = bind.getRoot().findViewById(R.id.button_favorite);
         playerMediaTitleLabel = bind.getRoot().findViewById(R.id.player_media_title_label);
@@ -276,18 +266,6 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         playerLyricsToggleButton.setContentDescription(getString(showingLyrics ? R.string.player_cover_toggle_button : R.string.player_lyrics_toggle_button));
     }
 
-    private void initPlayerBackground() {
-        playerBackgroundFirst = playerBackgroundFirstTarget = ContextCompat.getColor(requireContext(), R.color.steel);
-        playerBackgroundSecond = playerBackgroundSecondTarget = ContextCompat.getColor(requireContext(), R.color.iron);
-        playerBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR, gradientFor(playerBackgroundFirst, playerBackgroundSecond));
-        playerBackground.setGradientType(GradientDrawable.LINEAR_GRADIENT);
-        // Colours this dark and a slope this long change by a level every few pixels: dithered, the steps are noise, not stripes.
-        playerBackground.setDither(true);
-
-        bind.getRoot().setBackground(playerBackground);
-        setPlayPauseTint(playerBackgroundFirst);
-    }
-
     /**
      * Landscape draws the play button without the white disc, so there is no
      * background there to tint and the call is a no-op by design.
@@ -298,101 +276,23 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         playerPlayPauseButton.setBackgroundTintList(ColorStateList.valueOf(CoverColorUtil.toAccentTint(tint)));
     }
 
-    private int[] gradientFor(@ColorInt int first, @ColorInt int second) {
-        int canvas = ContextCompat.getColor(requireContext(), R.color.void_black);
-        return new int[]{first, second, ColorUtils.blendARGB(second, canvas, 0.7f)};
-    }
-
-    /**
-     * Pulls the artwork down to a thumbnail purely to count its colours - the
-     * player only needs two out of it, and the full-size cover is already being
-     * decoded for the cover page.
-     */
-    private void setBackgroundFromCover(MediaMetadata mediaMetadata) {
-        String coverArtId = mediaMetadata.extras != null ? mediaMetadata.extras.getString("coverArtId") : null;
-        Object cover = CustomGlideRequest.coverModel(requireContext(), coverArtId, !Preferences.isDataSavingMode());
-
-        if (cover == null) {
-            animateBackground(ContextCompat.getColor(requireContext(), R.color.steel), ContextCompat.getColor(requireContext(), R.color.iron));
-            return;
-        }
-
-        if (coverColorTarget != null) Glide.with(this).clear(coverColorTarget);
-
-        coverColorTarget = new CustomTarget<Bitmap>() {
-            @Override
-            public void onResourceReady(@NonNull Bitmap resource, @Nullable Transition<? super Bitmap> transition) {
-                if (bind == null) return;
-
-                int[] palette = CoverColorUtil.palette(
-                        resource,
-                        ContextCompat.getColor(requireContext(), R.color.steel),
-                        ContextCompat.getColor(requireContext(), R.color.iron)
-                );
-                animateBackground(palette[0], palette[1]);
-            }
-
-            @Override
-            public void onLoadFailed(@Nullable Drawable errorDrawable) {
-                if (bind == null) return;
-                animateBackground(ContextCompat.getColor(requireContext(), R.color.steel), ContextCompat.getColor(requireContext(), R.color.iron));
-            }
-
-            @Override
-            public void onLoadCleared(@Nullable Drawable placeholder) {
-            }
-        };
-
-        Glide.with(this)
-                .asBitmap()
-                .load(cover)
-                .dontTransform()
-                .override(64, 64)
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .into(coverColorTarget);
-    }
-
-    private void animateBackground(@ColorInt int first, @ColorInt int second) {
-        if (playerBackground == null) return;
-        if (first == playerBackgroundFirstTarget && second == playerBackgroundSecondTarget) return;
-
-        if (playerBackgroundAnimator != null) playerBackgroundAnimator.cancel();
-
-        playerBackgroundFirstTarget = first;
-        playerBackgroundSecondTarget = second;
-
-        // Both colours turn over together, from wherever the last turn had got to.
-        final int fromFirst = playerBackgroundFirst;
-        final int fromSecond = playerBackgroundSecond;
-
-        playerBackgroundAnimator = ValueAnimator.ofFloat(0f, 1f);
-        playerBackgroundAnimator.setDuration(BACKGROUND_DURATION);
-        playerBackgroundAnimator.setInterpolator(new FastOutSlowInInterpolator());
-        playerBackgroundAnimator.addUpdateListener(animation -> {
-            if (playerBackground == null) return;
-
-            float fraction = (float) animation.getAnimatedValue();
-            playerBackgroundFirst = ColorUtils.blendARGB(fromFirst, first, fraction);
-            playerBackgroundSecond = ColorUtils.blendARGB(fromSecond, second, fraction);
-
-            playerBackground.setColors(gradientFor(playerBackgroundFirst, playerBackgroundSecond));
-            setPlayPauseTint(playerBackgroundFirst);
-        });
-        playerBackgroundAnimator.start();
-    }
-
     private void initializeBrowser() {
         mediaBrowserListenableFuture = new MediaBrowser.Builder(requireContext(), new SessionToken(requireContext(), new ComponentName(requireContext(), MediaService.class))).buildAsync();
     }
 
     private void releaseBrowser() {
-        MediaBrowser.releaseFuture(mediaBrowserListenableFuture);
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        mediaBrowserListenableFuture = null;
+        if (bind != null) bind.nowPlayingMediaControllerView.setPlayer(null);
+        if (future != null) MediaBrowser.releaseFuture(future);
     }
 
     private void bindMediaController() {
-        mediaBrowserListenableFuture.addListener(() -> {
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        future.addListener(() -> {
+            if (future != mediaBrowserListenableFuture || bind == null) return;
             try {
-                MediaBrowser mediaBrowser = mediaBrowserListenableFuture.get();
+                MediaBrowser mediaBrowser = future.get();
 
                 bind.nowPlayingMediaControllerView.setPlayer(mediaBrowser);
 
@@ -407,17 +307,49 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         setMediaControllerUI(mediaBrowser);
         setMetadata(mediaBrowser.getMediaMetadata());
         setMediaInfo(mediaBrowser.getMediaMetadata());
-        setBackgroundFromCover(mediaBrowser.getMediaMetadata());
+        CoverTransition overlap = CoverTransition.updates().getValue();
+        playerGradient.updateTrack(mediaBrowser, overlap);
+        showAutoMixLabel(mediaBrowser, overlap);
+        showMixTimeline(AutoMixTimeline.updates().getValue());
 
         mediaBrowser.addListener(new Player.Listener() {
             @Override
+            public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
+                if (bind == null || bind.nowPlayingMediaControllerView.getPlayer() != player) return;
+                if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_TIMELINE_CHANGED)) {
+                    showMixTimeline(AutoMixTimeline.updates().getValue());
+                    showAutoMixLabel(player, CoverTransition.updates().getValue());
+                }
+                if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_MEDIA_METADATA_CHANGED,
+                        Player.EVENT_TIMELINE_CHANGED, Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED)) {
+                    playerGradient.updateTrack(player, CoverTransition.updates().getValue());
+                }
+            }
+
+            @Override
             public void onMediaMetadataChanged(@NonNull MediaMetadata mediaMetadata) {
+                if (bind == null || bind.nowPlayingMediaControllerView.getPlayer() != mediaBrowser) return;
                 setMediaControllerUI(mediaBrowser);
                 setMetadata(mediaMetadata);
                 setMediaInfo(mediaMetadata);
-                setBackgroundFromCover(mediaMetadata);
             }
         });
+    }
+
+    private void showAutoMixLabel(@NonNull Player player, @Nullable CoverTransition overlap) {
+        MediaItem item = player.getCurrentMediaItem();
+        boolean mixing = overlap != null && overlap.getMode() == CoverTransition.Mode.DISSOLVE && item != null
+                && player.getCurrentMediaItemIndex() == overlap.getToIndex() && item.mediaId.equals(overlap.getToId());
+        autoMixLabel.setVisibility(mixing ? View.VISIBLE : View.GONE);
+    }
+
+    private void showMixTimeline(@Nullable AutoMixTimeline.State state) {
+        if (bind == null || timeBar == null) return;
+        Player player = bind.nowPlayingMediaControllerView.getPlayer();
+        MediaItem item = player != null ? player.getCurrentMediaItem() : null;
+        timeBar.showMixSegments(state != null && item != null
+                ? state.segmentsFor(player.getCurrentMediaItemIndex(), item.mediaId)
+                : Collections.emptyList());
     }
 
     private void setMetadata(MediaMetadata mediaMetadata) {
@@ -476,7 +408,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.VISIBLE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.GONE);
                     playerInstantMixButton.setVisibility(View.GONE);
-                    setPlaybackParameters(mediaBrowser);
+                    refreshPlaybackSpeedControls();
                     break;
                 case Constants.MEDIA_TYPE_RADIO:
                     bind.getRoot().setShowShuffleButton(false);
@@ -489,7 +421,6 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.GONE);
                     playerInstantMixButton.setVisibility(View.GONE);
-                    setPlaybackParameters(mediaBrowser);
                     break;
                 case Constants.MEDIA_TYPE_MUSIC:
                 default:
@@ -503,7 +434,6 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                     bind.getRoot().findViewById(R.id.player_skip_silence_toggle_button).setVisibility(View.GONE);
                     bind.getRoot().findViewById(R.id.button_favorite).setVisibility(View.VISIBLE);
                     playerInstantMixButton.setVisibility(View.VISIBLE);
-                    resetPlaybackParameters(mediaBrowser);
                     break;
             }
         }
@@ -647,9 +577,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                     setRatingButtonsState(media);
                     LikeAnimation.play(buttonFavorite, media.getStarred() != null);
                 });
-                playerInstantMixButton.setOnClickListener(v -> playerBottomSheetViewModel
-                        .getMediaInstantMix(media)
-                        .observe(getViewLifecycleOwner(), this::answerInstantMix));
+                playerInstantMixButton.setOnClickListener(v -> activity.enqueueInstantMix(media));
                 buttonFavorite.setOnLongClickListener(v -> {
                     Bundle bundle = new Bundle();
                     bundle.putParcelable(Constants.TRACK_OBJECT, media);
@@ -727,9 +655,9 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                 if (media == null) return;
                 playerBottomSheetViewModel.setDislike(media);
                 setRatingButtonsState(media);
-                Snackbar.make(requireView(), PlayerBottomSheetViewModel.isDisliked(media)
+                activity.showFeedback(PlayerBottomSheetViewModel.isDisliked(media)
                         ? R.string.player_disliked
-                        : R.string.player_dislike_removed, Snackbar.LENGTH_SHORT).show();
+                        : R.string.player_dislike_removed);
                 break;
             case EQUALIZER:
                 EqualizerBottomSheetDialog.show(requireActivity().getSupportFragmentManager());
@@ -740,34 +668,13 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         }
     }
 
-    /**
-     * Puts the mix in after the current track, and says so. The queue is on the
-     * other page of the player, so without a word the tap looked like it had
-     * done nothing - and a failed or empty mix really had.
-     */
-    private void answerInstantMix(@Nullable List<Child> mix) {
-        if (getView() == null) return;
-
-        // null is a failed request, and nothing similar is nothing to add.
-        if (mix == null) {
-            Snackbar.make(requireView(), R.string.player_instant_mix_failed, Snackbar.LENGTH_SHORT).show();
-        } else if (mix.isEmpty()) {
-            Snackbar.make(requireView(), R.string.player_instant_mix_empty, Snackbar.LENGTH_SHORT).show();
-        } else {
-            MediaManager.enqueue(mediaBrowserListenableFuture, mix, true);
-            String added = getResources().getQuantityString(R.plurals.player_instant_mix_added, mix.size(), mix.size());
-            Snackbar.make(requireView(), added, Snackbar.LENGTH_SHORT).show();
-        }
-    }
-
     private void toggleDownload(Child media) {
         if (DownloadUtil.getDownloadTracker(requireContext()).isDownloaded(media.getId())) {
             DownloadUtil.getDownloadTracker(requireContext()).remove(MappingUtil.mapDownload(media), new Download(media));
-            Snackbar.make(requireView(), R.string.player_download_removed, Snackbar.LENGTH_SHORT).show();
+            activity.showFeedback(R.string.player_download_removed);
         } else {
-            // The download takes a while; the snackbar is what answers the tap.
             DownloadUtil.getDownloadTracker(requireContext()).download(MappingUtil.mapDownload(media), new Download(media));
-            Snackbar.make(requireView(), R.string.player_download_started, Snackbar.LENGTH_SHORT).show();
+            activity.showFeedback(R.string.player_download_started);
         }
     }
 
@@ -840,20 +747,15 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         fadeToPage(1);
     }
 
-    private void setPlaybackParameters(MediaBrowser mediaBrowser) {
+    private void refreshPlaybackSpeedControls() {
         Button playbackSpeedButton = bind.getRoot().findViewById(R.id.player_playback_speed_button);
         float currentSpeed = Preferences.getPlaybackSpeed();
         boolean skipSilence = Preferences.isSkipSilenceMode();
 
-        mediaBrowser.setPlaybackParameters(new PlaybackParameters(currentSpeed));
         playbackSpeedButton.setText(getString(R.string.player_playback_speed, currentSpeed));
 
         // TODO Skippare il silenzio
         skipSilenceToggleButton.setChecked(skipSilence);
     }
 
-    private void resetPlaybackParameters(MediaBrowser mediaBrowser) {
-        mediaBrowser.setPlaybackParameters(new PlaybackParameters(Constants.MEDIA_PLAYBACK_SPEED_100));
-        // TODO Resettare lo skip del silenzio
-    }
 }

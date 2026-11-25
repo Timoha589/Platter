@@ -12,11 +12,13 @@ import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.FragmentManager;
+import androidx.lifecycle.LiveData;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
@@ -28,13 +30,15 @@ import com.cappielloantonio.tempo.App;
 import com.cappielloantonio.tempo.R;
 import com.cappielloantonio.tempo.broadcast.receiver.ConnectivityStatusBroadcastReceiver;
 import com.cappielloantonio.tempo.databinding.ActivityMainBinding;
+import com.cappielloantonio.tempo.helper.view.FeedbackBanner;
 import com.cappielloantonio.tempo.helper.view.MiniPlayerClearance;
+import com.cappielloantonio.tempo.repository.SongRepository;
 import com.cappielloantonio.tempo.service.LikedTracksCache;
 import com.cappielloantonio.tempo.service.MediaManager;
+import com.cappielloantonio.tempo.subsonic.models.Child;
 import com.cappielloantonio.tempo.subsonic.models.SubsonicResponse;
 import com.cappielloantonio.tempo.ui.activity.base.BaseActivity;
 import com.cappielloantonio.tempo.ui.dialog.ConnectionAlertDialog;
-import com.cappielloantonio.tempo.ui.dialog.ServerUnreachableDialog;
 import com.cappielloantonio.tempo.ui.dialog.UpdateDialog;
 import com.cappielloantonio.tempo.ui.fragment.PlayerBottomSheetFragment;
 import com.cappielloantonio.tempo.update.AppUpdater;
@@ -47,8 +51,10 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.common.util.concurrent.MoreExecutors;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
 @UnstableApi
 public class MainActivity extends BaseActivity {
@@ -64,6 +70,9 @@ public class MainActivity extends BaseActivity {
     public NavController navController;
     private BottomSheetBehavior bottomSheetBehavior;
     private MiniPlayerClearance miniPlayerClearance;
+    private FeedbackBanner feedbackBanner;
+    private final SongRepository songRepository = new SongRepository();
+    private LiveData<List<Child>> instantMixRequest;
 
     /* A notification tap that arrived before there was a queue to show */
     private boolean openPlayerWhenQueueLoads;
@@ -79,6 +88,8 @@ public class MainActivity extends BaseActivity {
         bind = ActivityMainBinding.inflate(getLayoutInflater());
         View view = bind.getRoot();
         setContentView(view);
+        feedbackBanner = new FeedbackBanner(bind.feedbackBanner, bind.playerBottomSheet,
+                bind.bottomNavigation, () -> bottomSheetBehavior.getState());
 
         mainViewModel = new ViewModelProvider(this).get(MainViewModel.class);
 
@@ -168,9 +179,65 @@ public class MainActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        clearInstantMixRequest();
+        feedbackBanner.clear();
         super.onDestroy();
         connectivityStatusReceiverManager(false);
         bind = null;
+    }
+
+    public void playInstantMix(Child song) {
+        MediaManager.startQueue(getMediaBrowserListenableFuture(), song);
+        setBottomSheetInPeek(true);
+        enqueueInstantMix(song);
+    }
+
+    public void playInstantMix(String seedId) {
+        requestInstantMix(seedId, mix -> {
+            MediaManager.startQueue(getMediaBrowserListenableFuture(), mix, 0);
+            setBottomSheetInPeek(true);
+        });
+    }
+
+    public void enqueueInstantMix(Child song) {
+        requestInstantMix(song.getId(), mix -> MediaManager.enqueue(getMediaBrowserListenableFuture(), mix, true));
+    }
+
+    private void requestInstantMix(String seedId, Consumer<List<Child>> playMix) {
+        clearInstantMixRequest();
+        feedbackBanner.showLoading(getText(R.string.instant_mix_loading));
+
+        instantMixRequest = songRepository.getInstantMix(seedId, 20);
+        instantMixRequest.observe(this, mix -> {
+            instantMixRequest.removeObservers(this);
+            instantMixRequest = null;
+
+            CharSequence message;
+            if (mix == null) {
+                message = getText(R.string.player_instant_mix_failed);
+            } else if (mix.isEmpty()) {
+                message = getText(R.string.player_instant_mix_empty);
+            } else {
+                playMix.accept(mix);
+                message = getResources().getQuantityString(R.plurals.player_instant_mix_added, mix.size(), mix.size());
+            }
+            feedbackBanner.finishLoading(message);
+        });
+    }
+
+    private void clearInstantMixRequest() {
+        if (instantMixRequest != null) {
+            instantMixRequest.removeObservers(this);
+            instantMixRequest = null;
+        }
+    }
+
+    public void showFeedback(@StringRes int message) {
+        feedbackBanner.show(getText(message), 2200);
+    }
+
+    public void showFeedback(CharSequence message) {
+        feedbackBanner.show(message, 3500);
     }
 
     @Override
@@ -543,6 +610,8 @@ public class MainActivity extends BaseActivity {
     }
 
     public void quit() {
+        clearInstantMixRequest();
+        feedbackBanner.clear();
         resetUserSession();
         resetMusicSession();
         resetViewModel();
@@ -590,10 +659,7 @@ public class MainActivity extends BaseActivity {
     }
 
     /*
-     * First which address - the local one if the server has one and it answers
-     * - then the ping itself, on that address. The ping's failure is now only
-     * ever "the server is unreachable": choosing between addresses is
-     * ServerAddress's job, which also does it while the app is closed.
+     * ServerAddress selects the address before the ping checks the server's capabilities.
      */
     private void pingServer() {
         if (Preferences.getToken() == null) return;
@@ -602,12 +668,7 @@ public class MainActivity extends BaseActivity {
             if (isFinishing() || isDestroyed()) return;
 
             mainViewModel.ping().observe(this, subsonicResponse -> {
-                if (subsonicResponse == null) {
-                    if (Preferences.showServerUnreachableDialog()) {
-                        ServerUnreachableDialog dialog = new ServerUnreachableDialog();
-                        dialog.show(getSupportFragmentManager(), null);
-                    }
-                } else {
+                if (subsonicResponse != null) {
                     onServerReached(subsonicResponse);
                 }
             });

@@ -242,13 +242,14 @@
     <string name="player_download_removed">Загрузка удалена</string>
     <string name="player_download_started">Трек загружается</string>
     <plurals name="player_instant_mix_added">
-        <item quantity="one">Очередь обновлена: следом %d трек</item>
-        <item quantity="few">Очередь обновлена: следом %d трека</item>
-        <item quantity="many">Очередь обновлена: следом %d треков</item>
-        <item quantity="other">Очередь обновлена: следом %d трека</item>
+        <item quantity="one">В очередь добавлен %d трек</item>
+        <item quantity="few">В очередь добавлено %d трека</item>
+        <item quantity="many">В очередь добавлено %d треков</item>
+        <item quantity="other">В очередь добавлено %d трека</item>
     </plurals>
     <string name="player_instant_mix_empty">Похожих треков не нашлось</string>
     <string name="player_instant_mix_failed">Не удалось собрать микс</string>
+    <string name="instant_mix_loading">Подбираем похожие треки…</string>
     <string name="player_media_format_unknown">Неизвестный формат</string>
     <string name="player_media_transcoding">Перекодирование</string>
     <string name="player_media_transcoding_requested">запрошено</string>
@@ -342,11 +343,6 @@
     <string name="server_signup_dialog_neutral_button">Удалить</string>
     <string name="server_signup_dialog_positive_button">Сохранить</string>
     <string name="server_signup_dialog_title">Добавить сервер</string>
-    <string name="server_unreachable_dialog_negative_button">Отмена</string>
-    <string name="server_unreachable_dialog_neutral_button">Перейти к входу</string>
-    <string name="server_unreachable_dialog_positive_button">Продолжить в любом случае</string>
-    <string name="server_unreachable_dialog_summary">Запрошенный сервер недоступен. Если вы решите продолжить, это диалоговое окно не появится в течение следующего часа</string>
-    <string name="server_unreachable_dialog_title">Сервер недоступен</string>
     <string name="settings_about_summary">Platter — это лёгкий музыкальный клиент с открытым исходным кодом для Subsonic, разработанный специально для Android. Это форк приложения Tempo Антонио Каппиелло, распространяемый по лицензии GPL v3.</string>
     <string name="settings_about_title">О приложении</string>
     <string name="settings_always_on_display">Не выключать экран</string>
@@ -416,6 +412,9 @@
     <string name="settings_title_replay_gain">Усиление воспроизведения</string>
     <string name="settings_crossfade_title">Кроссфейд</string>
     <string name="settings_crossfade_summary">Конец трека накладывается на начало следующего. Между подряд идущими треками одного альбома не применяется.</string>
+    <string name="settings_crossfade_duration_title">Длительность кроссфейда (с)</string>
+    <string name="settings_auto_mix_title">Автомикс</string>
+    <string name="settings_auto_mix_summary">По разметке с сервера выбирает, где свести треки, и синхронизирует ритм, когда это возможно.</string>
     <string name="settings_bluetooth_resume_title">Продолжать при подключении Bluetooth</string>
     <string name="settings_bluetooth_resume_summary">Если отключившееся Bluetooth-устройство, например магнитола в машине, поставило музыку на паузу, при его повторном подключении воспроизведение продолжится, даже с выключенным экраном.</string>
     <string name="settings_title_scrobble">Скробблинг</string>

@@ -10,7 +10,22 @@
             android:key="crossfade"
             android:title="@string/settings_crossfade_title"
             android:summary="@string/settings_crossfade_summary"
-            android:defaultValue="true" />
+            app:persistent="false" />
+
+        <SeekBarPreference
+            android:key="crossfade_duration"
+            android:title="@string/settings_crossfade_duration_title"
+            android:defaultValue="6"
+            android:max="10"
+            app:min="1"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="auto_mix"
+            android:title="@string/settings_auto_mix_title"
+            android:summary="@string/settings_auto_mix_summary"
+            app:persistent="false" />
 
         <SwitchPreferenceCompat
             android:key="bluetooth_resume"

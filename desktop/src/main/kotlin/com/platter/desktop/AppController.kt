@@ -6,9 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import com.platter.automix.AutoMixPlanner
 import com.platter.desktop.api.Album
 import com.platter.desktop.api.Artist
 import com.platter.desktop.api.ArtistCredit
+import com.platter.desktop.api.AutoMixSource
 import com.platter.desktop.api.NavidromeClient
 import com.platter.desktop.api.Playlist
 import com.platter.desktop.api.PodcastChannel
@@ -19,6 +22,7 @@ import com.platter.desktop.api.SubsonicException
 import com.platter.desktop.api.SearchResult
 import com.platter.desktop.api.Song
 import com.platter.desktop.api.SongLyrics
+import com.platter.desktop.api.TrackStructure
 import com.platter.desktop.api.SubsonicClient
 import com.platter.desktop.data.PendingScrobbles
 import com.platter.desktop.data.SavedQueue
@@ -47,6 +51,7 @@ import com.platter.desktop.data.Secrets
 import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.log.AppLog
 import com.platter.desktop.player.PlayerController
+import com.platter.desktop.player.TransitionMode
 import com.platter.desktop.player.mediaLocation
 import com.platter.desktop.remote.RemoteControl
 import com.platter.desktop.search.FuzzyIndex
@@ -55,6 +60,7 @@ import com.platter.desktop.search.RankedResults
 import com.platter.desktop.search.SearchEngine
 import com.platter.desktop.search.TrackCatalogue
 import com.platter.search.TrackSearch
+import com.platter.desktop.wave.PremiumServer
 import com.platter.desktop.wave.WaveClient
 import com.platter.desktop.wave.WaveController
 import com.platter.desktop.wave.WaveLyrics
@@ -65,6 +71,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -302,6 +309,7 @@ class AppController(
     val scrollMemory = com.platter.desktop.ui.ScrollMemory()
 
     var searchQuery by mutableStateOf("")
+    internal val focusedEditor = com.platter.desktop.ui.FocusedEditor()
 
     /** The panel on the right; what was open when the app was closed is open again. */
     private var shownPanel by mutableStateOf(SidePanel.entries.firstOrNull { it.name == saved.sidePanel })
@@ -367,7 +375,20 @@ class AppController(
         private set
     var equalizerButton by mutableStateOf(saved.equalizerButton)
         private set
-    var crossfade by mutableStateOf(saved.crossfade)
+    val autoMixAvailable: Boolean get() = client != null && PremiumServer.isPremium(serverUrl)
+    private var crossfadeEnabled by mutableStateOf(saved.crossfade)
+    private var autoMixEnabled by mutableStateOf(saved.autoMix)
+    private val transitionMode: TransitionMode
+        get() = when {
+            autoMixAvailable && autoMixEnabled -> TransitionMode.AutoMix
+            crossfadeEnabled -> TransitionMode.Crossfade
+            else -> TransitionMode.Off
+        }
+    val crossfade: Boolean get() = transitionMode == TransitionMode.Crossfade
+    val autoMix: Boolean get() = transitionMode == TransitionMode.AutoMix
+    var crossfadeDurationSeconds by mutableStateOf(saved.crossfadeDurationSeconds.coerceIn(
+        AutoMixPlanner.MIN_CROSSFADE_SECONDS, AutoMixPlanner.MAX_CROSSFADE_SECONDS,
+    ))
         private set
     var maxBitrate by mutableStateOf(saved.maxBitrate)
         private set
@@ -504,7 +525,8 @@ class AppController(
         },
         initialVolume = saved.volume,
         initialEqualizer = EqSettings(saved.eqEnabled, saved.eqPreamp, saved.eqBands),
-        initialCrossfade = saved.crossfade,
+        initialTransitionMode = transitionMode,
+        initialCrossfadeDurationMs = crossfadeDurationSeconds * 1_000L,
         vlcArgs = vlcArgs + replayGainArgs(saved.replayGain),
     )
 
@@ -772,6 +794,7 @@ class AppController(
         serverUrl = signedIn.credentials.serverUrl
         usingLocal = false
         client = signedIn
+        player.setTransitionMode(transitionMode)
         ahead = emptyList()
         stack = listOf(Screen.Home)
         scrollMemory.forgetFrom(0)
@@ -809,6 +832,7 @@ class AppController(
         }
         password = null
         client = null
+        player.setTransitionMode(transitionMode)
         savedQueue.clear()
         waveClient = null
         waveError = null
@@ -1500,9 +1524,32 @@ class AppController(
     }
 
     fun changeCrossfade(on: Boolean) {
-        crossfade = on
-        player.setCrossfade(on)
-        store.update { crossfade = on }
+        if (on || crossfade) changeTransitionMode(if (on) TransitionMode.Crossfade else TransitionMode.Off)
+    }
+
+    fun changeCrossfadeDuration(seconds: Int) {
+        val duration = seconds.coerceIn(AutoMixPlanner.MIN_CROSSFADE_SECONDS, AutoMixPlanner.MAX_CROSSFADE_SECONDS)
+        if (crossfadeDurationSeconds == duration) return
+        store.update { crossfadeDurationSeconds = duration }
+        crossfadeDurationSeconds = duration
+        player.setCrossfadeDuration(duration * 1_000L)
+    }
+
+    fun changeAutoMix(on: Boolean) {
+        if (autoMixAvailable && (on || autoMix)) changeTransitionMode(if (on) TransitionMode.AutoMix else TransitionMode.Off)
+    }
+
+    private fun changeTransitionMode(mode: TransitionMode) {
+        if (transitionMode == mode) return
+        val useCrossfade = mode == TransitionMode.Crossfade
+        val useAutoMix = if (autoMixAvailable) mode == TransitionMode.AutoMix else autoMixEnabled
+        store.update {
+            crossfade = useCrossfade
+            autoMix = useAutoMix
+        }
+        crossfadeEnabled = useCrossfade
+        autoMixEnabled = useAutoMix
+        player.setTransitionMode(transitionMode)
     }
 
     fun changeEqualizerButton(on: Boolean) {
@@ -2166,6 +2213,48 @@ class AppController(
         // A track that would not load, with a home address set, may only need the other address.
         background += scope.launch {
             player.state.map { it.error }.distinctUntilChanged().collect { if (it != null) retryAfterAddressChange() }
+        }
+        background += scope.launch {
+            snapshotFlow { client.takeIf { autoMix } }.collectLatest { source ->
+                player.setStructures(emptyMap())
+                if (source != null) watchAutoMix(source)
+            }
+        }
+    }
+
+    private suspend fun watchAutoMix(source: SubsonicClient) {
+        val analysis = AutoMixSource(source, serverUrl)
+        var ready = emptyMap<String, TrackStructure>()
+        var pending = emptySet<String>()
+        player.state.map { state ->
+            val queue = state.queue
+            val next = queue.after(auto = true)?.takeIf { it != queue.index }
+            if (next == null) emptyList() else {
+                val following = queue.jumpTo(next).after(auto = true)
+                listOfNotNull(queue.current, queue.songs[next], following?.let(queue.songs::get))
+                    .filter { it.isMusic }.mapNotNull { it.id }.distinct()
+            }
+        }.distinctUntilChanged().collectLatest { ids ->
+            ready = ready.filterKeys { it in ids }
+            pending = pending.intersect(ids.toSet())
+            player.setStructures(ready)
+            while (true) {
+                val missing = ids.filter { it !in ready || it in pending }
+                if (missing.isEmpty()) break
+                val response = try {
+                    analysis.get(missing) ?: break
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    delay(30_000)
+                    continue
+                }
+                ready = ready + response.tracks.orEmpty().filterKeys { it in missing }
+                player.setStructures(ready)
+                pending = response.pending.orEmpty().filter { it in missing }.toSet()
+                if (pending.isEmpty()) break
+                delay(8_000)
+            }
         }
     }
 

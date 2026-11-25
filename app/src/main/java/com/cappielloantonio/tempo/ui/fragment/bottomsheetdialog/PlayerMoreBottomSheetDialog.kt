@@ -11,7 +11,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 /**
  * What the full player's bottom right button opens: add the track to a playlist, download it, dislike it, shape the
- * sound, or read about the track. The player it is opened from does the work - its snackbars and its track - so the
+ * sound, or read about the track. The player it is opened from handles the track and the feedback, so the
  * sheet only shows the rows and says which was chosen. Rows that only music has are left out for an episode or a
  * station.
  */

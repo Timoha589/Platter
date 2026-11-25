@@ -70,10 +70,6 @@ public class ArtistPageViewModel extends AndroidViewModel {
         return artistRepository.getRandomSong(artist, 50);
     }
 
-    public LiveData<List<Child>> getArtistInstantMix() {
-        return artistRepository.getInstantMix(artist, 20);
-    }
-
     public ArtistID3 getArtist() {
         return artist;
     }

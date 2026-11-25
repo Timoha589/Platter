@@ -11,7 +11,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.google.android.material.imageview.ShapeableImageView
+    <com.cappielloantonio.tempo.helper.view.DissolvingCoverView
         android:id="@+id/mini_player_cover_image"
         style="@style/Widget.Platter.Cover"
         android:layout_width="42dp"

@@ -196,7 +196,7 @@
         app:layout_constraintStart_toEndOf="@+id/controls_start_guideline"
         app:layout_constraintTop_toBottomOf="@+id/exo_progress" />
 
-    <androidx.media3.ui.DefaultTimeBar
+    <com.cappielloantonio.tempo.helper.view.AutoMixTimeBar
         android:id="@id/exo_progress"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -225,6 +225,22 @@
         android:textSize="12sp"
         app:layout_constraintEnd_toStartOf="@+id/vertical_guideline"
         app:layout_constraintTop_toBottomOf="@+id/exo_progress" />
+
+    <com.cappielloantonio.tempo.helper.view.AutoMixLabel
+        android:id="@+id/player_auto_mix_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="@font/inter_semi_bold"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/settings_auto_mix_title"
+        android:textColor="@color/mist"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintBaseline_toBaselineOf="@id/exo_position"
+        app:layout_constraintEnd_toStartOf="@id/exo_duration"
+        app:layout_constraintStart_toEndOf="@id/exo_position" />
 
     <View
         android:id="@+id/placeholder_view_left"

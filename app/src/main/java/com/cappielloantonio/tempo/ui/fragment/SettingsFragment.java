@@ -28,6 +28,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceScreen;
 import androidx.preference.SeekBarPreference;
+import androidx.preference.SwitchPreferenceCompat;
 
 import com.cappielloantonio.tempo.BuildConfig;
 import com.cappielloantonio.tempo.R;
@@ -173,6 +174,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.global_preferences, rootKey);
 
+        bindTransitionModes();
         setSmartDownloadCacheSizes();
 
         EditTextPreference deemixPassword = findPreference("deemix_password");
@@ -196,6 +198,35 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         if (waveUrl != null) waveUrl.setVisible(PremiumServer.isInUse());
 
         applyCardLayouts();
+    }
+
+    private void bindTransitionModes() {
+        SwitchPreferenceCompat crossfade = findPreference(Preferences.CROSSFADE);
+        SwitchPreferenceCompat autoMix = findPreference(Preferences.AUTO_MIX);
+        SeekBarPreference duration = findPreference(Preferences.CROSSFADE_DURATION);
+        if (crossfade == null || autoMix == null || duration == null) return;
+
+        Preferences.TransitionMode mode = Preferences.getTransitionMode();
+        crossfade.setChecked(mode == Preferences.TransitionMode.CROSSFADE);
+        autoMix.setVisible(PremiumServer.isInUse());
+        autoMix.setChecked(mode == Preferences.TransitionMode.AUTO_MIX);
+        duration.setVisible(crossfade.isChecked());
+        crossfade.setOnPreferenceChangeListener((preference, value) -> {
+            boolean on = Boolean.TRUE.equals(value);
+            Preferences.setTransitionMode(on ? Preferences.TransitionMode.CROSSFADE : Preferences.TransitionMode.OFF);
+            if (on) autoMix.setChecked(false);
+            duration.setVisible(on);
+            return true;
+        });
+        autoMix.setOnPreferenceChangeListener((preference, value) -> {
+            boolean on = Boolean.TRUE.equals(value);
+            Preferences.setTransitionMode(on ? Preferences.TransitionMode.AUTO_MIX : Preferences.TransitionMode.OFF);
+            if (on) {
+                crossfade.setChecked(false);
+                duration.setVisible(false);
+            }
+            return true;
+        });
     }
 
     /**

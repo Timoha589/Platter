@@ -28,3 +28,11 @@
 -keep class * extends **.reflect.TypeToken
 -keep class com.platter.search.TrackChanges { *; }
 -keep class com.platter.search.TrackChanges$Change { *; }
+
+# The optional AutoMix endpoint is decoded reflectively by Gson.
+-keepclasseswithmembers,allowobfuscation class com.platter.automix.** {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-keepclasseswithmembers,allowobfuscation class com.cappielloantonio.tempo.service.AutoMixAnalysis$* {
+    @com.google.gson.annotations.SerializedName <fields>;
+}

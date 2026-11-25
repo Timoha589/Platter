@@ -49,6 +49,10 @@
             android:visibility="gone"
             app:menu="@menu/bottom_nav_menu" />
 
+        <include
+            android:id="@+id/feedback_banner"
+            layout="@layout/view_feedback_banner" />
+
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <TextView

@@ -558,6 +558,21 @@ class ScreenshotTest {
                 }
                 ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File(outDir, "16-full-$name-turning.png"))
 
+                if (name == "upright") {
+                    app.fullPlayerLyrics = true
+                    repeat(38) { mainClock.advanceTimeByFrame(); waitForIdle() }
+                    app.player.next()
+                    repeat(14) { frame ->
+                        Thread.sleep(20)
+                        mainClock.advanceTimeByFrame()
+                        waitForIdle()
+                        if (frame == 7 || frame == 13) {
+                            val file = File(outDir, "16-full-upright-lyrics-turning-$frame.png")
+                            ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
+                        }
+                    }
+                }
+
                 app.shutdown()
             }
         }

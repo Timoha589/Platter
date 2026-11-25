@@ -98,8 +98,11 @@ fun TextInput(
     onEnter: (() -> Unit)? = null,
     /** Shows dots instead of what is typed. */
     password: Boolean = false,
+    correctable: Boolean = false,
+    correctionAvailable: () -> Boolean = { true },
 ) {
     val focus = remember { FocusRequester() }
+    val input = rememberCorrectableInput({ value }, onChange, correctable && !password, correctionAvailable)
     if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
     Box(
         modifier.height(40.dp).clip(PlatterShapes.Card).background(PlatterColors.Iron).padding(horizontal = 12.dp),
@@ -107,13 +110,13 @@ fun TextInput(
     ) {
         if (value.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = PlatterColors.Fog)
         BasicTextField(
-            value = value,
-            onValueChange = onChange,
+            value = input.value,
+            onValueChange = input.onChange,
             singleLine = true,
             visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = PlatterColors.White),
             cursorBrush = SolidColor(PlatterColors.White),
-            modifier = Modifier.fillMaxWidth().focusRequester(focus).onPreviewKeyEvent {
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).then(input.modifier).onPreviewKeyEvent {
                 if (onEnter != null && it.type == KeyEventType.KeyDown && it.key == Key.Enter) {
                     onEnter()
                     true
@@ -142,8 +145,8 @@ fun DialogHost(app: AppController) {
         Box(Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}) {
             when (dialog) {
                 is AppDialog.AddToPlaylist -> AddToPlaylistDialog(app, dialog.songs, close)
-                is AppDialog.NewPlaylist -> NameDialog(t("New playlist"), t("Playlist name"), "", t("Create"), close) { app.createPlaylist(it, dialog.songs); close() }
-                is AppDialog.RenamePlaylist -> NameDialog(t("Rename playlist"), t("Playlist name"), dialog.playlist.name.orEmpty(), t("Save"), close) { app.renamePlaylist(dialog.playlist, it); close() }
+                is AppDialog.NewPlaylist -> NameDialog(t("New playlist"), t("Playlist name"), "", t("Create"), close, correctable = true) { app.createPlaylist(it, dialog.songs); close() }
+                is AppDialog.RenamePlaylist -> NameDialog(t("Rename playlist"), t("Playlist name"), dialog.playlist.name.orEmpty(), t("Save"), close, correctable = true) { app.renamePlaylist(dialog.playlist, it); close() }
                 is AppDialog.DeletePlaylist -> ConfirmDialog(
                     t("Delete playlist?"), t("“%s” will be deleted from your server. Its songs stay in your library.", dialog.playlist.name.orEmpty()), t("Delete"), close,
                 ) { app.deletePlaylist(dialog.playlist); close() }
@@ -284,10 +287,11 @@ private fun UpdateDialog(app: AppController, close: () -> Unit) {
 }
 
 @Composable
-private fun NameDialog(title: String, placeholder: String, initial: String, ok: String, onCancel: () -> Unit, onOk: (String) -> Unit) {
+private fun NameDialog(title: String, placeholder: String, initial: String, ok: String, onCancel: () -> Unit, correctable: Boolean = false, onOk: (String) -> Unit) {
     var name by remember { mutableStateOf(initial) }
     DialogCard(title) {
-        TextInput(name, { name = it }, placeholder, Modifier.fillMaxWidth(), autoFocus = true, onEnter = { if (name.isNotBlank()) onOk(name) })
+        TextInput(name, { name = it }, placeholder, Modifier.fillMaxWidth().testTag("dialog-name"),
+            autoFocus = true, correctable = correctable, onEnter = { if (name.isNotBlank()) onOk(name) })
         Buttons(ok = ok, enabled = name.isNotBlank(), onCancel = onCancel) { onOk(name) }
     }
 }
@@ -424,7 +428,7 @@ private fun StationDialog(app: AppController, station: RadioStation?, close: () 
     val save = { if (ready) { app.saveStation(station, name, stream, home); close() } }
     DialogCard(if (station == null) t("Add a station") else t("Edit station")) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextInput(name, { name = it }, t("Name"), Modifier.fillMaxWidth(), autoFocus = true, onEnter = save)
+            TextInput(name, { name = it }, t("Name"), Modifier.fillMaxWidth(), autoFocus = true, onEnter = save, correctable = true)
             TextInput(stream, { stream = it }, t("Stream address (https://…)"), Modifier.fillMaxWidth(), onEnter = save)
             TextInput(home, { home = it }, t("Website (optional)"), Modifier.fillMaxWidth(), onEnter = save)
         }
@@ -506,7 +510,7 @@ private fun EqualizerDialog(app: AppController, close: () -> Unit) {
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val save = { app.saveEqPreset(name); naming = null }
-                TextInput(name, { naming = it }, t("Preset name"), Modifier.weight(1f).testTag("eq-preset-name"), autoFocus = true, onEnter = { if (name.isNotBlank()) save() })
+                TextInput(name, { naming = it }, t("Preset name"), Modifier.weight(1f).testTag("eq-preset-name"), autoFocus = true, correctable = true, onEnter = { if (name.isNotBlank()) save() })
                 Spacer(Modifier.width(8.dp))
                 Text(
                     t("Cancel"), style = MaterialTheme.typography.labelLarge,

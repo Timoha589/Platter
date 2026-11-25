@@ -1,6 +1,7 @@
 package com.platter.desktop
 
 import com.platter.desktop.api.Auth
+import com.platter.desktop.api.AutoMixSource
 import com.platter.desktop.api.Credentials
 import com.platter.desktop.api.SubsonicClient
 import com.platter.desktop.api.SubsonicException
@@ -12,6 +13,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SubsonicClientTest {
@@ -34,6 +36,28 @@ class SubsonicClientTest {
         assertEquals("https://music.example.com/rest/", Auth.restBase("music.example.com"))
         assertEquals("http://host:4533/rest/", Auth.restBase(" http://host:4533/ "))
         assertEquals("https://host/navidrome/rest/", Auth.restBase("https://host/navidrome"))
+    }
+
+    @Test
+    fun `AutoMix uses the main proxy when direct Navidrome has no analysis route`() = runBlocking {
+        MockWebServer().use { main ->
+            main.start()
+            server.enqueue(MockResponse().setResponseCode(404))
+            val body = """{"subsonic-response":{"status":"ok","platterAutoMix":{"tracks":{
+                "song":{"durationMs":60000,"audioMuse":{"tempoBpm":123.5,"key":"C","scale":"major","energy":0.7}}
+            }}}}"""
+            repeat(2) { main.enqueue(MockResponse().setBody(body)) }
+            val source = AutoMixSource(client(), main.url("/").toString())
+            repeat(2) {
+                val response = assertNotNull(source.get(listOf("song")))
+                assertEquals(123.5, response.tracks?.get("song")?.audioMuse?.tempoBpm)
+            }
+            assertEquals(1, server.requestCount)
+            assertEquals(2, main.requestCount)
+            val request = main.takeRequest().requestUrl
+            assertEquals("/rest/platterAutoMix", request?.encodedPath)
+            assertEquals("song", request?.queryParameter("id"))
+        }
     }
 
     @Test

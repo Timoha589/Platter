@@ -1,0 +1,37 @@
+services:
+  automix:
+    build:
+      context: ..
+      dockerfile: automix/Dockerfile
+    restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:4535:4535"
+    environment:
+      NAVIDROME_URL: ${NAVIDROME_URL:-http://host.docker.internal:4533}
+      ANALYSIS_DEVICE: cuda
+      SCAN_LIBRARY: ${SCAN_LIBRARY:-0}
+      AUDIOMUSE_URL: ${AUDIOMUSE_URL:-}
+      AUDIOMUSE_TOKEN: ${AUDIOMUSE_TOKEN:-}
+      AUDIOMUSE_SERVER: ${AUDIOMUSE_SERVER:-}
+    volumes:
+      - type: bind
+        source: ${NAVIDROME_DATA:?Set NAVIDROME_DATA in .env}
+        target: /navidrome
+        read_only: true
+      - type: bind
+        source: ${MUSIC_DIR:?Set MUSIC_DIR in .env}
+        target: ${NAVIDROME_MUSIC_ROOT:-/music}
+        read_only: true
+      - state:/state
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  state:

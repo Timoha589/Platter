@@ -219,11 +219,6 @@
     <string name="server_signup_dialog_neutral_button">Supprimer</string>
     <string name="server_signup_dialog_positive_button">Enregistrer</string>
     <string name="server_signup_dialog_title">Ajouter un serveur</string>
-    <string name="server_unreachable_dialog_negative_button">Annuler</string>
-    <string name="server_unreachable_dialog_neutral_button">Aller à la connexion</string>
-    <string name="server_unreachable_dialog_positive_button">Continuer quand même</string>
-    <string name="server_unreachable_dialog_summary">Le serveur est injoignable. Si vous décidez de continuer, cette fenêtre n\'apparaîtra plus pendant une heure.</string>
-    <string name="server_unreachable_dialog_title">Serveur injoignable</string>
     <string name="settings_about_summary">Platter est un client open source et léger pour Subsonic, développé et build nativement pour Android.</string>
     <string name="settings_about_title">À propos</string>
     <string name="settings_audio_transcode_download_format">Format de transcodage</string>
@@ -278,6 +273,9 @@
     <string name="settings_title_replay_gain">Replay Gain</string>
     <string name="settings_crossfade_title">Fondu enchaîné</string>
     <string name="settings_crossfade_summary">La fin d\'un titre se superpose au début du suivant. Sans effet entre des titres consécutifs d\'un même album.</string>
+    <string name="settings_crossfade_duration_title">Durée du fondu enchaîné (s)</string>
+    <string name="settings_auto_mix_title">AutoMix</string>
+    <string name="settings_auto_mix_summary">Utilise l’analyse des titres fournie par le serveur pour choisir les transitions et synchroniser les rythmes compatibles.</string>
     <string name="settings_bluetooth_resume_title">Reprendre à la reconnexion Bluetooth</string>
     <string name="settings_bluetooth_resume_summary">Si la déconnexion d\'un appareil Bluetooth, comme l\'autoradio, a mis la lecture en pause, elle reprend dès qu\'il se reconnecte, même écran éteint.</string>
     <string name="settings_title_scrobble">Scrobble</string>
@@ -375,4 +373,5 @@
     <string name="eq_preset_name">Nom du préréglage</string>
     <string name="eq_save">Enregistrer</string>
     <string name="eq_delete_preset">Supprimer le préréglage %1$s</string>
+    <string name="instant_mix_loading">Recherche de titres similaires…</string>
 </resources>

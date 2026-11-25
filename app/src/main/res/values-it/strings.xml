@@ -252,11 +252,6 @@
 	<string name="server_signup_dialog_neutral_button">Elimina</string>
 	<string name="server_signup_dialog_positive_button">Salva</string>
 	<string name="server_signup_dialog_title">Aggiungi server</string>
-	<string name="server_unreachable_dialog_negative_button">Annulla</string>
-	<string name="server_unreachable_dialog_neutral_button">Vai al login</string>
-	<string name="server_unreachable_dialog_positive_button">Continua comunque</string>
-	<string name="server_unreachable_dialog_summary">Il server richiesto non è disponibile. Se scegli di continuare, questo messaggio non apparirà per la prossima ora.</string>
-	<string name="server_unreachable_dialog_title">Server irraggiungibile</string>
 	<string name="settings_about_summary">Platter è un client musicale open source e leggero per Subsonic, progettato e costruito nativamente per Android.</string>
 	<string name="settings_about_title">Informazioni</string>
 	<string name="settings_always_on_display">Sempre attivo</string>
@@ -319,6 +314,9 @@
 	<string name="settings_title_replay_gain">Guadagno di riproduzione</string>
 	<string name="settings_crossfade_title">Crossfade</string>
 	<string name="settings_crossfade_summary">La fine di un brano si sovrappone all\'inizio del successivo. Non si applica tra brani consecutivi dello stesso album.</string>
+	<string name="settings_crossfade_duration_title">Durata del crossfade (s)</string>
+	<string name="settings_auto_mix_title">AutoMix</string>
+	<string name="settings_auto_mix_summary">Usa l’analisi dei brani sul server per scegliere i punti di transizione e sincronizzare i ritmi compatibili.</string>
 	<string name="settings_bluetooth_resume_title">Riprendi alla riconnessione Bluetooth</string>
 	<string name="settings_bluetooth_resume_summary">Se la disconnessione di un dispositivo Bluetooth, come l\'autoradio, ha messo in pausa la riproduzione, questa riprende quando si riconnette, anche a schermo spento.</string>
 	<string name="settings_title_scrobble">Scrobble</string>
@@ -423,4 +421,5 @@
     <string name="eq_preset_name">Nome del preset</string>
     <string name="eq_save">Salva</string>
     <string name="eq_delete_preset">Elimina il preset %1$s</string>
+    <string name="instant_mix_loading">Ricerca di brani simili…</string>
 </resources>

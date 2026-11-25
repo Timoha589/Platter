@@ -88,17 +88,8 @@ public class ArtistBottomSheetDialog extends BottomSheetDialogFragment implement
 
         TextView playRadio = view.findViewById(R.id.play_radio_text_view);
         playRadio.setOnClickListener(v -> {
-            ArtistRepository artistRepository = new ArtistRepository();
-
-            artistRepository.getInstantMix(artist, 20).observe(getViewLifecycleOwner(), songs -> {
-
-                if (!songs.isEmpty()) {
-                    MediaManager.startQueue(mediaBrowserListenableFuture, songs, 0);
-                    ((MainActivity) requireActivity()).setBottomSheetInPeek(true);
-                }
-
-                dismissBottomSheet();
-            });
+            ((MainActivity) requireActivity()).playInstantMix(artist.getId());
+            dismissBottomSheet();
         });
 
         TextView playRandom = view.findViewById(R.id.play_random_text_view);

@@ -63,7 +63,6 @@ import com.cappielloantonio.tempo.wave.WaveBatch;
 import com.cappielloantonio.tempo.wave.WaveClient;
 import com.cappielloantonio.tempo.wave.WaveResult;
 import com.cappielloantonio.tempo.wave.WaveState;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.Collections;
@@ -449,9 +448,7 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
                 message = getString(R.string.wave_error_unreachable);
                 break;
         }
-        Snackbar.make(requireView(), message, Snackbar.LENGTH_LONG)
-                .setAnchorView(activity.bind.playerBottomSheet)
-                .show();
+        activity.showFeedback(message);
     }
 
     private void initDiscoverSongSlideView() {
@@ -914,17 +911,8 @@ public class HomeTabMusicFragment extends Fragment implements ClickCallback {
     @Override
     public void onMediaClick(Bundle bundle) {
         if (bundle.containsKey(Constants.MEDIA_MIX)) {
-            MediaManager.startQueue(mediaBrowserListenableFuture, bundle.getParcelable(Constants.TRACK_OBJECT));
-            activity.setBottomSheetInPeek(true);
-
-            if (mediaBrowserListenableFuture != null) {
-                homeViewModel.getMediaInstantMix(bundle.getParcelable(Constants.TRACK_OBJECT)).observe(getViewLifecycleOwner(), songs -> {
-
-                    if (songs != null && !songs.isEmpty()) {
-                        MediaManager.enqueue(mediaBrowserListenableFuture, songs, true);
-                    }
-                });
-            }
+            Child song = bundle.getParcelable(Constants.TRACK_OBJECT);
+            activity.playInstantMix(song);
         } else if (bundle.containsKey(Constants.MEDIA_CHRONOLOGY)) {
             List<Child> media = bundle.getParcelableArrayList(Constants.TRACKS_OBJECT);
             MediaManager.startQueue(mediaBrowserListenableFuture, media, bundle.getInt(Constants.ITEM_POSITION));

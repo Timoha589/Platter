@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
@@ -31,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
@@ -42,6 +44,7 @@ import com.platter.desktop.data.SettingsStore
 import com.platter.desktop.ui.PlatterColors
 import com.platter.desktop.ui.PlatterTheme
 import com.platter.desktop.ui.Shell
+import com.platter.desktop.wave.PremiumServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -103,6 +106,105 @@ class InteractionTest {
             step()
             assertEquals(0, reachedWindow)
             app.shutdown()
+        }
+    }
+
+    @Test
+    fun `double Shift corrects the selected query or the word before the caret`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            try {
+                open(app)
+                val field = onNode(hasSetTextAction())
+                field.performTextInput("яукщ срудф")
+                field.performKeyInput { pressKey(Key.ShiftLeft) }
+                assertEquals("яукщ срудф", app.searchQuery)
+
+                field.performKeyInput {
+                    pressKey(Key.Escape)
+                    repeat(2) { pressKey(Key.ShiftLeft) }
+                }
+                assertEquals("яукщ chela", app.searchQuery)
+
+                step(1)
+                val query = "Яукщ Срудф"
+                field.performTextReplacement(query)
+                assertEquals(query, app.searchQuery)
+                step(1)
+                field.performSemanticsAction(SemanticsActions.SetSelection) {
+                    assertTrue(it(0, query.length, false))
+                }
+                step(1)
+                field.performKeyInput { repeat(2) { pressKey(Key.ShiftRight) } }
+                assertEquals("Zero Chela", app.searchQuery)
+                field.performTextInput("abbey")
+                assertEquals("abbey", app.searchQuery)
+            } finally {
+                app.shutdown()
+            }
+        }
+    }
+
+    @Test
+    fun `search accepts a focused correction and double Shift undoes it`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            try {
+                open(app)
+                val field = onNode(hasSetTextAction())
+                field.performTextInput("teh ")
+                step(1)
+                runOnIdle {
+                    app.focusedEditor.windowMatches = { it == 42L }
+                    val snapshot = checkNotNull(app.focusedEditor.snapshot(42L))
+                    assertTrue(app.focusedEditor.replace(42L, snapshot.getValue("revision") as Long, "teh ", "the ", "en"))
+                }
+                step(1)
+                assertEquals("the ", app.searchQuery)
+                field.performKeyInput { repeat(2) { pressKey(Key.ShiftLeft) } }
+                assertEquals("teh ", app.searchQuery)
+            } finally {
+                app.shutdown()
+            }
+        }
+    }
+
+    @Test
+    fun `dialog names get automatic correction and double Shift`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 800) {
+            val app = app(fake)
+            try {
+                open(app)
+                runOnIdle { app.dialog = AppDialog.NewPlaylist(emptyList()) }
+                step()
+                val field = onNode(
+                    hasSetTextAction() and androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("dialog-name")),
+                    useUnmergedTree = true,
+                )
+                field.performTextInput("teh ")
+                step(1)
+                runOnIdle {
+                    app.focusedEditor.windowMatches = { it == 42L }
+                    val snapshot = checkNotNull(app.focusedEditor.snapshot(42L))
+                    assertTrue(app.focusedEditor.replace(42L, snapshot.getValue("revision") as Long, "teh ", "the ", "en"))
+                }
+                step(1)
+                runOnIdle { assertEquals("the ", app.focusedEditor.snapshot(42L)?.get("prefix")) }
+                field.performKeyInput { repeat(2) { pressKey(Key.ShiftLeft) } }
+                step(1)
+                runOnIdle { assertEquals("teh ", app.focusedEditor.snapshot(42L)?.get("prefix")) }
+
+                // A name-like control shown for a feed URL is deliberately skipped.
+                runOnIdle { app.dialog = null }
+                step(1)
+                runOnIdle { app.dialog = AppDialog.AddPodcast }
+                step()
+                field.performTextInput("https://feeds.example.invalid/rss")
+                step(1)
+                runOnIdle { assertNull(app.focusedEditor.snapshot(42L)) }
+            } finally {
+                app.shutdown()
+            }
         }
     }
 
@@ -291,12 +393,75 @@ class InteractionTest {
             assertEquals("mp3", app.streamFormat)
             assertEquals("album", app.replayGain)
 
+            onNodeWithText("AutoMix").assertDoesNotExist()
             assertTrue(app.scrobbling)
-            // Crossfade is the first switch on the page, the equalizer button the second, scrobbling the third.
+            // Crossfade and the equalizer button appear before scrobbling.
             onAllNodes(isToggleable())[2].performClick()
             step()
             assertFalse(app.scrobbling)
             app.shutdown()
+        }
+    }
+
+    @Test
+    fun `transition switches exclude each other and can both be off`() = FakeSubsonic().use { fake ->
+        runDesktopComposeUiTest(1280, 1500) {
+            val store = SettingsStore(Files.createTempDirectory("platter-ui-test").resolve("settings.json"))
+            store.update {
+                withCredentials(Credentials(PremiumServer.ADDRESS, "tim", Auth.token("pw", "salt"), "salt"))
+                localAddress = fake.url
+                crossfade = true
+                autoMix = true
+            }
+            val app = AppController(store, CoroutineScope(SupervisorJob() + Dispatchers.Main), vlcArgs = listOf("--aout=dummy"))
+            try {
+                waitUntil("the local server to be in use") { app.usingLocal }
+                app.navigate(Screen.Settings)
+                open(app)
+                val crossfade = onAllNodes(isToggleable())[0]
+                val autoMix = onAllNodes(isToggleable())[1]
+                val duration = onNodeWithContentDescription("Crossfade duration")
+                assertFalse(app.crossfade)
+                assertTrue(app.autoMix)
+                duration.assertDoesNotExist()
+
+                crossfade.performClick()
+                step()
+                assertTrue(app.crossfade)
+                assertFalse(app.autoMix)
+                duration.assertIsDisplayed()
+                duration.performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(1f)) }
+                step(1)
+                onNodeWithText("1 s").assertIsDisplayed()
+                duration.performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(10f)) }
+                step(1)
+                onNodeWithText("10 s").assertIsDisplayed()
+
+                autoMix.performClick()
+                step()
+                assertFalse(app.crossfade)
+                assertTrue(app.autoMix)
+                duration.assertDoesNotExist()
+                val savedAutoMix = store.load()
+                assertFalse(savedAutoMix.crossfade)
+                assertTrue(savedAutoMix.autoMix)
+                assertEquals(10, savedAutoMix.crossfadeDurationSeconds)
+
+                app.player.play(listOf(Song().apply { id = "s1-1" }, Song().apply { id = "s2-1" }))
+                waitUntil("AutoMix analysis to be requested") { fake.requestsTo("platterAutoMix").isNotEmpty() }
+
+                autoMix.performClick()
+                step()
+                onNodeWithText("AutoMix").assertIsDisplayed()
+                assertFalse(app.crossfade)
+                assertFalse(app.autoMix)
+                duration.assertDoesNotExist()
+                val savedOff = store.load()
+                assertFalse(savedOff.crossfade)
+                assertFalse(savedOff.autoMix)
+            } finally {
+                app.shutdown()
+            }
         }
     }
 
@@ -391,7 +556,7 @@ class InteractionTest {
             app.navigate(Screen.Settings)
             step()
             assertTrue(app.syncQueue)
-            // Crossfade is the first switch, the equalizer button the second, scrobbling the third, syncing the fourth.
+            // Crossfade, the equalizer button and scrobbling appear before queue sync.
             onAllNodes(isToggleable())[3].performClick()
             step()
             assertFalse(app.syncQueue)

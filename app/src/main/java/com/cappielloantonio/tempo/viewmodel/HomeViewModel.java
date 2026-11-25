@@ -271,17 +271,6 @@ public class HomeViewModel extends AndroidViewModel {
     }
 
     /*
-     * This used to hand back one shared field, primed with an empty list and
-     * observed again on every tap, so a second tap on any mix card was
-     * answered by every observer the earlier taps had left behind. The
-     * repository's LiveData is already one request's answer; it is returned
-     * as it is.
-     */
-    public LiveData<List<Child>> getMediaInstantMix(Child media) {
-        return songRepository.getInstantMix(media.getId(), 20);
-    }
-
-    /*
      * The pinned set is the intersection of what the server has and what the
      * local pin table names.
      *

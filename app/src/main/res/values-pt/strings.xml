@@ -220,11 +220,6 @@
     <string name="server_signup_dialog_neutral_button">Excluir</string>
     <string name="server_signup_dialog_positive_button">Salvar</string>
     <string name="server_signup_dialog_title">Adicionar servidor</string>
-    <string name="server_unreachable_dialog_negative_button">Cancelar</string>
-    <string name="server_unreachable_dialog_neutral_button">Ir para o login</string>
-    <string name="server_unreachable_dialog_positive_button">Continuar mesmo assim</string>
-    <string name="server_unreachable_dialog_summary">O servidor solicitado não está disponível. Se você optar por continuar, essa caixa de diálogo não será exibida pela próxima hora.</string>
-    <string name="server_unreachable_dialog_title">Servidor inacessível</string>
     <string name="settings_about_summary">O Platter é um cliente de música leve e de código aberto para Subsonic, projetado e desenvolvido nativamente para Android.</string>
     <string name="settings_about_title">Sobre</string>
     <string name="settings_always_on_display">Tela sempre ativa</string>
@@ -280,6 +275,9 @@
     <string name="settings_title_replay_gain">Replay Gain</string>
     <string name="settings_crossfade_title">Crossfade</string>
     <string name="settings_crossfade_summary">O fim de uma faixa se sobrepõe ao início da próxima. Não se aplica entre faixas consecutivas do mesmo álbum.</string>
+    <string name="settings_crossfade_duration_title">Duração do crossfade (s)</string>
+    <string name="settings_auto_mix_title">AutoMix</string>
+    <string name="settings_auto_mix_summary">Usa a análise das faixas no servidor para escolher os pontos de transição e sincronizar batidas compatíveis.</string>
     <string name="settings_bluetooth_resume_title">Retomar ao reconectar o Bluetooth</string>
     <string name="settings_bluetooth_resume_summary">Se a desconexão de um dispositivo Bluetooth, como o som do carro, pausou a reprodução, ela continua quando ele se reconectar, mesmo com a tela desligada.</string>
     <string name="settings_title_scrobble">Scrobble</string>
@@ -377,4 +375,5 @@
     <string name="eq_preset_name">Nome da predefinição</string>
     <string name="eq_save">Salvar</string>
     <string name="eq_delete_preset">Excluir predefinição %1$s</string>
+    <string name="instant_mix_loading">A procurar faixas semelhantes…</string>
 </resources>

@@ -23,7 +23,6 @@ import androidx.navigation.fragment.NavHostFragment;
 
 import com.cappielloantonio.tempo.R;
 import com.cappielloantonio.tempo.glide.CustomGlideRequest;
-import com.cappielloantonio.tempo.interfaces.MediaCallback;
 import com.cappielloantonio.tempo.model.Download;
 import com.cappielloantonio.tempo.repository.AlbumRepository;
 import com.cappielloantonio.tempo.service.MediaManager;
@@ -43,7 +42,6 @@ import com.cappielloantonio.tempo.helper.view.LikeAnimation;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -109,24 +107,8 @@ public class AlbumBottomSheetDialog extends BottomSheetDialogFragment implements
 
         TextView playRadio = view.findViewById(R.id.play_radio_text_view);
         playRadio.setOnClickListener(v -> {
-            AlbumRepository albumRepository = new AlbumRepository();
-            albumRepository.getInstantMix(album, 20, new MediaCallback() {
-                @Override
-                public void onError(Exception exception) {
-                    exception.printStackTrace();
-                }
-
-                @Override
-                public void onLoadMedia(List<?> media) {
-
-                    if (!media.isEmpty()) {
-                        MediaManager.startQueue(mediaBrowserListenableFuture, (ArrayList<Child>) media, 0);
-                        ((MainActivity) requireActivity()).setBottomSheetInPeek(true);
-                    }
-
-                    dismissBottomSheet();
-                }
-            });
+            ((MainActivity) requireActivity()).playInstantMix(album.getId());
+            dismissBottomSheet();
         });
 
         TextView playRandom = view.findViewById(R.id.play_random_text_view);

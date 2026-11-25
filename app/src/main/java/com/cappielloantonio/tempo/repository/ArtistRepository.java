@@ -168,36 +168,6 @@ public class ArtistRepository {
         return artist;
     }
 
-    public MutableLiveData<List<Child>> getInstantMix(ArtistID3 artist, int count) {
-        MutableLiveData<List<Child>> instantMix = new MutableLiveData<>();
-
-        App.getSubsonicClientInstance(false)
-                .getBrowsingClient()
-                .getSimilarSongs2(artist.getId(), count)
-                .enqueue(new Callback<ApiResponse>() {
-                    /*
-                     * Never null and always answered, like SongRepository's:
-                     * an artist with nothing similar comes back as a
-                     * similarSongs2 with no song list, and the radio buttons
-                     * that read this called isEmpty() on it.
-                     */
-                    @Override
-                    public void onResponse(@NonNull Call<ApiResponse> call, @NonNull Response<ApiResponse> response) {
-                        SubsonicResponse body = ResponseUtil.body(response);
-                        List<Child> songs = body != null && body.getSimilarSongs2() != null ? body.getSimilarSongs2().getSongs() : null;
-
-                        instantMix.setValue(songs != null ? new ArrayList<>(songs) : new ArrayList<>());
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<ApiResponse> call, @NonNull Throwable t) {
-                        instantMix.setValue(new ArrayList<>());
-                    }
-                });
-
-        return instantMix;
-    }
-
     public MutableLiveData<List<Child>> getRandomSong(ArtistID3 artist, int count) {
         MutableLiveData<List<Child>> randomSongs = new MutableLiveData<>();
 

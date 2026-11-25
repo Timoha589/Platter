@@ -1,6 +1,7 @@
 package com.cappielloantonio.tempo.ui.fragment;
 
 import android.content.ComponentName;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,7 +23,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
-import androidx.media3.common.Timeline;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.session.MediaBrowser;
 import androidx.media3.session.MediaController;
@@ -32,8 +32,9 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.cappielloantonio.tempo.R;
 import com.cappielloantonio.tempo.databinding.FragmentPlayerBottomSheetBinding;
 import com.cappielloantonio.tempo.databinding.ViewMiniPlayerTrackBinding;
-import com.cappielloantonio.tempo.glide.CustomGlideRequest;
+import com.cappielloantonio.tempo.helper.view.DissolvingCoverView;
 import com.cappielloantonio.tempo.model.Download;
+import com.cappielloantonio.tempo.service.CoverTransition;
 import com.cappielloantonio.tempo.service.MediaManager;
 import com.cappielloantonio.tempo.service.MediaService;
 import com.cappielloantonio.tempo.subsonic.models.Child;
@@ -90,6 +91,36 @@ public class PlayerBottomSheetFragment extends Fragment {
     private boolean headerVerticalGestureHandled;
 
     private TrackSwipeCarousel headerCarousel;
+    private final TrackSwipeCarousel.OverlayTurn headerDissolve = (outgoing, incoming, token, progress) -> {
+        DissolvingCoverView cover = outgoing.findViewById(R.id.mini_player_cover_image);
+        cover.dissolve(token, progress);
+        setHeaderTitleAlpha(outgoing, progress < 1f ? 0f : 1f);
+    };
+    private final TrackSwipeCarousel.OverlayTurn headerSlide = (outgoing, incoming, token, progress) -> {
+        View oldCover = outgoing.findViewById(R.id.mini_player_cover_image);
+        View newCover = incoming.findViewById(R.id.mini_player_cover_image);
+        setHeaderTitleAlpha(outgoing, progress < 1f ? 0f : 1f);
+        if (progress >= 1f) {
+            oldCover.setClipBounds(null);
+            newCover.setClipBounds(null);
+            oldCover.setTranslationX(0f);
+            newCover.setTranslationX(0f);
+            return;
+        }
+        // Both sleeves travel inside the mini player's square artwork area.
+        int width = oldCover.getWidth();
+        float shift = width * progress;
+        int clip = Math.round(shift);
+        oldCover.setClipBounds(new Rect(clip, 0, width, oldCover.getHeight()));
+        newCover.setClipBounds(new Rect(0, 0, clip, newCover.getHeight()));
+        oldCover.setTranslationX(-shift);
+        newCover.setTranslationX(width - shift);
+    };
+
+    private static void setHeaderTitleAlpha(View row, float alpha) {
+        row.findViewById(R.id.mini_player_title_label).setAlpha(alpha);
+        row.findViewById(R.id.mini_player_artist_label).setAlpha(alpha);
+    }
 
     /**
      * The gap between one row and the next while they are being dragged past
@@ -117,6 +148,11 @@ public class PlayerBottomSheetFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        CoverTransition.updates().observe(getViewLifecycleOwner(), transition -> {
+            if (headerCarousel != null && connectedBrowser() != null) {
+                headerCarousel.syncCover(transition, headerDissolve, headerSlide);
+            }
+        });
 
         /*
          * A fresh view starts with the mini player showing, whatever state the
@@ -142,6 +178,7 @@ public class PlayerBottomSheetFragment extends Fragment {
     @Override
     public void onStop() {
         progressBarHandler.removeCallbacks(progressBarRunnable);
+        if (headerCarousel != null) headerCarousel.cancel();
         releaseMediaBrowser();
         super.onStop();
     }
@@ -151,6 +188,7 @@ public class PlayerBottomSheetFragment extends Fragment {
         super.onDestroyView();
 
         if (headerCarousel != null) headerCarousel.cancel();
+        headerCarousel = null;
 
         bind = null;
     }
@@ -258,12 +296,7 @@ public class PlayerBottomSheetFragment extends Fragment {
         track.miniPlayerTitleLabel.setVisibility(TextUtils.isEmpty(title) ? View.GONE : View.VISIBLE);
         track.miniPlayerArtistLabel.setVisibility(TextUtils.isEmpty(artist) ? View.GONE : View.VISIBLE);
 
-        CustomGlideRequest.loadCover(
-                requireContext(),
-                track.miniPlayerCoverImage,
-                extras != null ? extras.getString("coverArtId") : null,
-                CustomGlideRequest.ResourceType.Song
-        );
+        track.miniPlayerCoverImage.loadArtwork(extras != null ? extras.getString("coverArtId") : null);
     }
 
     /**
@@ -324,15 +357,17 @@ public class PlayerBottomSheetFragment extends Fragment {
     }
 
     private void releaseMediaBrowser() {
-        MediaController.releaseFuture(mediaBrowserListenableFuture);
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        mediaBrowserListenableFuture = null;
+        if (future != null) MediaController.releaseFuture(future);
     }
 
     private void bindMediaController() {
-        mediaBrowserListenableFuture.addListener(() -> {
+        ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
+        future.addListener(() -> {
+            if (future != mediaBrowserListenableFuture || bind == null) return;
             try {
-                MediaBrowser mediaBrowser = mediaBrowserListenableFuture.get();
-
-                setMediaControllerListener(mediaBrowser);
+                setMediaControllerListener(future.get());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -343,6 +378,7 @@ public class PlayerBottomSheetFragment extends Fragment {
         setMediaControllerUI(mediaBrowser);
         setMetadata(mediaBrowser.getMediaMetadata());
         headerCarousel.bindAll();
+        headerCarousel.syncCover(CoverTransition.updates().getValue(), headerDissolve, headerSlide);
         setContentDuration(mediaBrowser.getContentDuration());
         // Straight away: the tick is a second off, and the bar would show where it was left until then.
         setProgress(mediaBrowser);
@@ -359,44 +395,19 @@ public class PlayerBottomSheetFragment extends Fragment {
                 setContentDuration(mediaBrowser.getContentDuration());
             }
 
-            /*
-             * A transition rather than a metadata change: the same track queued
-             * twice in a row carries the same metadata, and the strip has to
-             * follow the queue even when nothing about the track is different.
-             */
             @Override
-            public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
-                if (bind == null) return;
-
-                headerCarousel.sync();
-            }
-
-            @Override
-            public void onTimelineChanged(@NonNull Timeline timeline, int reason) {
-                if (bind == null) return;
-
-                headerCarousel.sync();
-            }
-
-            @Override
-            public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
-                if (bind == null) return;
-
-                headerCarousel.sync();
-            }
-
-            @Override
-            public void onRepeatModeChanged(int repeatMode) {
-                if (bind == null) return;
-
-                headerCarousel.sync();
+            public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
+                if (mediaBrowser != connectedBrowser()) return;
+                if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_TIMELINE_CHANGED,
+                        Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED,
+                        Player.EVENT_IS_PLAYING_CHANGED)) {
+                    headerCarousel.syncCover(CoverTransition.updates().getValue(), headerDissolve, headerSlide);
+                }
             }
 
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
                 setPlayingState(isPlaying);
-
-                if (bind != null) headerCarousel.sync();
             }
 
             @Override

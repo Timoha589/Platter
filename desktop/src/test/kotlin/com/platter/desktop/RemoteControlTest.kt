@@ -1,5 +1,7 @@
 package com.platter.desktop
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.platter.desktop.api.Auth
@@ -15,6 +17,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,6 +58,45 @@ class RemoteControlTest {
             .apply { if (token != null) header("Authorization", "Bearer $token") }
             .build()
         http.newCall(request).execute().use { r -> return Answer(r.code, JsonParser.parseString(r.body!!.string()).asJsonObject) }
+    }
+
+    @Test
+    fun `search editor keeps whitespace and rejects stale or unfocused edits`() {
+        val app = app(fake = null)
+        val active = AtomicBoolean(true)
+        val field = AtomicReference(TextFieldValue("🎵 ghbdtn   tail", TextRange("🎵 ghbdtn   ".length)))
+        app.focusedEditor.windowMatches = { it == 42L && active.get() }
+        val owner = Any()
+        app.focusedEditor.attach(owner, { field.get() }, { value, _ -> field.set(value) })
+
+        fun read() = call("focused_editor", """{"window":42}""")
+        fun replace(revision: Long): Answer {
+            val body = JsonObject().apply {
+                addProperty("window", 42)
+                addProperty("revision", revision)
+                addProperty("before", "ghbdtn   ")
+                addProperty("after", "привет   ")
+                addProperty("layout", "ru")
+            }
+            return call("replace_focused_text", body.toString())
+        }
+
+        assertEquals(401, call("focused_editor", """{"window":42}""", token = null).status)
+        assertFalse(call("focused_editor", """{"window":43}""").json["active"].asBoolean)
+        val snapshot = read().json
+        assertEquals("🎵 ghbdtn   ", snapshot["prefix"].asString)
+        val revision = snapshot["revision"].asLong
+
+        active.set(false)
+        assertFalse(replace(revision).json["applied"].asBoolean)
+        active.set(true)
+        app.focusedEditor.changed(owner)
+        assertFalse(replace(revision).json["applied"].asBoolean)
+
+        val next = read().json["revision"].asLong
+        assertTrue(replace(next).json["applied"].asBoolean)
+        assertEquals(TextFieldValue("🎵 привет   tail", TextRange("🎵 привет   ".length)), field.get())
+        assertFalse(replace(next).json["applied"].asBoolean)
     }
 
     /** What [probe] finds within a few seconds, or null: some commands finish after they have answered. */
