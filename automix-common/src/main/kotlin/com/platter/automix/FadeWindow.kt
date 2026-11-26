@@ -14,24 +14,69 @@ internal data class FadeWindow(
     val incomingVocalMs: Long? = null,
 )
 
+/** At native speeds the two rhythms may drift. Keep their overlap brief and retain the outgoing end. */
+internal fun FadeWindow.shortFallback(): FadeWindow {
+    val overlap = minOf(fadeMs, 1_500L)
+    return copy(startMs = startMs + fadeMs - overlap, fadeMs = overlap)
+}
+
 internal fun equalPowerGains(progress: Float): Pair<Float, Float> {
     val angle = progress.coerceIn(0f, 1f) * (PI.toFloat() / 2)
     return sin(angle) to cos(angle).coerceAtLeast(0f)
 }
 
-/** Cross the bass over a single beat centered in the overlap. */
-internal fun bassGains(elapsedMs: Double, overlapMs: Long, beatPeriodMs: Double): Pair<Float, Float> {
+/** Cross the bass over one beat at the selected center, defaulting to the overlap midpoint. */
+internal fun bassGains(elapsedMs: Double, overlapMs: Long, beatPeriodMs: Double, centerMs: Double? = null,
+                       terminal: Boolean = false): Pair<Float, Float> {
     val widthMs = minOf(beatPeriodMs, overlapMs.toDouble())
-    return equalPowerGains(((elapsedMs - (overlapMs - widthMs) / 2) / widthMs).toFloat())
+    if (terminal) {
+        val release = ((elapsedMs - (overlapMs - widthMs)) / widthMs).toFloat()
+        return equalPowerGains(release).first to 1f
+    }
+    val startMs = (centerMs ?: overlapMs / 2.0) - widthMs / 2
+    return equalPowerGains(((elapsedMs - startMs) / widthMs).toFloat())
 }
 
-internal fun bandGainWithBass(baseDb: Float, band: Int, bassGain: Float): Float {
-    val gain = when (band) {
+/** Ease the outgoing highs down while the incoming track takes over. */
+internal fun outgoingDamping(progress: Float): Float = MixTempo.glideRate(0f, 1f, (progress - 0.45f) / 0.40f)
+
+internal fun transitionBandGain(baseDb: Float, band: Int, bassGain: Float, damping: Float): Float {
+    val lowGain = when (band) {
         0 -> bassGain.coerceAtLeast(0.1f)
         1 -> 0.2f + 0.8f * bassGain
         else -> 1f
     }
-    return (baseDb + 20f * log10(gain)).coerceAtLeast(-20f)
+    val highCutDb = when (band) {
+        5 -> 4f
+        6 -> 7f
+        in 7..9 -> 9f
+        else -> 0f
+    }
+    return (baseDb + 20f * log10(lowGain) - damping * highCutDb).coerceAtLeast(-20f)
+}
+
+/** The audible envelope, sampled on the outgoing deck's media clock by either player. */
+internal class FadeEnvelope(
+    private val durationMs: Long,
+    private val autoMix: Boolean,
+    private val beats: BeatMixPlan?,
+    startMs: Long,
+    forceBassMidpoint: Boolean,
+) {
+    val bassCenterMs = beats?.bassCenterMs(startMs, durationMs, forceBassMidpoint)
+    val terminalBass = beats?.bassEndsOverlap(startMs, durationMs, forceBassMidpoint) == true
+
+    data class Levels(val incoming: Float, val outgoing: Float, val bass: Pair<Float, Float>?, val highCut: Float)
+
+    fun progressAt(elapsedMs: Long): Float = (elapsedMs.toFloat() / durationMs).coerceIn(0f, 1f)
+
+    fun levels(progress: Float, bassPositionMs: Double): Levels {
+        val period = beats?.outgoingBeatPeriodMs
+        val bass = period?.let { bassGains(bassPositionMs, durationMs, it, bassCenterMs, terminalBass) }
+        val (incoming, outgoing) = if (beats == null) equalPowerGains(progress)
+            else mixGains(progress, durationMs, period.takeIf { terminalBass })
+        return Levels(incoming, outgoing, bass, if (autoMix) outgoingDamping(progress) else 0f)
+    }
 }
 
 /** Measured quiet edges can guide a crossfade even when the two beat grids are incompatible. */
@@ -56,8 +101,16 @@ internal fun audibleEdges(
 }
 
 /** Bring up the incoming rhythm early and keep the outgoing rhythm present until the handoff. */
-internal fun mixGains(progress: Float): Pair<Float, Float> {
-    val x = progress.coerceIn(0f, 1f)
+internal fun mixGains(progress: Float, overlapMs: Long = 0, terminalBassBeatMs: Double? = null): Pair<Float, Float> {
+    val position = progress.coerceIn(0f, 1f)
+    val x = if (terminalBassBeatMs == null) position else {
+        // Keep the outgoing bed audible until just before the incoming bass appears. The
+        // last half-beat completes the handoff at the original boundary at equal power.
+        val handoff = 1f - (terminalBassBeatMs / 2 / overlapMs).toFloat().coerceAtMost(0.25f)
+        val held = 0.70f
+        if (position < handoff) minOf(position, held)
+        else MixTempo.glideRate(held, 1f, (position - handoff) / (1f - handoff))
+    }
     val (incoming, outgoing) = equalPowerGains(x)
     val incomingPower = incoming * incoming
     val outgoingPower = outgoing * outgoing

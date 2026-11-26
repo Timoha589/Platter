@@ -1,5 +1,9 @@
 package com.platter.desktop
 
+import com.platter.automix.AutoMixPlanner
+import com.platter.automix.FadeEnvelope
+import com.platter.automix.TrackBassEntries
+import com.platter.automix.bassGains
 import com.platter.desktop.api.Auth
 import com.platter.desktop.api.AudioMuseFeatures
 import com.platter.desktop.api.Credentials
@@ -20,6 +24,7 @@ import com.platter.desktop.player.TimelineOverlap
 import com.platter.desktop.player.TransitionMode
 import com.platter.desktop.player.confirmZeroVolume
 import com.platter.desktop.player.vlcVolumeForGain
+import com.platter.desktop.player.window
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -200,11 +205,95 @@ class CrossfadePlanTest {
         assertEquals(Crossfade.gains(0.5f), bass(4_000.0))
 
         val settings = EqSettings(enabled = true, preamp = -3f, bands = listOf(4f, 3f, 2f, 1f))
-        val cut = settings.gainsWithBass(bass(3_750.0).first)
+        val cut = settings.transitionGains(bass(3_750.0).first)
         assertTrue(cut[0] < 0f && cut[1] < 3f)
         assertEquals(settings.gains().drop(2), cut.toList().drop(2))
-        assertEquals(settings.gains(), settings.gainsWithBass(bass(4_250.0).first).toList())
-        assertTrue(settings.copy(enabled = false).gainsWithBass(1f).all { it == 0f })
+        assertEquals(settings.gains(), settings.transitionGains(bass(4_250.0).first).toList())
+        assertTrue(settings.copy(enabled = false).transitionGains(1f).all { it == 0f })
+    }
+
+    @Test
+    fun `AutoMix darkens the outgoing highs gradually and combines the cut with the listener EQ`() {
+        val settings = EqSettings(enabled = true, bands = List(10) { 2f })
+        val envelope = FadeEnvelope(10_000, autoMix = true, beats = null, startMs = 190_000, forceBassMidpoint = false)
+        val ordinary = FadeEnvelope(10_000, autoMix = false, beats = null, startMs = 190_000, forceBassMidpoint = false)
+        fun levelsAt(elapsed: Long) = envelope.levels(envelope.progressAt(elapsed), elapsed.toDouble())
+        assertEquals(0f, levelsAt(4_500).highCut)
+        assertEquals(0.5f, levelsAt(6_500).highCut, 0.00001f)
+        assertNull(levelsAt(6_500).bass)
+        assertEquals(0f, ordinary.levels(0.9f, 9_000.0).highCut)
+        val outgoing = settings.transitionGains(1f, levelsAt(9_000).highCut).toList()
+        assertEquals(settings.gains().take(5), outgoing.take(5))
+        assertEquals(listOf(-2f, -5f, -7f, -7f, -7f), outgoing.drop(5))
+        assertEquals(settings.gains(), settings.transitionGains(1f).toList())
+    }
+
+    @Test
+    fun `AutoMix uses a complete two-bar phrase only when longer phrases fail`() {
+        val fade = assertNotNull(Crossfade.plan(queue(song("a"), song("b")), 200_000))
+        val beats = (0L..200_000 step 468).toList()
+        val grid = TrackStructure(200_000, beats, (0L..200_000 step 1_872).toList())
+        val from = grid.copy(sections = listOf(TrackSection(187_200, 190_944, "outro")))
+        val to = grid.copy(sections = listOf(TrackSection(0, 3_744, "intro"), TrackSection(3_744, 60_000, "verse")))
+        fun choose(outgoing: TrackStructure, incoming: TrackStructure = to) =
+            StructureMix.plan(outgoing, incoming, 200_000, fade, 0).mix
+        val short = assertNotNull(choose(from))
+        assertEquals(2, short.bars)
+        assertEquals(3_744, short.overlapMs)
+        assertNull(choose(from.copy(beatsMs = beats - 188_136L)))
+        assertNull(choose(from.copy(beatsMs = beats.map { if (it == 188_136L) it + 95 else it })))
+        assertNull(choose(from.copy(beatsMs = beats.map { if (it == 187_200L) it + 80 else it })))
+        val longFrom = from.copy(sections = listOf(TrackSection(168_480, 190_944, "outro")))
+        val longTo = to.copy(sections = listOf(TrackSection(0, 22_464, "intro"), TrackSection(22_464, 60_000, "verse")))
+        assertTrue(assertNotNull(choose(longFrom, longTo)).bars!! >= 4)
+    }
+
+    @Test
+    fun `AutoMix bass A and B use the same cue and tempo and B stays on the downbeat after a late start`() {
+        val fade = assertNotNull(Crossfade.plan(queue(song("a"), song("b")), 200_000))
+        val grid = TrackStructure(200_000, (0L..200_000 step 500).toList(), (0L..200_000 step 2_000).toList())
+        val from = grid.copy(sections = listOf(TrackSection(184_000, 200_000, "outro")))
+        val to = grid.copy(sections = listOf(TrackSection(0, 16_000, "intro"), TrackSection(16_000, 60_000, "verse")))
+        fun choose(incoming: TrackStructure) = assertNotNull(StructureMix.plan(from, incoming, 200_000, fade, 0).mix)
+        val midpoint = choose(to)
+        val downbeat = choose(to.copy(bassEntries = TrackBassEntries(1, listOf(10_000))))
+        assertEquals(midpoint, downbeat.copy(bassHandoffMs = null))
+        assertEquals(194_000, downbeat.bassHandoffMs)
+        val center = downbeat.bassCenterMs(184_050, 15_950, forceMidpoint = false)
+        assertEquals(9_950.0, center)
+        assertEquals(Crossfade.gains(0.5f), bassGains(9_950.0, 15_950, 500.0, center))
+        assertNull(downbeat.bassCenterMs(184_050, 15_950, forceMidpoint = true))
+        assertNull(downbeat.bassCenterMs(193_900, 6_100, forceMidpoint = false))
+        assertEquals(midpoint, choose(to.copy(bassEntries = TrackBassEntries(9, listOf(10_000)))))
+    }
+
+    @Test
+    fun `confirmed bass on the final downbeat preserves the bed and original phrase`() {
+        val fade = assertNotNull(Crossfade.plan(queue(song("a"), song("b")), 200_000))
+        val beats = (0L..200_000 step 500).toList()
+        val grid = TrackStructure(200_000, beats, (0L..200_000 step 2_000).toList())
+        val from = grid.copy(sections = listOf(TrackSection(184_000, 200_000, "inst")), beatOffsetsMs = beats.map { 0L })
+        val to = grid.copy(sections = listOf(TrackSection(0, 16_000, "verse"), TrackSection(16_000, 60_000, "verse")))
+        fun choose(outgoing: TrackStructure, incoming: TrackStructure) = StructureMix.plan(outgoing, incoming, 200_000, fade, 0)
+        val unchanged = assertNotNull(choose(from, to).mix)
+        val enriched = to.copy(bassEntries = TrackBassEntries(2, listOf(16_000)))
+        val selection = choose(from, enriched)
+        val plan = assertNotNull(selection.mix)
+        assertEquals(unchanged, plan.copy(bassHandoffMs = null))
+        assertTrue(plan.bassEndsOverlap(184_000, 16_000, forceMidpoint = false))
+        assertFalse(plan.bassEndsOverlap(184_000, 16_000, forceMidpoint = true))
+        assertTrue("bass entry at 16000ms maps to 200000ms" in selection.detail)
+        assertNull(choose(from.copy(beatOffsetsMs = null), enriched).mix?.bassHandoffMs)
+        assertTrue("no sustained entries detected" in choose(from, to.copy(bassEntries = TrackBassEntries(2, emptyList()))).detail)
+        assertTrue("bass entries missing" in choose(from, to).detail)
+
+        fun gain(at: Float) = com.platter.automix.mixGains(at, 16_000, 500.0)
+        assertEquals(Crossfade.mixGains(0.5f), gain(0.5f))
+        assertTrue(gain(0.97f).second > 0.45f)
+        assertEquals(1f to 0f, gain(1f))
+        assertTrue((0..1000).map { gain(it / 1000f) }.all { (a, b) -> a * a + b * b in 0.999f..1.251f })
+        assertEquals(0f to 1f, bassGains(15_499.0, 16_000, 500.0, terminal = true))
+        assertEquals(1f to 1f, bassGains(16_000.0, 16_000, 500.0, terminal = true))
     }
 
     @Test
@@ -326,8 +415,8 @@ class CrossfadePlanTest {
         assertNull(selection.mix)
         assertTrue("first rejection: Vocals at" in selection.detail)
         val fallback = StructureMix.crossfade(from, to, 200_000, fade, 0)
-        assertEquals(1_500, fallback.fadeMs)
-        assertEquals(198_500, fallback.startMs)
+        assertTrue(fallback.fadeMs in 1_200..1_500)
+        assertEquals(200_000, fallback.startMs + fallback.fadeMs)
 
         val outro = from.copy(sections = listOf(
             TrackSection(150_000, 190_000, "chorus"), TrackSection(190_000, 200_000, "outro"),
@@ -335,6 +424,43 @@ class CrossfadePlanTest {
         val clean = assertNotNull(StructureMix.plan(outro, to, 200_000, fade, 0).mix)
         assertEquals("outro", clean.exitSection)
         assertEquals(192_000, clean.launchMs())
+    }
+
+    @Test
+    fun `rhythmic fallback aligns measured attacks without skipping an early vocal`() {
+        val standard = assertNotNull(Crossfade.plan(queue(song("a"), song("b")), 200_000))
+        val outgoingBeats = (195_000L..200_000 step 500).toList()
+        val incomingBeats = (220L..5_000 step 500).toList()
+        val from = TrackStructure(200_000, beatsMs = outgoingBeats, beatOffsetsMs = outgoingBeats.map { 35L })
+        val to = TrackStructure(200_000, beatsMs = incomingBeats, beatOffsetsMs = incomingBeats.map { 30L })
+        val adjusted = StructureMix.crossfade(from, to, 200_000, standard, 0)
+        assertEquals(1_200, adjusted.fadeMs)
+        assertEquals(198_800, adjusted.startMs)
+        assertEquals(15, adjusted.cueMs)
+        assertEquals(199_535 - adjusted.startMs, 750 - adjusted.cueMs)
+
+        val vocal = to.copy(sections = listOf(TrackSection(0, 10_000, "verse")))
+        assertEquals(0, StructureMix.crossfade(from, vocal, 200_000, standard, 0).cueMs)
+        val quiet = to.copy(beatOffsetsMs = incomingBeats.map { null },
+            audioLevels = TrackAudioLevels(0, 500, listOf(-55.0, -54.0, -53.0, -30.0, -20.0, -19.0)))
+        assertEquals(0, StructureMix.crossfade(from, quiet, 200_000, standard, 0).cueMs)
+    }
+
+    @Test
+    fun `fallback duration follows quiet material up to ten seconds and respects short recordings`() {
+        val standard = assertNotNull(Crossfade.plan(queue(song("a"), song("b")), 200_000)).window()
+        val quietIntro = TrackStructure(200_000, audioLevels = TrackAudioLevels(0, 100,
+            List(200) { -55.0 } + List(100) { -16.0 }))
+        val partialIntro = quietIntro.copy(audioLevels = TrackAudioLevels(0, 100,
+            List(45) { -55.0 } + List(255) { -16.0 }))
+        fun fade(to: TrackStructure?) = AutoMixPlanner.shapedFade(null, to, 200_000, 200_000, standard, 0)
+
+        assertEquals(1_500L, fade(null).fadeMs)
+        assertTrue(fade(partialIntro).fadeMs in 3_000L..7_000L)
+        assertEquals(10_000L, fade(quietIntro).fadeMs)
+        assertEquals(200_000L, fade(quietIntro).let { it.startMs + it.fadeMs })
+        val short = assertNotNull(AutoMixPlanner.standardFade(3_000, 3_000))
+        assertEquals(1_000L, AutoMixPlanner.shapedFade(null, null, 3_000, 3_000, short, 0).fadeMs)
     }
 
     @Test
@@ -400,15 +526,16 @@ class CrossfadePlanTest {
         val to = TrackStructure(200_000, sections = listOf(TrackSection(0, 23_500, "intro"),
             TrackSection(23_500, 40_000, "verse"), TrackSection(40_000, 60_000, "chorus")))
         val plan = StructureMix.crossfade(from, to, 200_000, fade, 0)
-        assertEquals(180_000, plan.startMs)
-        assertEquals(18_000, plan.fadeMs)
-        assertEquals(5_500, plan.cueMs)
+        assertEquals(196_500, plan.startMs)
+        assertEquals(1_500, plan.fadeMs)
+        assertEquals(22_000, plan.cueMs)
         assertEquals(23_500, plan.incomingVocalMs)
 
         val late = StructureMix.crossfade(from, to, 200_000, fade, 191_000)
         assertTrue(late.startMs >= 191_000)
         assertEquals(23_500, late.cueMs + late.fadeMs)
-        assertEquals(fade, StructureMix.crossfade(null, to.copy(durationMs = 196_000), 200_000, fade, 0))
+        assertEquals(fade.copy(startMs = 198_500, fadeMs = 1_500),
+            StructureMix.crossfade(null, to.copy(durationMs = 196_000), 200_000, fade, 0))
     }
 
     @Test
@@ -575,7 +702,7 @@ class CrossfadePlayerTest {
     @Test
     fun `a stream without seeking still crossfades from the start`() = withTrialStreams(seekable = false) { player, _ ->
         player.setStructures(quietEdges())
-        player.play(trialPair().onEach { it.title = "untagged fixture" }, positionMs = 228_000)
+        player.play(trialPair().onEach { it.title = "untagged fixture" }, positionMs = 232_000)
         waitFor(what = "the ordinary crossfade") { player.crossfading && player.state.value.current?.id == "27" }
         assertTrue(player.state.value.positionMs < 1_000, "cue was ${player.state.value.positionMs} ms")
         assertEquals(1f, player.incomingPlaybackRate)
@@ -600,27 +727,45 @@ class CrossfadePlayerTest {
             player.state.value.isPlaying && player.state.value.positionMs >= 214_000
         }
         waitFor(what = "the fallback timeline to show the shaped fade") {
-            player.state.value.upcomingOverlap == TimelineOverlap(224_000L..242_000L, FadeMode.AutoMixFallback)
+            player.state.value.upcomingOverlap?.let {
+                it.mode == FadeMode.AutoMixFallback && it.rangeMs.first in 240_380..240_800 && it.rangeMs.last in 241_880..242_000
+            } == true
         }
-        player.seekMs(221_000)
+        player.seekMs(237_000)
         waitFor(what = "the incoming track to start during its intro") {
             player.crossfading && player.state.value.current?.id == "27"
         }
-        assertTrue(player.state.value.positionMs in 4_200..4_700)
+        val entry = player.state.value
+        assertTrue(entry.positionMs in 20_700..21_400, "incoming position ${entry.positionMs} ms, overlap ${entry.incomingOverlap}")
         assertNull(player.state.value.autoMixTransition)
         assertEquals(1f, player.outgoingPlaybackRate)
         assertEquals(1f, player.incomingPlaybackRate)
-        waitFor(what = "the incoming track to play for several seconds") { player.state.value.positionMs >= 8_000 }
         val fade = assertNotNull(player.state.value.fadeTransition)
         assertEquals(FadeMode.AutoMixFallback, fade.mode)
-        assertTrue(fade.progress in 0.15f..0.30f)
         val incoming = assertNotNull(player.state.value.incomingOverlap)
         assertEquals(FadeMode.AutoMixFallback, incoming.mode)
-        assertTrue(incoming.rangeMs.first in 4_200..4_700)
+        assertTrue(incoming.rangeMs.first in 20_700..21_200)
+        assertTrue(incoming.rangeMs.last - incoming.rangeMs.first <= 1_500)
         assertTrue(incoming.rangeMs.last in 21_800..22_700)
-        waitFor(timeoutMs = 22_000, what = "the fade to finish at the first vocal") { player.state.value.fadeTransition == null }
+        waitFor(what = "the fade to finish at the first vocal") { player.state.value.fadeTransition == null }
         assertTrue(player.state.value.positionMs in 21_800..22_700, "handoff was at ${player.state.value.positionMs} ms")
         assertEquals(incoming, player.state.value.incomingOverlap)
+    }
+
+    @Test
+    fun `a phrase starting at zero runs muted until its clock can be checked`() = withTrialStreams { player, _ ->
+        val beats = (0L..244_000 step 500).toList()
+        val bars = (0L..244_000 step 2_000).toList()
+        player.setStructures(mapOf(
+            "03" to TrackStructure(244_689, beats, bars, listOf(TrackSection(224_000, 240_000, "outro"))),
+            "27" to TrackStructure(247_171, beats, bars, listOf(TrackSection(0, 16_000, "intro"),
+                TrackSection(16_000, 40_000, "verse"))),
+        ))
+        player.play(trialPair(), positionMs = 220_000)
+        waitFor(what = "the phase-checked beat mix") { player.state.value.autoMixTransition != null }
+        val overlap = assertNotNull(player.state.value.incomingOverlap)
+        assertTrue(overlap.rangeMs.first in 600..900, "opened the incoming deck at ${overlap.rangeMs.first} ms")
+        assertTrue(overlap.rangeMs.last in 15_900..16_100)
     }
 
     @Test

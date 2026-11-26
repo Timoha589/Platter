@@ -30,6 +30,11 @@ internal object AutoMixPlanner {
     fun remainingFadeMs(window: FadeWindow, positionMs: Long): Long =
         minOf(window.fadeMs, window.startMs + window.fadeMs - positionMs)
 
+    fun canStartFallback(window: FadeWindow, positionMs: Long): Boolean = remainingFadeMs(window, positionMs) >= MIN_FADE_MS
+
+    fun keepPreparedFallback(prepared: FadeWindow, replacement: FadeWindow, positionMs: Long): Boolean =
+        positionMs >= minOf(prepared.startMs, replacement.startMs) - PLAN_LEAD_MS && canStartFallback(prepared, positionMs)
+
     fun cueStatus(expectedDurationMs: Long, actualDurationMs: Long, seekable: Boolean, requiresSeek: Boolean): CueStatus = when {
         actualDurationMs <= 0 -> CueStatus.UNKNOWN_DURATION
         requiresSeek && !seekable -> CueStatus.NOT_SEEKABLE
@@ -51,12 +56,13 @@ internal object AutoMixPlanner {
         val structural = if (fromAnalysis != null && toAnalysis != null) {
             StructureMix.plan(fromAnalysis, toAnalysis, durationMs, to.duration?.times(1_000L), earliestMs)
         } else null
-        if (structural?.mix != null) return structural
+        if (structural?.mix?.let { it.fadeDurationMs(it.launchMs(), durationMs, standard.fadeMs) >= MIN_FADE_MS } == true) return structural
         val detail = structural?.detail ?: "server analysis unavailable for one or both tracks"
         val local = LocalBeatGrid.plan(from, to, durationMs, standard) ?: return StructureMix.Selection(null, detail)
         val launch = local.launchMs()
         if (launch < earliestMs) return StructureMix.Selection(null, "$detail; local beat cue already passed")
         val span = local.fadeDurationMs(launch, durationMs, standard.fadeMs)
+        if (span < MIN_FADE_MS) return StructureMix.Selection(null, "$detail; local beat overlap is too short")
         val outgoing = fromAnalysis?.takeIf { MixTempo.sameDuration(it.durationMs, durationMs) }?.sections.orEmpty()
         val incoming = toAnalysis?.takeIf { MixTempo.sameDuration(it.durationMs, local.incomingDurationMs) }?.sections.orEmpty()
         val cue = local.incomingStartMs
@@ -76,12 +82,14 @@ internal object AutoMixPlanner {
         earliestMs: Long,
     ): FadeWindow {
         val advertised = incomingDurationMs ?: 0L
-        val edges = audibleEdges(standard, durationMs, advertised, from, to, MIN_FADE_MS)
+        val maximum = standardFade(durationMs, incomingDurationMs, MAX_CROSSFADE_SECONDS * 1_000L) ?: standard
+        val edges = audibleEdges(maximum, durationMs, advertised, from, to, MIN_FADE_MS)
         return StructureMix.crossfade(from, to, durationMs, advertised, edges, earliestMs, MIN_FADE_MS)
     }
 
-    fun prerollCue(mix: BeatMixPlan, positionMs: Long): Long {
-        val lead = minOf(mix.incomingStartMs, PREROLL_MS, (mix.launchMs() - positionMs - PLAN_LEAD_MS).coerceAtLeast(0))
-        return if (lead >= MIN_PREROLL_MS) mix.incomingStartMs - lead else mix.incomingStartMs
+    fun prerollCue(mix: BeatMixPlan, positionMs: Long, wantedMs: Long = PREROLL_MS): Long {
+        val availableMs = (mix.launchMs() - positionMs - PLAN_LEAD_MS).coerceAtLeast(0)
+        val lead = minOf(mix.incomingStartMs, wantedMs, (availableMs * mix.tempoRatio).roundToLong())
+        return mix.incomingStartMs - lead
     }
 }

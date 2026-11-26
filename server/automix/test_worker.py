@@ -20,7 +20,7 @@ from urllib.request import urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "navidrome-journal"))
 from worker import Cache, Catalog, Handler, Work, encode
 from audio_muse import AudioMuse
-from audio_levels import measure
+from audio_levels import beat_features, measure
 
 
 class WorkerTest(unittest.TestCase):
@@ -93,17 +93,19 @@ class WorkerTest(unittest.TestCase):
             self.assertEqual(work.request(["song"], {1}),
                              {"tracks": {"song": {**timing, "audioLevels": levels}}, "pending": []})
 
-    def test_beat_offset_backfill_keeps_ready_grid_available(self):
+    def test_bass_entry_backfill_keeps_ready_grid_available(self):
         track = self.catalog.tracks(["song"])["song"]
-        timing = {"durationMs": 60200, "beatsMs": [400, 900]}
+        timing = {"durationMs": 60200, "beatsMs": [400, 900], "beatOffsetsMs": [18, None]}
+        bass_entries = {"version": 2, "downbeatsMs": []}
+        timing["bassEntries"] = {"version": 1, "downbeatsMs": []}
         self.cache.save("song", track, timing)
-        with patch("worker.beat_offsets", return_value=[18, None]) as detector:
-            work = Work(self.catalog, self.cache, measure_beat_offsets=detector)
+        with patch("worker.beat_features", return_value=([18, None], bass_entries)) as detector:
+            work = Work(self.catalog, self.cache, measure_beats=detector)
             self.assertEqual(work.request(["song"], {1}), {"tracks": {"song": timing}, "pending": ["song"]})
             work.process("song", lambda _: self.fail("an existing beat grid must not be reanalyzed"))
-            detector.assert_called_once_with(self.audio, [400, 900])
+            detector.assert_called_once_with(self.audio, [400, 900], [])
             self.assertEqual(work.request(["song"], {1}),
-                             {"tracks": {"song": {**timing, "beatOffsetsMs": [18, None]}}, "pending": []})
+                             {"tracks": {"song": {**timing, "bassEntries": bass_entries}}, "pending": []})
 
     def test_failed_audio_levels_are_retried_without_hiding_the_grid(self):
         track = self.catalog.tracks(["song"])["song"]
@@ -131,6 +133,22 @@ class WorkerTest(unittest.TestCase):
         self.assertAlmostEqual(result["lastSoundMs"], 5000, delta=20)
         self.assertEqual(result["stepMs"], 500)
         self.assertGreater(result["momentaryLufs"][4] - result["momentaryLufs"][8], 18)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "FFmpeg is required to test bass entries")
+    def test_marks_a_sustained_bass_entry_and_ignores_a_single_hit(self):
+        sample_rate = 8000
+        path = self.audio.with_suffix(".wav")
+        signal = array("h", [0]) * (10 * sample_rate)
+        for time_ms in (2000, 5500, 6000, 6500, 7500, 8000, 8500, 9000, 9500):
+            start = time_ms * sample_rate // 1000
+            for n in range(120 * sample_rate // 1000):
+                signal[start + n] = int(13000 * math.sin(2 * math.pi * 80 * n / sample_rate))
+        with wave.open(str(path), "wb") as wav:
+            wav.setparams((1, 2, sample_rate, 0, "NONE", "not compressed"))
+            wav.writeframes(signal.tobytes())
+        offsets, entries = beat_features(path, list(range(0, 10_000, 500)), [0, 2000, 4000, 6020, 8000])
+        self.assertEqual(entries, {"version": 2, "downbeatsMs": [6020]})
+        self.assertIsNotNone(offsets[4])
 
     def test_http_only_queues_tracks_visible_to_the_authenticated_user(self):
         calls = []

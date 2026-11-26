@@ -15,6 +15,12 @@ internal data class TrackStructure(
     @SerializedName("audioMuse") val audioMuse: AudioMuseFeatures? = null,
     @SerializedName("audioLevels") val audioLevels: TrackAudioLevels? = null,
     @SerializedName("beatOffsetsMs") val beatOffsetsMs: List<Long?>? = null,
+    @SerializedName("bassEntries") val bassEntries: TrackBassEntries? = null,
+)
+
+internal data class TrackBassEntries(
+    @SerializedName("version") val version: Int = 0,
+    @SerializedName("downbeatsMs") val downbeatsMs: List<Long>? = null,
 )
 
 internal data class TrackAudioLevels(

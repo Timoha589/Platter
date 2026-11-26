@@ -1,7 +1,9 @@
 package com.platter.desktop.player
 
 import com.platter.automix.AutoMixPlanner
+import com.platter.automix.FadeEnvelope
 import com.platter.automix.MixTempo
+import com.platter.automix.shortFallback
 import com.platter.desktop.i18n.t
 import com.platter.desktop.log.AppLog
 import com.platter.desktop.api.Song
@@ -109,6 +111,9 @@ class PlayerController(
     private val crossfadeMs: Long = Crossfade.DEFAULT_MS,
     initialCrossfadeDurationMs: Long = crossfadeMs,
 ) {
+    private val forceBassMidpoint = java.lang.Boolean.getBoolean("platter.automix.bassMidpoint")
+    private val correctPrerollPhase = System.getProperty("platter.automix.correctPrerollPhase", "true").toBoolean()
+    private val windowsAudio = System.getProperty("os.name").startsWith("Windows")
     /** The equalizer asked for; applied when the engine is up, and again whenever it changes. */
     private var wantedEq = initialEqualizer
     @Volatile
@@ -151,6 +156,8 @@ class PlayerController(
     private var mixRateSet = false
     private var preparedBeatCue = 0L
     private var mixPrerollStarted = false
+    private var phaseCorrectionTried = false
+    private var restorePrerollRate: ScheduledFuture<*>? = null
     private data class DeckClock(val positionMs: Long, val sampledAt: Long) {
         fun positionAt(now: Long, rate: Float) = positionMs + (now - sampledAt) / 1_000_000.0 * rate
     }
@@ -186,6 +193,7 @@ class PlayerController(
     private var fadeElapsedNanos = 0L
     private var lastTickNanos = 0L
     private var bassGains: Pair<Float, Float>? = null
+    private var outgoingHighCut = 0f
 
     /** True while two tracks overlap. */
     val crossfading: Boolean get() = outgoing != null
@@ -569,7 +577,7 @@ class PlayerController(
         val incoming = if (outgoing == null) spare else player
         val leaving = outgoing ?: player
         val bass = bassGains
-        val enabled = wantedEq.enabled || bass != null || autoMixOn
+        val enabled = wantedEq.enabled || bass != null || autoMixOn || outgoingHighCut > 0f
         try {
             val userPreamp = if (wantedEq.enabled) wantedEq.preamp else 0f
             val preamp = (userPreamp + LIBVLC_UNITY_PREAMP_DB).coerceAtMost(LIBVLC_MAX_PREAMP_DB)
@@ -587,7 +595,7 @@ class PlayerController(
                     else -> 1f
                 }
                 if (eq.preamp() != preamp) eq.setPreamp(preamp)
-                eq.setAmps(wantedEq.gainsWithBass(bassGain))
+                eq.setAmps(wantedEq.transitionGains(bassGain, if (deck === outgoing) outgoingHighCut else 0f))
                 if (attached == null) audio.setEqualizer(eq)
             }
             eqAttached = wantedEq.enabled
@@ -694,6 +702,7 @@ class PlayerController(
             }
             plannedMix
         } else null
+        val base = if (autoMixOn && mix == null) plan.withWindow(plan.window().shortFallback()) else plan
         val edges = if (autoMixOn && mix == null) {
             val shaped = plannedCrossfade ?: run {
                 val from = plannedFor?.fromStructure
@@ -703,12 +712,14 @@ class PlayerController(
                 )
                 plan.withWindow(window).also { plannedCrossfade = it }
             }
-            shaped.takeIf { positionMs <= it.startMs + it.fadeMs - Crossfade.MIN_FADE_MS } ?: plan
-        } else plan
+            shaped.takeIf { AutoMixPlanner.canStartFallback(it.window(), positionMs) } ?: base
+        } else base
         val previousFade = preparedFade
         val fade = if (autoMixOn && mix == null && preparedMix == null && spareFor === plan.to && previousFade != null &&
-            (plainCueSet && previousFade == plan || positionMs >= minOf(previousFade.startMs, edges.startMs) - 1_000)) previousFade else edges
-        val launch = mix?.launchMs() ?: fade.startMs
+            (plainCueSet && previousFade == base ||
+                AutoMixPlanner.keepPreparedFallback(previousFade.window(), edges.window(), positionMs))) previousFade else edges
+        val launch = if (mix != null && mix === preparedMix && mixRateSet) audibleLaunchMs(mix)
+            else mix?.launchMs() ?: fade.startMs
         val overlap = when {
             !autoMixOn || (spareFor === plan.to && spareFailed) -> null
             mix != null -> {
@@ -717,7 +728,7 @@ class PlayerController(
                     TimelineOverlap(launch..(launch + fadeMs), FadeMode.AutoMix)
                 } else null
             }
-            positionMs <= launch + fade.fadeMs - Crossfade.MIN_FADE_MS ->
+            AutoMixPlanner.canStartFallback(fade.window(), positionMs) ->
                 TimelineOverlap(launch..(launch + fade.fadeMs), FadeMode.AutoMixFallback)
             else -> null
         }
@@ -738,7 +749,7 @@ class PlayerController(
             return
         }
         if (spareFailed) return
-        if (spareReady) startCrossfade(plan, fade, positionMs)
+        if (spareReady) startCrossfade(base, fade, positionMs)
         else if (positionMs >= s.durationMs - minimumOverlapMs(fade)) dropPrewarm()
     }
 
@@ -775,7 +786,7 @@ class PlayerController(
                 }
             }
         }
-        if (positionMs >= fade.startMs) beginFade(fade, positionMs, cue, layered = fade != base)
+        if (positionMs >= fade.startMs) beginFade(fade, positionMs, cue)
     }
 
     private fun useFullCrossfade(plan: CrossfadePlan, reason: String) {
@@ -788,6 +799,11 @@ class PlayerController(
         plainCueSet = true
         mixDecision = "$mixDecision; $reason"
     }
+
+    // An entry close to sample zero has little or no material to preroll. Keep the beginning
+    // of the phrase muted long enough to measure both clocks before opening the incoming deck.
+    private fun audibleLaunchMs(mix: BeatMixPlan): Long = maxOf(mix.launchMs(),
+        mix.launchMs(preparedBeatCue) + (AutoMixPlanner.MIN_PREROLL_MS * mix.initialOutgoingRate).roundToLong())
 
     private fun scheduleBeatMix(plan: CrossfadePlan, mix: BeatMixPlan, positionMs: Long, sampledAt: Long) {
         val incoming = spare ?: return
@@ -806,8 +822,14 @@ class PlayerController(
             }
         }
         val incomingRate = BeatMix.incomingRate(mix.tempoRatio, 0f)
+        // WASAPI loopback with an incoming deck stretched below native speed and an outgoing
+        // deck at native speed shows a 3–20 ms output lead when VLC's input clocks agree.
+        val compensateOutput = correctPrerollPhase && windowsAudio &&
+            incomingRate < 1f - MixTempo.RATE_TOLERANCE && mix.initialOutgoingRate == 1f
+        val phaseTargetMs = if (compensateOutput) -10L else 0L
         if (!mixRateSet) {
-            preparedBeatCue = AutoMixPlanner.prerollCue(mix, positionMs)
+            val prerollMs = if (compensateOutput) PHASE_PREROLL_MS else AutoMixPlanner.PREROLL_MS
+            preparedBeatCue = AutoMixPlanner.prerollCue(mix, positionMs, prerollMs)
             incoming.controls().setTime(preparedBeatCue)
             if (incomingRate != status.rate() && !incoming.controls().setRate(incomingRate)) {
                 fallbackToCrossfade("audio engine refused the selected playback rate")
@@ -819,8 +841,8 @@ class PlayerController(
         val cue = if (mixPrerollStarted) mix.incomingStartMs else status.time()
         if (!mixPrerollStarted && (!AutoMixPlanner.matchesCue(cue, preparedBeatCue) || cue > mix.incomingBeatMs)) return
 
-        // shortcut: VLC reports its input clock every ~250 ms, so interpolate between events until the app mixes PCM on one output clock.
-        val launchAt = mix.launchMs(cue)
+        // VLC emits input-clock samples about every 250 ms. Extrapolate both decks to the same instant.
+        val launchAt = if (mixPrerollStarted) audibleLaunchMs(mix) else mix.launchMs(cue)
         val cueRate = mix.initialOutgoingRate
         val toCueMs = launchAt - positionMs
         val rampRate = if (mixPrerollStarted) cueRate else MixTempo.outgoingCueRate(mix, toCueMs)
@@ -837,6 +859,32 @@ class PlayerController(
         if (waitMs < -MIX_LATE_MS) {
             fallbackToCrossfade("selected cue at ${launchAt}ms was missed")
             return
+        }
+        if (restorePrerollRate != null) return
+        if (correctPrerollPhase && mixPrerollStarted && !phaseCorrectionTried) {
+            // Restore the matched rate early enough to get a fresh VLC clock sample before unmuting.
+            val correctionMs = minOf(waitMs - PHASE_CORRECTION_SETTLE_MS, if (compensateOutput) 850L else 600L)
+            val now = System.nanoTime()
+            val phase = prerollPosition(now, incomingRate)?.let {
+                mix.phaseErrorMs(DeckClock(positionMs, sampledAt).positionAt(now, cueRate).roundToLong(), it)
+            }
+            if (correctionMs >= PHASE_CORRECTION_MIN_MS && phase != null && abs(phase) <= MIX_MAX_PHASE_MS) {
+                val error = phase - phaseTargetMs
+                val correctionRate = (incomingRate * (1.0 - error.toDouble() / correctionMs)).coerceIn(.90, 1.10).toFloat()
+                val deadband = if (compensateOutput) 5 else 10
+                if (abs(error) >= deadband && correctionRate != incomingRate && incoming.controls().setRate(correctionRate)) {
+                    phaseCorrectionTried = true
+                    AppLog.info("AutoMix muted preroll correction: VLC phase ${phase}ms, target ${phaseTargetMs}ms, " +
+                        "${correctionRate}x for ${correctionMs}ms")
+                    restorePrerollRate = worker.schedule({
+                        restorePrerollRate = null
+                        if (!incoming.controls().setRate(incomingRate)) {
+                            fallbackToCrossfade("audio engine could not restore the selected playback rate")
+                        } else spareClock = null
+                    }, correctionMs, TimeUnit.MILLISECONDS)
+                    return
+                }
+            }
         }
         if (waitMs > MIX_LOOKAHEAD_MS) return
         mixLaunch?.cancel(false)
@@ -860,7 +908,7 @@ class PlayerController(
                 fallbackToCrossfade(failure)
                 return@schedule
             }
-            if (!mixPrerollStarted && preparedBeatCue < mix.incomingStartMs) {
+            if (!mixPrerollStarted) {
                 // Give the decoder time to fill its output while the outgoing track is still alone.
                 if (!silenceIncoming(incoming)) {
                     fallbackToCrossfade("incoming audio could not be silenced before preroll")
@@ -869,23 +917,24 @@ class PlayerController(
                 spareClock = null
                 mixPrerollStarted = true
                 incoming.controls().setPause(false)
-            } else if (mixPrerollStarted) {
+            } else {
                 val now = System.nanoTime()
-                val incomingPosition = spareClock?.takeIf {
-                    it.positionMs > preparedBeatCue && elapsedMs(it.sampledAt) <= MIX_CLOCK_MAX_AGE_MS
-                }?.positionAt(now, incomingRate)
+                val incomingPosition = prerollPosition(now, incomingRate)
                 val phase = incomingPosition?.let { mix.phaseErrorMs(estimatedPosition, it) }
                 if (!status.isPlaying || incomingPosition == null || phase == null || abs(phase) > MIX_MAX_PHASE_MS) {
                     fallbackToCrossfade("incoming clock could not lock to the selected cue (phase ${phase?.let { "${it}ms" } ?: "unknown"})")
                     return@schedule
                 }
-                AppLog.info("AutoMix phase before overlap: ${phase}ms")
-                beginFade(current, estimatedPosition, incomingPosition.roundToLong(), layered = true)
-            } else {
-                beginFade(current, estimatedPosition, cue, layered = true)
+                AppLog.info("AutoMix phase before overlap: ${phase}ms on VLC input clocks " +
+                    "(target ${phaseTargetMs}ms)")
+                beginFade(current, estimatedPosition, incomingPosition.roundToLong())
             }
         }, waitMs.coerceAtLeast(0), TimeUnit.MILLISECONDS)
     }
+
+    private fun prerollPosition(now: Long, rate: Float): Double? = spareClock?.takeIf {
+        it.positionMs > preparedBeatCue && now - it.sampledAt <= TimeUnit.MILLISECONDS.toNanos(MIX_CLOCK_MAX_AGE_MS)
+    }?.positionAt(now, rate)
 
     private fun elapsedMs(sampledAt: Long) = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - sampledAt)
 
@@ -918,6 +967,7 @@ class PlayerController(
         plainCueSet = false
         mixRateSet = false
         mixPrerollStarted = false
+        phaseCorrectionTried = false
         spareClock = null
         if (!silenceIncoming(s)) {
             AppLog.info("The next track could not be silenced before prewarming")
@@ -939,6 +989,8 @@ class PlayerController(
         if (outgoing != null) return
         mixLaunch?.cancel(false)
         mixLaunch = null
+        restorePrerollRate?.cancel(false)
+        restorePrerollRate = null
         val preparing = spare
         spare = null
         if (outgoingCueRate != 1f) {
@@ -955,11 +1007,11 @@ class PlayerController(
         spareReady = false
         spareFailed = false
         preparing?.let(::stopAndRelease)
-        clearBassHandoff()
+        clearTransitionEq()
     }
 
     /** The spare takes over as the player, silent, and the volumes start to cross. */
-    private fun beginFade(plan: CrossfadePlan, positionMs: Long, cueMs: Long, layered: Boolean) {
+    private fun beginFade(plan: CrossfadePlan, positionMs: Long, cueMs: Long) {
         val incoming = spare ?: return
         val before = state.value
         val mix = preparedMix
@@ -1032,9 +1084,14 @@ class PlayerController(
         fadeLengthMs = fadeMs
         fadeElapsedNanos = 0
         lastTickNanos = System.nanoTime()
+        val envelope = FadeEnvelope(fadeMs, autoMixOn, mix, positionMs, forceBassMidpoint)
         if (mix != null) {
             val bars = mix.bars?.let { ", $it bars" }.orEmpty()
-            val bass = mix.outgoingBeatPeriodMs?.let { ", bass handoff over ${it.roundToLong()}ms" }.orEmpty()
+            val bass = mix.outgoingBeatPeriodMs?.let {
+                val center = if (envelope.terminalBass) "final downbeat"
+                    else envelope.bassCenterMs?.let { "downbeat +${it.roundToLong()}ms" } ?: "midpoint"
+                ", bass handoff at $center over ${it.roundToLong()}ms"
+            }.orEmpty()
             val pair = transitionName(before.current, plan.to)
             val remaining = (before.durationMs - positionMs - fadeMs).coerceAtLeast(0)
             AppLog.info("AutoMix at ${positionMs}ms, exit ${mix.exitSection ?: "beat grid"}, entry ${cueMs}ms, " +
@@ -1048,11 +1105,13 @@ class PlayerController(
         }
         if (incomingRunning) nowPlaying() else incoming.controls().setPause(false)
         val autoMix = autoMixOn
-        ticker = worker.scheduleAtFixedRate({ fadeTick(layered, autoMix, mix?.outgoingBeatPeriodMs) }, 0, FADE_TICK_MS, TimeUnit.MILLISECONDS)
+        ticker = worker.scheduleAtFixedRate(
+            { fadeTick(autoMix, envelope) }, 0, FADE_TICK_MS, TimeUnit.MILLISECONDS,
+        )
     }
 
     /** One step of the fade. The clock runs only while the new track is actually sounding, so a pause holds it still. */
-    private fun fadeTick(layered: Boolean, autoMix: Boolean, beatPeriodMs: Double?) {
+    private fun fadeTick(autoMix: Boolean, envelope: FadeEnvelope) {
         try {
             val leaving = outgoing ?: return
             val incoming = player ?: return
@@ -1066,7 +1125,7 @@ class PlayerController(
             }
             lastTickNanos = now
             val fadeElapsedMs = TimeUnit.NANOSECONDS.toMillis(fadeElapsedNanos)
-            val progress = (fadeElapsedMs.toFloat() / fadeLengthMs).coerceAtMost(1f)
+            val progress = envelope.progressAt(fadeElapsedMs)
             if (tempoRatio != 1.0) {
                 val nextRate = BeatMix.incomingRate(tempoRatio, progress)
                 if (nextRate != activeMixRate && (abs(nextRate - activeMixRate) >= MixTempo.TEMPO_STEP || progress == 1f)) {
@@ -1083,14 +1142,13 @@ class PlayerController(
             }
 
             val volume = state.value.volume
-            if (beatPeriodMs != null) {
-                val gains = Crossfade.bassGains(fadeElapsedMs + BASS_FILTER_LOOKAHEAD_MS * outgoingRate, fadeLengthMs, beatPeriodMs)
-                if (bassGains != gains) {
-                    bassGains = gains
-                    applyEqualizer()
-                }
+            val levels = envelope.levels(progress, fadeElapsedMs + BASS_FILTER_LOOKAHEAD_MS * outgoingRate)
+            if (bassGains != levels.bass || outgoingHighCut != levels.highCut) {
+                bassGains = levels.bass
+                outgoingHighCut = levels.highCut
+                applyEqualizer()
             }
-            val (inGain, outGain) = if (layered) Crossfade.mixGains(progress) else Crossfade.gains(progress)
+            val (inGain, outGain) = levels
             val inVolume = if (autoMix) vlcVolumeForGain(volume, inGain) else (volume * inGain).roundToInt()
             val outVolume = if (autoMix) vlcVolumeForGain(volume, outGain) else (volume * outGain).roundToInt()
             val incomingAudio = incoming.audio()
@@ -1135,7 +1193,7 @@ class PlayerController(
         activeMixRate = 1f
         outgoing = null
         if (restoreVolume) runCatching { player?.let(::applyPlaybackVolume) }
-        clearBassHandoff()
+        clearTransitionEq()
         _state.update { state ->
             val heard = state.incomingOverlap?.let { overlap ->
                 val range = overlap.rangeMs
@@ -1151,9 +1209,10 @@ class PlayerController(
         runCatching { deck.release() }
     }
 
-    private fun clearBassHandoff() {
-        if (bassGains == null) return
+    private fun clearTransitionEq() {
+        if (bassGains == null && outgoingHighCut == 0f) return
         bassGains = null
+        outgoingHighCut = 0f
         applyEqualizer()
     }
 
@@ -1192,6 +1251,7 @@ class PlayerController(
         worker.execute {
             ticker?.cancel(false)
             mixLaunch?.cancel(false)
+            restorePrerollRate?.cancel(false)
             rateRecovery?.cancel(false)
             runCatching { player?.controls()?.stop() }
             runCatching { outgoing?.controls()?.stop() }
@@ -1216,6 +1276,9 @@ class PlayerController(
         const val MIX_LOOKAHEAD_MS = 285L
         const val MIX_CLOCK_MAX_AGE_MS = 450L
         const val MIX_MAX_PHASE_MS = AutoMixPlanner.PHASE_TOLERANCE_MS
+        const val PHASE_CORRECTION_MIN_MS = 240L
+        const val PHASE_PREROLL_MS = 1_600L
+        const val PHASE_CORRECTION_SETTLE_MS = 320L
 
         /** What libvlc's equalizer needs as preamp to leave the level as it was; measured, see EqualizerSoundTest. */
         const val LIBVLC_UNITY_PREAMP_DB = 12f

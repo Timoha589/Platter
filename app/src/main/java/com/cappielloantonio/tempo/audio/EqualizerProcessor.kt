@@ -4,7 +4,7 @@ import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor.AudioFormat
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
-import com.platter.automix.bandGainWithBass
+import com.platter.automix.transitionBandGain
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
@@ -24,10 +24,13 @@ import kotlin.math.sin
 class EqualizerProcessor : BaseAudioProcessor() {
     @Volatile
     internal var mixBassGain: Float? = null
+    @Volatile
+    internal var mixDamping: Float? = null
 
     // Worked out on the playback thread whenever the settings' version moves on.
     private var version = -1
     private var appliedBassGain: Float? = null
+    private var appliedDamping: Float? = null
     private var active = false
     private var preamp = 1f
     private var bandCount = 0
@@ -102,12 +105,14 @@ class EqualizerProcessor : BaseAudioProcessor() {
     private fun refresh() {
         val now = PlatterEqualizer.version
         val bass = mixBassGain
-        if (now == version && bass == appliedBassGain) return
+        val damping = mixDamping
+        if (now == version && bass == appliedBassGain && damping == appliedDamping) return
         version = now
         appliedBassGain = bass
+        appliedDamping = damping
 
         val settings = PlatterEqualizer.settings
-        if (!settings.enabled && bass == null) {
+        if (!settings.enabled && bass == null && damping == null) {
             active = false
             return
         }
@@ -115,12 +120,13 @@ class EqualizerProcessor : BaseAudioProcessor() {
         val channels = inputAudioFormat.channelCount
         val gains = settings.gains().mapIndexed { band, gain ->
             val base = if (settings.enabled) gain else 0f
-            if (bass != null) bandGainWithBass(base, band, bass) else base
+            transitionBandGain(base, band, bass ?: 1f, damping ?: 0f)
         }
 
-        // Keep the low filters in place while mixing so their memory survives the handoff.
+        // Keep the transition bands in place so their filter memory survives gain changes.
         val bands = gains.indices.filter {
-            (abs(gains[it]) >= 0.05f || bass != null && it < 2) && EqSettings.FREQUENCIES[it] < rate * 0.45f
+            (abs(gains[it]) >= 0.05f || bass != null && it < 2 || damping != null && it >= 5) &&
+                EqSettings.FREQUENCIES[it] < rate * 0.45f
         }
         val preampDb = if (settings.enabled) settings.preamp else 0f
         active = bands.isNotEmpty() || abs(preampDb) >= 0.05f

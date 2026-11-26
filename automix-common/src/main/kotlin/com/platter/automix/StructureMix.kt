@@ -36,8 +36,16 @@ internal object StructureMix {
         val outBars = from.downbeatsMs.orEmpty()
         val inBeats = to.beatsMs.orEmpty()
         val outBeats = from.beatsMs.orEmpty()
+        val bass = to.bassEntries
+        val bassMarkers = bass?.takeIf { it.version in 1..2 }?.downbeatsMs.orEmpty().sorted()
+        val bassStatus = when {
+            bass == null -> "bass entries missing"
+            bass.version !in 1..2 -> "bass entries version ${bass.version} unsupported"
+            bassMarkers.isEmpty() -> "bass entries v${bass.version}: no sustained entries detected"
+            else -> "bass entries v${bass.version}: ${bassMarkers.size} detected"
+        }
         if (inBars.isEmpty() || outBars.isEmpty() || inBeats.isEmpty() || outBeats.isEmpty())
-            return Selection(null, "missing beat grid")
+            return Selection(null, "missing beat grid; $bassStatus")
         val firstExit = maxOf(earliestMs, durationMs - minOf(90_000L, durationMs / 3))
         val exits = outgoing.filter { it.endMs >= firstExit && (it.label in backing || it.label in vocals) }
         val profileCost = overlapCostPerMs(from.audioMuse, to.audioMuse)
@@ -46,6 +54,7 @@ internal object StructureMix {
         var best: BeatMixPlan? = null
         var bestCost = Double.POSITIVE_INFINITY
         var bestEndsAtFirstVocal = false
+        var bestBass = BassHandoff(null, null)
         var valid = 0
         var tempoRejected = 0
         var gridRejected = 0
@@ -57,6 +66,8 @@ internal object StructureMix {
             val launch = outBars[exit.first]
             val end = outBars[exit.first + count]
             val overlap = end - launch
+            if (count == 2 && (!completeTwoBars(inBeats, inBars, entry.first) ||
+                    !completeTwoBars(outBeats, outBars, exit.first))) return PhraseResult.Grid
             val rate = (anchor - cue).toDouble() / overlap
             if (rate !in MixTempo.supportedTempoRatios) return PhraseResult.Tempo
             val barError = (1..count).maxOf { k ->
@@ -86,10 +97,19 @@ internal object StructureMix {
             // Leave the audio at native speed if stretching would only save a few milliseconds of drift.
             val playbackRate = if (abs(anchor - cue - overlap) <= 15) 1.0 else rate
             val phaseAdvance = phaseAdvance(from, to, alignment, end, anchor, playbackRate)
+            val period = overlap.toDouble() / alignment.beats
+            val terminalBass = bass?.version == 2 && exit.label in backing &&
+                end - period < lastSound && outgoing.none { it.label in vocals &&
+                    it.startMs < end - 90 && it.endMs > end - period } &&
+                localRhythm(from, end - 2 * period.roundToLong(), end).any { it.measured &&
+                    it.timeMs in (end - 2 * period.roundToLong())..end } &&
+                !locallyQuiet(from.audioLevels, end - period.roundToLong(), end)
+            bestBass = bassHandoff(bassMarkers, inBars, entry, outBars, exit, count, period, terminalBass)
             best = BeatMixPlan(
                 end, anchor + phaseAdvance, (cue + phaseAdvance).coerceAtLeast(0), to.durationMs,
                 playbackRate, entry.label, exit.label, overlap, count, phaseAdvance,
-                outgoingBeatPeriodMs = overlap.toDouble() / alignment.beats,
+                outgoingBeatPeriodMs = period,
+                bassHandoffMs = bestBass.outgoingMs,
             )
             return PhraseResult.Compatible
         }
@@ -140,7 +160,17 @@ internal object StructureMix {
             }.joinToString(" | ", prefix = "early search: ")
         } else null
         val earlyChoice = best?.takeUnless { it === standard }
+        if (best == null) {
+            val exitsForTwoBars = (exitPhrases(exits, outBars, 2, firstExit, durationMs) +
+                tailPhrases(exits, outBars, 2, firstExit, lastSound, durationMs)).distinctBy { it.first }
+            val entriesForTwoBars = (entryPhrases(incoming, inBars, 2, to.durationMs).toList() +
+                earlyPhrases(incoming, inBars, 2, earlyLimit)).distinctBy { it.first }
+            for (entry in entriesForTwoBars) {
+                for (exit in exitsForTwoBars) consider(entry, exit, 2, expanded = true)
+            }
+        }
         val detail = when {
+            best?.bars == 2 -> "selected a two-bar overlap after longer phrases failed"
             earlyChoice != null -> "selected an early handoff at ${earlyChoice.incomingBeatMs}ms"
             valid > 0 -> "selected from $valid compatible phrases"
             tempoRejected + gridRejected + vocalRejected > 0 ->
@@ -154,6 +184,14 @@ internal object StructureMix {
             "$vocalRejected section-boundary pairs rejected for overlapping vocals".takeIf { vocalRejected > 0 && best != null },
             best?.takeIf { bestEndsAtFirstVocal }?.let { "handoff at first vocal (${it.incomingBeatMs}ms)" },
             best?.phaseAdvanceMs?.takeIf { it != 0L }?.let { "audio attack correction ${it}ms" },
+            bassStatus,
+            best?.takeIf { bassMarkers.isNotEmpty() }?.let {
+                when {
+                    bestBass.outgoingMs != null -> "bass entry at ${bestBass.incomingMs}ms maps to ${bestBass.outgoingMs}ms"
+                    bestBass.incomingMs != null -> "bass entry at ${bestBass.incomingMs}ms is too close to the overlap edge"
+                    else -> "no bass entry in the selected overlap"
+                }
+            },
             "AudioMuse features available".takeIf { from.audioMuse != null || to.audioMuse != null },
             "local loudness available".takeIf { from.audioLevels != null || to.audioLevels != null },
         )
@@ -161,7 +199,8 @@ internal object StructureMix {
     }
 
     /** Pick section boundaries for a fade at native speed, even when the grids cannot be mixed. */
-    fun crossfade(from: TrackStructure?, to: TrackStructure?, durationMs: Long, advertisedMs: Long, edges: FadeWindow, earliestMs: Long, minFadeMs: Long): FadeWindow {
+    fun crossfade(from: TrackStructure?, to: TrackStructure?, durationMs: Long, advertisedMs: Long, window: FadeWindow, earliestMs: Long, minFadeMs: Long): FadeWindow {
+        val edges = window.shortFallback()
         val outgoing = from?.takeIf { MixTempo.sameDuration(it.durationMs, durationMs) }
         val incoming = to?.takeIf { MixTempo.sameDuration(it.durationMs, advertisedMs) }
         val incomingDuration = incoming?.durationMs ?: 0L
@@ -174,37 +213,110 @@ internal object StructureMix {
         val firstExit = maxOf(earliestMs, durationMs - minOf(90_000L, durationMs / 3))
         val outgoingParts = outgoing?.let(::passages).orEmpty()
         val exits = outgoingParts.filter { it.endMs > firstExit && (it.label in backing || it.label in vocals) }
-        if (firstVocal == null && introEnd == null && exits.isEmpty()) return edges
-
         val introLength = (firstVocal ?: introEnd)?.minus(edges.cueMs)
-        val preferred = introLength?.let { minOf(it, preferredOverlapMs.last, durationMs / 3, incomingDuration / 3) } ?: edges.fadeMs
+        val preferred = minOf(introLength ?: window.fadeMs, window.fadeMs)
         var best: FadeWindow? = null
         var bestCost = Double.POSITIVE_INFINITY
         for (exit in exits + TrackSection(firstExit, tail, null)) {
             val end = minOf(exit.endMs, tail)
-            val overlap = minOf(preferred, end - maxOf(firstExit, exit.startMs))
-            if (overlap < minFadeMs) continue
-            val start = end - overlap
-            val cue = firstVocal?.minus(overlap) ?: edges.cueMs
-            if (cue > 75_000L) continue
-            if (hasVocalOverlap(outgoingParts, incomingParts, start, end, cue, cue + overlap)) continue
-            val cost = (tail - end) + (cue - edges.cueMs) + 2 * (preferred - overlap) +
-                levelCost(outgoing?.audioLevels, incoming?.audioLevels, start, end, cue, cue + overlap) +
-                when (exit.label) {
-                    null -> 4_000
-                    in vocals -> 3_000
-                    else -> 0
-                }
-            if (cost >= bestCost) continue
-            bestCost = cost
-            best = edges.copy(startMs = start, fadeMs = overlap, cueMs = cue,
-                cueRecordingDurationMs = incoming?.durationMs ?: edges.cueRecordingDurationMs, incomingVocalMs = firstVocal)
+            val room = minOf(preferred, end - maxOf(firstExit, exit.startMs))
+            if (room < minFadeMs) continue
+            val short = minOf(room, edges.fadeMs)
+            val spans = if (outgoing?.audioLevels?.momentaryLufs != null || incoming?.audioLevels?.momentaryLufs != null) {
+                (room downTo short step 500).toList() + short
+            } else listOf(short)
+            for (overlap in spans.distinct()) {
+                val start = end - overlap
+                val cue = firstVocal?.minus(overlap) ?: edges.cueMs
+                if (cue > 75_000L || hasVocalOverlap(outgoingParts, incomingParts, start, end, cue, cue + overlap)) continue
+                // At native speeds, extend the overlap only when one deck is quiet enough to stay in the background.
+                if (overlap > short && !locallyQuiet(outgoing?.audioLevels, start, end) &&
+                    !locallyQuiet(incoming?.audioLevels, cue, cue + overlap)) continue
+                val cost = (tail - end) + (cue - edges.cueMs) + 2 * (room - overlap) +
+                    levelCost(outgoing?.audioLevels, incoming?.audioLevels, start, end, cue, cue + overlap) +
+                    when (exit.label) {
+                        null -> 4_000
+                        in vocals -> 3_000
+                        else -> 0
+                    }
+                if (cost >= bestCost) continue
+                bestCost = cost
+                best = edges.copy(startMs = start, fadeMs = overlap, cueMs = cue,
+                    cueRecordingDurationMs = incoming?.durationMs?.takeIf { cue > 0 }, incomingVocalMs = firstVocal)
+            }
         }
-        if (best != null) return best
-        if (!hasVocalOverlap(outgoingParts, incomingParts, edges.startMs, tail, edges.cueMs, edges.cueMs + edges.fadeMs)) return edges
-        // Leave time for the player's minimum fade even if starting the spare deck takes a few ticks.
-        val briefFade = minOf(edges.fadeMs, minFadeMs + 500)
-        return edges.copy(startMs = tail - briefFade, fadeMs = briefFade)
+        val selected = best ?: edges
+        if (selected.fadeMs > edges.fadeMs || outgoing == null || incoming == null) return selected
+        val end = selected.startMs + selected.fadeMs
+        val outAttacks = localRhythm(outgoing, selected.startMs - 120, end)
+        val inAttacks = localRhythm(incoming, selected.cueMs, selected.cueMs + selected.fadeMs + 160)
+        if (outAttacks.isEmpty() || inAttacks.isEmpty()) return selected
+
+        // With two active grids, a shorter overlap limits drift at native speeds. Align the
+        // attacks nearest the gain crossover, where the two tracks are equally loud.
+        val short = minOf(selected.fadeMs, maxOf(minFadeMs, 1_200L))
+        val endMoves = if (selected.incomingVocalMs != null) 0L..120L step 10 else 0L..0L
+        val spans = ((short..selected.fadeMs step 10).toList() + selected.fadeMs).distinct()
+        var bestRhythm = selected
+        var bestRhythmCost = Double.POSITIVE_INFINITY
+        for (moveEnd in endMoves) {
+            val stop = end - moveEnd
+            if (moveEnd > 0 && clipsVocal(outgoingParts, stop, end)) continue
+            for (span in spans) {
+                val start = stop - span
+                if (start < earliestMs) continue
+                val baseCue = selected.incomingVocalMs?.minus(span) ?: selected.cueMs
+                val cross = closestAttack(outAttacks, start + span / 2) - start
+                val hit = closestAttack(inAttacks, baseCue + cross)
+                val alignedCue = if (selected.incomingVocalMs == null) (hit - baseCue - cross).coerceIn(0L, 160L) else 0L
+                for (move in listOf(0L, alignedCue).distinct()) {
+                    val cue = baseCue + move
+                    if (cue + span > incomingDuration ||
+                        (move > 0 && clipsVocal(incomingParts, baseCue, cue)) ||
+                        hasVocalOverlap(outgoingParts, incomingParts, start, stop, cue, cue + span)) continue
+                    // Require corroborating loudness evidence before treating the lack of measured attacks as a quiet deck.
+                    val outHits = outAttacks.any { it.measured && it.timeMs in start..stop }
+                    val inHits = inAttacks.any { it.measured && it.timeMs in cue..(cue + span) }
+                    val oneRhythm = (outHits && !inHits && locallyQuiet(incoming.audioLevels, cue, cue + span)) ||
+                        (inHits && !outHits && locallyQuiet(outgoing.audioLevels, start, stop))
+                    val phaseCost = if (oneRhythm) -200L else abs(hit - cue - cross)
+                    val cost = phaseCost + (span - short) / 2.0 + move / 4.0 + moveEnd / 4.0
+                    if (cost >= bestRhythmCost) continue
+                    bestRhythmCost = cost
+                    bestRhythm = selected.copy(startMs = start, fadeMs = span, cueMs = cue,
+                        cueRecordingDurationMs = incomingDuration.takeIf { cue > 0 })
+                }
+            }
+        }
+        return bestRhythm
+    }
+
+    private fun clipsVocal(sections: List<TrackSection>, start: Long, end: Long): Boolean =
+        sections.any { it.label in vocals && it.startMs < end && it.endMs > start }
+
+    private data class Attack(val timeMs: Long, val measured: Boolean)
+
+    private fun localRhythm(track: TrackStructure, start: Long, end: Long): List<Attack> {
+        val beats = track.beatsMs.orEmpty()
+        val from = nearest(beats, start, 850) ?: return emptyList()
+        val to = nearest(beats, end, 850) ?: return emptyList()
+        if (to - from < 2 || (from + 1..to).any { beats[it] - beats[it - 1] !in 240L..850L }) return emptyList()
+        return (from..to).map { i ->
+            val offset = track.beatOffsetsMs?.getOrNull(i)?.takeIf { it in -65L..85L }
+            Attack(beats[i] + (offset ?: 0L), offset != null)
+        }
+    }
+
+    private fun closestAttack(attacks: List<Attack>, targetMs: Long): Long = attacks.minBy {
+        abs(it.timeMs - targetMs) + if (it.measured) 0 else 65
+    }.timeMs
+
+    private fun locallyQuiet(levels: TrackAudioLevels?, start: Long, end: Long): Boolean {
+        val outside = maxOf(levels?.at(start - 1_500) ?: return false, levels.at(end + 1_500) ?: return false)
+        return listOf(start + (end - start) / 4, (start + end) / 2, end - (end - start) / 4).all { time ->
+            val level = levels.at(time) ?: return false
+            level < -48 || outside - level >= 9
+        }
     }
 
     private fun TrackAudioLevels.at(ms: Long): Double? {
@@ -299,7 +411,7 @@ internal object StructureMix {
                 val cue = bars[first]
                 val anchor = bars[first + count]
                 if (cue < maxOf(0, intro.startMs - 900) || cue > lastCue ||
-                    anchor > intro.endMs + 900 || anchor - cue !in 4_000L..48_000L) continue
+                    anchor > intro.endMs + 900 || anchor - cue !in minSpanMs(count)..48_000L) continue
                 val vocalAtHandoff = vocal?.takeIf { first + count == vocalBar }
                 yield(Phrase(first, vocalAtHandoff?.label ?: intro.label, vocalAtHandoff))
             }
@@ -318,7 +430,7 @@ internal object StructureMix {
                 if (end > limit) break
                 val first = handoff - count
                 val cue = bars[first]
-                if (end - cue !in 4_000L..48_000L) continue
+                if (end - cue !in minSpanMs(count)..48_000L) continue
                 val (boundary, section) = boundaries.lastOrNull { (index, _) -> index <= handoff } ?: continue
                 if ((handoff - boundary) % 4 != 0 || end > section.endMs + 900) continue
                 val start = boundaries.lastOrNull { (index, _) -> index <= first }?.second ?: continue
@@ -376,6 +488,33 @@ internal object StructureMix {
 
     private fun adjacent(a: TrackSection, b: TrackSection) = abs(a.endMs - b.startMs) <= 1_000
 
+    private fun minSpanMs(bars: Int): Long = if (bars == 2) 1_920L else 4_000L
+
+    private fun completeTwoBars(beats: List<Long>, downbeats: List<Long>, first: Int): Boolean {
+        val start = nearest(beats, downbeats[first], 45) ?: return false
+        val middle = nearest(beats, downbeats[first + 1], 45) ?: return false
+        val end = nearest(beats, downbeats[first + 2], 45) ?: return false
+        return middle - start == 4 && end - middle == 4
+    }
+
+    private data class BassHandoff(val outgoingMs: Long?, val incomingMs: Long?)
+
+    private fun bassHandoff(strong: List<Long>, incoming: List<Long>, entry: Phrase, outgoing: List<Long>, exit: Phrase,
+                            count: Int, beatPeriodMs: Double, allowTerminal: Boolean): BassHandoff {
+        val start = outgoing[exit.first]
+        val end = outgoing[exit.first + count]
+        // The one-beat bass ramp needs room on both sides and should avoid a nearly silent deck.
+        val guardMs = maxOf(beatPeriodMs, (end - start) / 5.0)
+        val hits = (0..count).filter { k -> nearest(strong, incoming[entry.first + k], 45) != null }
+        val selected = hits.filter { k ->
+            val at = outgoing[exit.first + k]
+            at - start >= guardMs && end - at >= guardMs
+        }.minByOrNull { abs((outgoing[exit.first + it] - start) - (end - start) / 2.0) }
+            ?: count.takeIf { allowTerminal && it in hits }
+        return BassHandoff(selected?.let { outgoing[exit.first + it] },
+            (selected ?: hits.firstOrNull())?.let { incoming[entry.first + it] })
+    }
+
     private fun nearest(times: List<Long>, time: Long, tolerance: Long): Int? {
         val hit = times.binarySearch(time)
         if (hit >= 0) return hit
@@ -390,10 +529,10 @@ internal object StructureMix {
         val count = (nearest(incoming, anchor, 85) ?: return null) - i
         if (count < 8 || (nearest(outgoing, end, 85) ?: return null) - j != count) return null
         var worst = 0.0
-        for (k in 1..count) {
+        for (k in 0..count) {
             val a = incoming[i + k]
             val b = outgoing[j + k]
-            if (a - incoming[i + k - 1] !in 240L..850L || b - outgoing[j + k - 1] !in 240L..850L) return null
+            if (k > 0 && (a - incoming[i + k - 1] !in 240L..850L || b - outgoing[j + k - 1] !in 240L..850L)) return null
             val error = abs((a - cue) / rate - (b - launch))
             if (error > 65) return null
             worst = maxOf(worst, error)

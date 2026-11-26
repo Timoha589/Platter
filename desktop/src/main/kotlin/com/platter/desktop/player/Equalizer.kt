@@ -1,6 +1,6 @@
 package com.platter.desktop.player
 
-import com.platter.automix.bandGainWithBass
+import com.platter.automix.transitionBandGain
 
 /**
  * The equalizer as the listener left it: on or off, a preamp, and a gain in dB for each of libvlc's ten bands.
@@ -14,10 +14,9 @@ data class EqSettings(
     /** Always ten values, whatever was saved. */
     fun gains(): List<Float> = List(BANDS) { bands.getOrNull(it) ?: 0f }
 
-    /** Scale the low two bands for AutoMix, keeping the listener's settings as the baseline. */
-    internal fun gainsWithBass(bassGain: Float): FloatArray = FloatArray(BANDS) { band ->
+    internal fun transitionGains(bassGain: Float, damping: Float = 0f): FloatArray = FloatArray(BANDS) { band ->
         val base = if (enabled) bands.getOrNull(band) ?: 0f else 0f
-        bandGainWithBass(base, band, bassGain)
+        transitionBandGain(base, band, bassGain, damping)
     }
 
     companion object {

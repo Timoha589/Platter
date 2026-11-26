@@ -32,6 +32,8 @@ class AutoMixTransitionTest {
         val preroll = AutoMixPlanner.prerollCue(beats, 0)
         assertEquals(840L, preroll)
         assertEquals(preroll, beats.cueAt(beats.launchMs(preroll)))
+        assertEquals(0L, AutoMixPlanner.prerollCue(beats.copy(incomingStartMs = 300), 0))
+        assertEquals(1_530L, AutoMixPlanner.prerollCue(beats, mix.window.startMs - 1_500))
     }
 
     @Test
@@ -40,9 +42,20 @@ class AutoMixTransitionTest {
         val incoming = TrackStructure(durationMs, audioLevels = TrackAudioLevels(firstSoundMs = 1_000))
         val mix = checkNotNull(plan(outgoing, incoming))
         assertNull(mix.beats)
-        assertEquals(40_000L, mix.window.startMs)
+        assertEquals(44_500L, mix.window.startMs)
         assertEquals(46_000L, mix.endMs)
         assertEquals(1_000L, mix.window.cueMs)
+    }
+
+    @Test
+    fun `a quiet intro can extend incompatible rhythms to the same ten second maximum as desktop`() {
+        val incoming = structure(350, TrackSection(0, durationMs, "intro")).copy(
+            audioLevels = TrackAudioLevels(0, 100, List(100) { -55.0 } + List(380) { -16.0 }),
+        )
+        val mix = checkNotNull(plan(from, incoming))
+        assertNull(mix.beats)
+        assertEquals(10_000L, mix.window.fadeMs)
+        assertEquals(durationMs, mix.endMs)
     }
 
     @Test

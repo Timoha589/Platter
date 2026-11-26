@@ -26,6 +26,9 @@
     <dimen name="now_playing_bottom_peek_height">64dp</dimen>
     <dimen name="global_padding_bottom">142dp</dimen>
 
+    <dimen name="feedback_banner_max_width">352dp</dimen>
+    <dimen name="feedback_banner_mix_width">288dp</dimen>
+
     <!-- Lyrics are read from across the room, not scanned like metadata: the one
          place the type scale is taken to its 24sp ceiling. Inactive lines are
          drawn back from this rather than the sung one being pushed past it. -->

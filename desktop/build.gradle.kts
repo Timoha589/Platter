@@ -7,7 +7,7 @@ plugins {
 }
 
 /** The one place the version is written: the installer, the running app (`-Dplatter.version`) and the updater all read it. */
-val platterVersion = "1.1.1"
+val platterVersion = "1.1.2"
 
 group = "com.platter"
 version = platterVersion
@@ -117,6 +117,19 @@ tasks.test {
     // The bundle test plays through the bundle alone.
     dependsOn(prepareVlc)
     systemProperty("platter.test.vlcBundle", layout.buildDirectory.dir("vlc-resources/windows-x64/vlc").get().asFile.path)
+}
+
+tasks.register<JavaExec>("autoMixOutputProbe") {
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass = "com.platter.desktop.AutoMixOutputProbeKt"
+    val runDirectory = providers.gradleProperty("probeDirectory")
+    val midpoint = providers.gradleProperty("platterBassMidpoint").orElse("false")
+    val phaseCorrection = providers.gradleProperty("probeCorrectPhase").orElse("true")
+    doFirst {
+        args(runDirectory.get())
+        systemProperty("platter.automix.bassMidpoint", midpoint.get())
+        systemProperty("platter.automix.correctPrerollPhase", phaseCorrection.get())
+    }
 }
 
 compose.desktop {

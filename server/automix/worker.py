@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from audio_levels import beat_offsets, measure
+from audio_levels import BASS_ENTRY_VERSION, beat_features, measure
 from audio_muse import AudioMuse
 from journal import AUTH_KEYS, Navidrome
 
@@ -95,12 +95,12 @@ def timing(track, result):
 
 
 class Work:
-    def __init__(self, catalog, cache, audio_muse=None, measure_levels=None, measure_beat_offsets=None):
+    def __init__(self, catalog, cache, audio_muse=None, measure_levels=None, measure_beats=None):
         self.catalog = catalog
         self.cache = cache
         self.audio_muse = audio_muse
         self.measure_levels = measure_levels
-        self.measure_beat_offsets = measure_beat_offsets
+        self.measure_beats = measure_beats
         self.lock = threading.Condition()
         self.priority = OrderedDict()
         self.active = None
@@ -109,8 +109,9 @@ class Work:
         return (self.measure_levels is not None and "audioLevels" not in result
                 and result.get("levelsRetryAt", 0) <= time.time())
 
-    def needs_beat_offsets(self, result):
-        return (self.measure_beat_offsets is not None and result.get("beatsMs") and "beatOffsetsMs" not in result
+    def needs_beat_features(self, result):
+        return (self.measure_beats is not None and result.get("beatsMs")
+                and ("beatOffsetsMs" not in result or (result.get("bassEntries") or {}).get("version") != BASS_ENTRY_VERSION)
                 and result.get("beatOffsetsRetryAt", 0) <= time.time())
 
     def request(self, ids, libraries):
@@ -122,7 +123,7 @@ class Work:
                 continue
             status, result = self.cache.lookup(track_id, track)
             if status == "ready":
-                if self.needs_levels(result) or self.needs_beat_offsets(result):
+                if self.needs_levels(result) or self.needs_beat_features(result):
                     pending.append(track_id)
                 result.pop("levelsRetryAt", None)
                 result.pop("beatOffsetsRetryAt", None)
@@ -182,12 +183,15 @@ class Work:
                 logging.warning("Audio levels unavailable for %s (%s)", track_id, type(error).__name__)
                 result["levelsRetryAt"] = time.time() + RETRY_SECONDS
             self.cache.save(track_id, track, result)
-        if self.needs_beat_offsets(result):
+        if self.needs_beat_features(result):
             try:
-                result["beatOffsetsMs"] = self.measure_beat_offsets(self.catalog.audio(track), result["beatsMs"])
+                offsets, bass_entries = self.measure_beats(
+                    self.catalog.audio(track), result["beatsMs"], result.get("downbeatsMs", []))
+                result["beatOffsetsMs"] = offsets
+                result["bassEntries"] = bass_entries
                 result.pop("beatOffsetsRetryAt", None)
             except (OSError, ValueError, subprocess.SubprocessError) as error:
-                logging.warning("Beat attacks unavailable for %s (%s)", track_id, type(error).__name__)
+                logging.warning("Beat features unavailable for %s (%s)", track_id, type(error).__name__)
                 result["beatOffsetsRetryAt"] = time.time() + RETRY_SECONDS
             self.cache.save(track_id, track, result)
 
@@ -294,7 +298,7 @@ def main():
         except ValueError:
             logging.warning("Invalid AUDIOMUSE_URL; using local analysis")
             muse = None
-        work = Work(catalog, Cache(Path("/state/automix.db"), model), muse, measure, beat_offsets)
+        work = Work(catalog, Cache(Path("/state/automix.db"), model), muse, measure, beat_features)
         navidrome_url = os.environ["NAVIDROME_URL"]
         navidrome = Navidrome(navidrome_url)
         endpoint = urlsplit(navidrome_url).path.rstrip("/") + ENDPOINT

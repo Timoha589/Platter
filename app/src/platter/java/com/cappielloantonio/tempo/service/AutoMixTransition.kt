@@ -4,6 +4,7 @@ import com.platter.automix.AutoMixPlanner
 import com.platter.automix.BeatMixPlan
 import com.platter.automix.FadeWindow
 import com.platter.automix.TrackStructure
+import com.platter.automix.shortFallback
 import com.platter.search.RecordingMetadata
 
 internal data class AutoMixTransition(val window: FadeWindow, val beats: BeatMixPlan? = null, val detail: String = "") {
@@ -26,9 +27,7 @@ internal data class AutoMixTransition(val window: FadeWindow, val beats: BeatMix
             if (beats != null) {
                 val start = beats.launchMs()
                 val span = beats.fadeDurationMs(start, durationMs, standard.fadeMs)
-                if (span >= AutoMixPlanner.MIN_FADE_MS) {
-                    return AutoMixTransition(FadeWindow(start, span, beats.incomingStartMs, beats.incomingDurationMs), beats, selection.detail)
-                }
+                return AutoMixTransition(FadeWindow(start, span, beats.incomingStartMs, beats.incomingDurationMs), beats, selection.detail)
             }
             return fallback(fromAnalysis, toAnalysis, durationMs, to.duration?.times(1_000L), standard, positionMs)
                 ?.copy(detail = selection.detail)
@@ -45,7 +44,7 @@ internal data class AutoMixTransition(val window: FadeWindow, val beats: BeatMix
             val window = AutoMixPlanner.shapedFade(
                 from, to, durationMs, incomingDurationMs, standard, positionMs + AutoMixPlanner.PLAN_LEAD_MS,
             )
-            return window.takeIf { it != standard && AutoMixPlanner.remainingFadeMs(it, positionMs) >= AutoMixPlanner.MIN_FADE_MS }
+            return window.takeIf { it != standard.shortFallback() && AutoMixPlanner.canStartFallback(it, positionMs) }
                 ?.let(::AutoMixTransition)
         }
     }

@@ -44,13 +44,16 @@ class SubsonicClientTest {
             main.start()
             server.enqueue(MockResponse().setResponseCode(404))
             val body = """{"subsonic-response":{"status":"ok","platterAutoMix":{"tracks":{
-                "song":{"durationMs":60000,"audioMuse":{"tempoBpm":123.5,"key":"C","scale":"major","energy":0.7}}
+                "song":{"durationMs":60000,"audioMuse":{"tempoBpm":123.5,"key":"C","scale":"major","energy":0.7},
+                    "beatOffsetsMs":[12,null],"bassEntries":{"version":2,"downbeatsMs":[2100]}}
             }}}}"""
             repeat(2) { main.enqueue(MockResponse().setBody(body)) }
             val source = AutoMixSource(client(), main.url("/").toString())
             repeat(2) {
                 val response = assertNotNull(source.get(listOf("song")))
                 assertEquals(123.5, response.tracks?.get("song")?.audioMuse?.tempoBpm)
+                assertEquals(listOf(12L, null), response.tracks?.get("song")?.beatOffsetsMs)
+                assertEquals(listOf(2_100L), response.tracks?.get("song")?.bassEntries?.downbeatsMs)
             }
             assertEquals(1, server.requestCount)
             assertEquals(2, main.requestCount)

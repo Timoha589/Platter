@@ -22,12 +22,11 @@ import com.cappielloantonio.tempo.util.Preferences.TransitionMode
 import com.cappielloantonio.tempo.util.ReplayGainUtil
 import com.platter.automix.AutoMixPlanner
 import com.platter.automix.BeatMixPlan
+import com.platter.automix.FadeEnvelope
 import com.platter.automix.FadeWindow
 import com.platter.automix.MixTempo
 import com.platter.automix.TrackStructure
-import com.platter.automix.bassGains
-import com.platter.automix.equalPowerGains
-import com.platter.automix.mixGains
+import com.platter.automix.shortFallback
 import com.platter.search.RecordingMetadata
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -132,10 +131,12 @@ class Crossfader(
     private var handoffWaitedMs = 0L
     private var toStarted = false
     private var tailAtStartMs = 0L
+    private lateinit var fadeEnvelope: FadeEnvelope
     private var fadeElapsedNanos = 0L
     private var lastFadeTickNanos = 0L
     private var coverToken: Long? = null
     private var incomingMixSegment: AutoMixTimeline.Segment? = null
+    private var incomingPreview: AutoMixTimeline.Segment? = null
     private var heardThroughMs: Long? = null
     private var prerollCueMs = 0L
     private var incomingCueMs = 0L
@@ -349,7 +350,8 @@ class Crossfader(
         val toDuration = durationOf(to)
         val fadeMs = if (autoMixOn) AutoMixPlanner.DEFAULT_FADE_MS else Preferences.getCrossfadeDurationSeconds() * 1_000L
         val window = AutoMixPlanner.standardFade(length, toDuration, fadeMs) ?: return null
-        val standard = Plan(fromIndex, from.mediaId, toIndex, to.mediaId, length, toDuration, window)
+        val standard = Plan(fromIndex, from.mediaId, toIndex, to.mediaId, length, toDuration,
+                if (autoMixOn) window.shortFallback() else window)
         if (!autoMixOn || !player.isCurrentMediaItemSeekable ||
                 player.playbackParameters != PlaybackParameters.DEFAULT || player.skipSilenceEnabled) {
             plannedFor = null
@@ -367,11 +369,10 @@ class Crossfader(
             plannedMix = AutoMixTransition.plan(inputs.from, inputs.to, length, window,
                     inputs.fromAnalysis, inputs.toAnalysis, position)
         }
-        val mix = plannedMix?.takeIf { it.beats != null || AutoMixPlanner.remainingFadeMs(it.window, position) >= MIN_FADE_MS }
+        val mix = plannedMix?.takeIf { it.beats != null || AutoMixPlanner.canStartFallback(it.window, position) }
         val next = standard.copy(mix = mix)
         if (previous != null && previous.mix?.beats == null && mix?.beats == null && cueReady &&
-                position >= minOf(previous.startMs, next.startMs) - AutoMixPlanner.PLAN_LEAD_MS &&
-                AutoMixPlanner.remainingFadeMs(previous.window, position) >= MIN_FADE_MS) return previous
+                AutoMixPlanner.keepPreparedFallback(previous.window, next.window, position)) return previous
         return next
     }
 
@@ -579,7 +580,7 @@ class Crossfader(
         if (plannedFor?.base == armed.copy(mix = null)) plannedMix = nextMix
         val next = armed.copy(mix = nextMix)
         plan = next
-        publishTimeline()
+        if (phase != Phase.FADING) publishTimeline()
         return next
     }
 
@@ -724,9 +725,9 @@ class Crossfader(
     /** A rejected early beat cue can leave a while before the replacement fade. */
     private fun parkOnOutgoing(armed: Plan, position: Long) {
         phase = Phase.WAITING_FOR_FADE
-        if (!stillOn(armed)) seekTrack(armed.fromIndex, position)
-        incomingMixSegment = null
+        incomingPreview = null
         publishTimeline()
+        if (!stillOn(armed)) seekTrack(armed.fromIndex, position)
     }
 
     private fun waitForFade() {
@@ -745,9 +746,7 @@ class Crossfader(
         phase = Phase.FADING
         toStarted = false
         cueSync.reset(armed.startMs, armed.window.fadeMs)
-        incomingMixSegment = null
         seekIncoming(armed, cueMs)
-        publishTimeline()
         refresh()
     }
 
@@ -755,7 +754,9 @@ class Crossfader(
         incomingCueMs = cueMs
         cueTimeMs = SystemClock.elapsedRealtime()
         incomingChecked = false
-        if (armed.mix?.beats != null) helper?.let { cueSync.onSeek(outgoingPosition(it), cueMs) }
+        val outgoingMs = helper?.let(::outgoingPosition) ?: armed.startMs
+        if (armed.mix?.beats != null) cueSync.onSeek(outgoingMs, cueMs)
+        publishIncomingPreview(armed, outgoingMs)
         seekTrack(armed.toIndex, cueMs)
     }
 
@@ -799,7 +800,7 @@ class Crossfader(
 
             val naturalEnd = h.duration.takeIf { it != C.TIME_UNSET } ?: armed.durationMs
             val beats = armed.mix?.beats
-            tailAtStartMs = beats?.fadeDurationMs(position, minOf(armed.durationMs, naturalEnd), armed.standard.fadeMs)
+            tailAtStartMs = beats?.fadeDurationMs(position, minOf(armed.durationMs, naturalEnd), armed.window.fadeMs)
                     ?: minOf(AutoMixPlanner.remainingFadeMs(armed.window, position), naturalEnd - position)
             if (beats != null && cueSync.startMs > armed.startMs) {
                 tailAtStartMs = minOf(tailAtStartMs, armed.startMs + armed.window.fadeMs - position)
@@ -812,6 +813,13 @@ class Crossfader(
                 end()
                 return
             }
+            fadeEnvelope = FadeEnvelope(tailAtStartMs, autoMixOn, beats, position,
+                com.cappielloantonio.tempo.BuildConfig.AUTOMIX_BASS_MIDPOINT)
+            if (beats?.outgoingBeatPeriodMs != null) {
+                val center = if (fadeEnvelope.terminalBass) "final downbeat"
+                    else fadeEnvelope.bassCenterMs?.let { "downbeat +${it.roundToLong()}ms" } ?: "midpoint"
+                Log.d(TAG, "AutoMix bass handoff: $center")
+            }
             Log.d(TAG, "fade: new track audible at ${position}ms, entry ${player.currentPosition}ms, overlap ${tailAtStartMs}ms")
             fadeElapsedNanos = 0L
             lastFadeTickNanos = now
@@ -821,13 +829,20 @@ class Crossfader(
         }
 
         // Count the outgoing phrase in media time only while the new track is playing, as on desktop.
-        if (player.isPlaying) fadeElapsedNanos += ((now - lastFadeTickNanos) * h.playbackParameters.speed.toDouble()).toLong()
+        val outgoingRate = h.playbackParameters.speed.toDouble()
+        if (player.isPlaying) fadeElapsedNanos += ((now - lastFadeTickNanos) * outgoingRate).toLong()
         lastFadeTickNanos = now
         val elapsedMs = fadeElapsedNanos / 1_000_000L
-        val progress = (elapsedMs / tailAtStartMs.toFloat()).coerceIn(0f, 1f)
+        val progress = fadeEnvelope.progressAt(elapsedMs)
         val mix = armed.mix
-        mix?.beats?.let { updateBeatMix(h, it, elapsedMs, progress) }
-        val (incoming, outgoing) = if (mix != null) mixGains(progress) else equalPowerGains(progress)
+        mix?.beats?.let { updateMixTempo(h, it, progress) }
+        val levels = fadeEnvelope.levels(progress, elapsedMs + BASS_FILTER_LOOKAHEAD_MS * outgoingRate)
+        levels.bass?.let { (incoming, outgoing) ->
+            playerEqualizer.mixBassGain = incoming
+            helperEqualizer?.mixBassGain = outgoing
+        }
+        if (autoMixOn) helperEqualizer?.mixDamping = levels.highCut
+        val (incoming, outgoing) = levels
         h.volume = outVolume * outgoing
         ReplayGainUtil.setFade(player, incoming)
         if (player.isPlaying) heardThroughMs = heardThroughMs?.let { maxOf(it, player.currentPosition) }
@@ -855,6 +870,7 @@ class Crossfader(
                 return false
             }
             Log.d(TAG, "AutoMix cue moved to the next beat at ${cueSync.startMs}ms")
+            publishIncomingPreview(armed, position)
         }
         if (!player.isPlaying) {
             cueSync.resetClockSample()
@@ -905,34 +921,30 @@ class Crossfader(
 
     private fun fallbackAfterHandoff(armed: Plan, h: ExoPlayer, position: Long, reason: String) {
         val next = useFallbackPlan(armed, h, position, reason)
-        clearBassHandoff()
+        clearTransitionEq()
         if (position < next.startMs) parkOnOutgoing(next, position)
         else seekIncoming(next, next.window.cueMs)
     }
 
-    private fun updateBeatMix(h: ExoPlayer, beats: BeatMixPlan, elapsedMs: Long, progress: Float) {
+    private fun updateMixTempo(h: ExoPlayer, beats: BeatMixPlan, progress: Float) {
         val rate = MixTempo.incomingRate(beats.tempoRatio, progress)
         if (abs(rate - player.playbackParameters.speed) >= MixTempo.TEMPO_STEP || progress == 1f) {
             val outRate = MixTempo.outgoingRate(beats.tempoRatio, rate)
             if (h.playbackParameters.speed != outRate) h.playbackParameters = PlaybackParameters(outRate)
             setMixSpeed(rate)
         }
-        val period = beats.outgoingBeatPeriodMs ?: return
-        val lookahead = BASS_FILTER_LOOKAHEAD_MS * h.playbackParameters.speed.toDouble()
-        val (incoming, outgoing) = bassGains(elapsedMs + lookahead, tailAtStartMs, period)
-        playerEqualizer.mixBassGain = incoming
-        helperEqualizer?.mixBassGain = outgoing
     }
 
-    private fun clearBassHandoff() {
+    private fun clearTransitionEq() {
         playerEqualizer.mixBassGain = null
         helperEqualizer?.mixBassGain = null
+        helperEqualizer?.mixDamping = null
     }
 
     private fun finishFade() {
         finishIncomingMixSegment()
         finishCoverTransition()
-        clearBassHandoff()
+        clearTransitionEq()
         if (savedParameters == null || player.playbackParameters == savedParameters) {
             end()
             return
@@ -990,29 +1002,41 @@ class Crossfader(
     private fun startIncomingMixSegment(armed: Plan) {
         if (!autoMixOn) return
         val start = player.currentPosition
-        val tempoRatio = armed.mix?.beats?.tempoRatio ?: 1.0
-        val plannedEnd = start + (tailAtStartMs * tempoRatio).roundToLong()
-        val end = minOf(player.duration.takeIf { it > 0 } ?: plannedEnd, plannedEnd)
-        if (end <= start) return
-        incomingMixSegment = AutoMixTimeline.Segment(armed.toIndex, armed.toId, start, end, armed.timelineMode)
-        heardThroughMs = start
+        incomingMixSegment = incomingSegment(armed, start, tailAtStartMs, player.duration.takeIf { it > 0 })
+        incomingPreview = null
+        heardThroughMs = incomingMixSegment?.startMs
         publishTimeline()
     }
+
+    private fun publishIncomingPreview(armed: Plan, outgoingMs: Long) {
+        if (!autoMixOn) return
+        val beats = armed.mix?.beats
+        val start = beats?.cueAt(cueSync.startMs) ?: incomingCueMs
+        val overlapStart = if (beats != null) cueSync.startMs else maxOf(armed.startMs, outgoingMs)
+        val overlapMs = AutoMixPlanner.remainingFadeMs(armed.window, overlapStart)
+        // Moving the main player can update the controller before the overlap is audible.
+        // Publish both tracks' ranges before the seek, then replace this estimate at audio start.
+        incomingPreview = incomingSegment(armed, start, overlapMs, armed.toDurationMs)
+        publishTimeline()
+    }
+
+    private fun incomingSegment(armed: Plan, start: Long, overlapMs: Long, durationMs: Long?) =
+        AutoMixTimeline.Segment.incoming(
+            armed.toIndex, armed.toId, start, overlapMs, armed.mix?.beats?.tempoRatio ?: 1.0, durationMs, armed.timelineMode,
+        )
 
     private fun finishIncomingMixSegment() {
         val heard = heardThroughMs ?: return
         heardThroughMs = null
-        incomingMixSegment = incomingMixSegment?.let {
-            val end = minOf(heard, it.endMs)
-            if (end > it.startMs) it.copy(endMs = end) else null
-        }
+        incomingMixSegment = incomingMixSegment?.heardThrough(heard)
     }
 
     private fun publishTimeline() {
-        val outgoing = plan?.takeIf { autoMixOn && phase != Phase.FADING && phase != Phase.RECOVERING && !helperFailed }?.let { armed ->
-            AutoMixTimeline.Segment(armed.fromIndex, armed.fromId, armed.startMs, armed.startMs + armed.window.fadeMs, armed.timelineMode)
+        val outgoing = plan?.takeIf { autoMixOn && phase != Phase.RECOVERING && !helperFailed }?.let { armed ->
+            AutoMixTimeline.Segment(armed.fromIndex, armed.fromId, armed.startMs, armed.startMs + armed.window.fadeMs,
+                armed.timelineMode, AutoMixTimeline.Direction.OUTGOING)
         }
-        AutoMixTimeline.set(outgoing, incomingMixSegment)
+        AutoMixTimeline.set(AutoMixTimeline.State(outgoing, incomingMixSegment, incomingPreview))
     }
 
     /* Leaves the fade, finished or not, with everything back to how a plain track plays. */
@@ -1021,9 +1045,10 @@ class Crossfader(
         val wasFading = phase != Phase.IDLE
         if (wasFading) Log.d(TAG, "end: was $phase")
         phase = Phase.IDLE
+        incomingPreview = null
         finishIncomingMixSegment()
         finishCoverTransition()
-        clearBassHandoff()
+        clearTransitionEq()
         ReplayGainUtil.setFade(player, 1f)
         restoreTempo()
         disarm()

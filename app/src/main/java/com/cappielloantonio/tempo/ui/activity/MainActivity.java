@@ -88,8 +88,6 @@ public class MainActivity extends BaseActivity {
         bind = ActivityMainBinding.inflate(getLayoutInflater());
         View view = bind.getRoot();
         setContentView(view);
-        feedbackBanner = new FeedbackBanner(bind.feedbackBanner, bind.playerBottomSheet,
-                bind.bottomNavigation, () -> bottomSheetBehavior.getState());
 
         mainViewModel = new ViewModelProvider(this).get(MainViewModel.class);
 
@@ -268,6 +266,8 @@ public class MainActivity extends BaseActivity {
     // BOTTOM SHEET/NAVIGATION
     private void initBottomSheet() {
         bottomSheetBehavior = BottomSheetBehavior.from(findViewById(R.id.player_bottom_sheet));
+        feedbackBanner = new FeedbackBanner(bind.feedbackBanner, bind.playerBottomSheet,
+                bind.bottomNavigation, bottomSheetBehavior);
         bottomSheetBehavior.addBottomSheetCallback(bottomSheetCallback);
         fragmentManager.beginTransaction().replace(R.id.player_bottom_sheet, new PlayerBottomSheetFragment(), "PlayerBottomSheet").commit();
 

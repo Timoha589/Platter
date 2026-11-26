@@ -284,6 +284,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         ListenableFuture<MediaBrowser> future = mediaBrowserListenableFuture;
         mediaBrowserListenableFuture = null;
         if (bind != null) bind.nowPlayingMediaControllerView.setPlayer(null);
+        if (timeBar != null) timeBar.setMixPlaybackActive(false);
         if (future != null) MediaBrowser.releaseFuture(future);
     }
 
@@ -311,6 +312,7 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         playerGradient.updateTrack(mediaBrowser, overlap);
         showAutoMixLabel(mediaBrowser, overlap);
         showMixTimeline(AutoMixTimeline.updates().getValue());
+        timeBar.setMixPlaybackActive(mediaBrowser.isPlaying());
 
         mediaBrowser.addListener(new Player.Listener() {
             @Override
@@ -319,6 +321,9 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
                 if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_TIMELINE_CHANGED)) {
                     showMixTimeline(AutoMixTimeline.updates().getValue());
                     showAutoMixLabel(player, CoverTransition.updates().getValue());
+                }
+                if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
+                    timeBar.setMixPlaybackActive(player.isPlaying());
                 }
                 if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_MEDIA_METADATA_CHANGED,
                         Player.EVENT_TIMELINE_CHANGED, Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED, Player.EVENT_REPEAT_MODE_CHANGED)) {
@@ -347,9 +352,15 @@ public class PlayerControllerFragment extends Fragment implements PlayerMoreBott
         if (bind == null || timeBar == null) return;
         Player player = bind.nowPlayingMediaControllerView.getPlayer();
         MediaItem item = player != null ? player.getCurrentMediaItem() : null;
-        timeBar.showMixSegments(state != null && item != null
-                ? state.segmentsFor(player.getCurrentMediaItemIndex(), item.mediaId)
-                : Collections.emptyList());
+        if (item == null) {
+            timeBar.showMixSegments(-1, null, 0L, Collections.emptyList());
+            return;
+        }
+        int index = player.getCurrentMediaItemIndex();
+        Bundle extras = item.mediaMetadata.extras;
+        long duration = extras != null ? extras.getInt("duration", 0) * 1000L : 0L;
+        timeBar.showMixSegments(index, item.mediaId, duration,
+                state != null ? state.segmentsFor(index, item.mediaId) : Collections.emptyList());
     }
 
     private void setMetadata(MediaMetadata mediaMetadata) {

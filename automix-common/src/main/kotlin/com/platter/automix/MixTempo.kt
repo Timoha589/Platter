@@ -15,6 +15,7 @@ internal data class BeatMixPlan(
     val bars: Int? = null,
     val phaseAdvanceMs: Long = 0,
     val outgoingBeatPeriodMs: Double? = null,
+    val bassHandoffMs: Long? = null,
 ) {
     val initialOutgoingRate: Float get() = MixTempo.initialOutgoingRate(tempoRatio)
 
@@ -31,6 +32,16 @@ internal data class BeatMixPlan(
 
     fun cueAt(outgoingMs: Long): Long =
         (incomingStartMs + ((outgoingMs - launchMs()) * tempoRatio).roundToLong()).coerceAtLeast(0)
+
+    /** Convert the selected downbeat to the overlap clock, accounting for late launch. */
+    fun bassCenterMs(startMs: Long, fadeMs: Long, forceMidpoint: Boolean): Double? {
+        val period = outgoingBeatPeriodMs ?: return null
+        val center = bassHandoffMs?.minus(startMs)?.toDouble() ?: return null
+        return center.takeIf { !forceMidpoint && it >= period && it <= fadeMs - period }
+    }
+
+    fun bassEndsOverlap(startMs: Long, fadeMs: Long, forceMidpoint: Boolean): Boolean =
+        !forceMidpoint && overlapMs != null && bassHandoffMs == outgoingBeatMs && startMs + fadeMs == outgoingBeatMs
 }
 
 internal object MixTempo {
